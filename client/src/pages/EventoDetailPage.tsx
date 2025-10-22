@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calendar, MapPin, Clock, Award, Info, FileText, Download, Package } from "lucide-react";
+import { Calendar, MapPin, Clock, Award, Info, FileText, Download, Package, Map } from "lucide-react";
 import heroImage from '@assets/generated_images/Marathon_runners_landscape_hero_b439e181.png';
 
 //todo: remove mock functionality
@@ -38,27 +38,19 @@ const mockEvent = {
   percursos: [
     {
       distancia: "5km",
-      descricao: "Percurso plano ideal para iniciantes, passando pelos principais pontos do Parque Ibirapuera.",
-      elevacao: "Mínima",
-      tipo: "Asfalto"
+      mapaUrl: "/documentos/mapa-percurso-5km.pdf"
     },
     {
       distancia: "10km",
-      descricao: "Circuito urbano com passagem pela Av. Paulista e retorno ao parque.",
-      elevacao: "Moderada",
-      tipo: "Asfalto"
+      mapaUrl: "/documentos/mapa-percurso-10km.pdf"
     },
     {
       distancia: "21km",
-      descricao: "Meia maratona com tour pelos bairros históricos de São Paulo.",
-      elevacao: "Moderada a alta",
-      tipo: "Asfalto"
+      mapaUrl: "/documentos/mapa-percurso-21km.pdf"
     },
     {
       distancia: "42km",
-      descricao: "Maratona completa percorrendo os principais pontos turísticos da cidade.",
-      elevacao: "Variada",
-      tipo: "Asfalto"
+      mapaUrl: "/documentos/mapa-percurso-42km.pdf"
     },
   ],
   regulamentoUrl: "/documentos/regulamento-maratona-sp-2025.pdf",
@@ -85,6 +77,17 @@ export default function EventoDetailPage() {
 
   const handleDownload = (url: string, nome: string) => {
     console.log('Download documento:', nome, url);
+  };
+
+  const handleVerPercurso = (url: string, distancia: string) => {
+    console.log('Visualizar percurso:', distancia, url);
+    window.open(url, '_blank');
+  };
+
+  const getGridClass = (count: number) => {
+    if (count === 3) return 'grid-cols-1 sm:grid-cols-3';
+    if (count === 4) return 'grid-cols-1 sm:grid-cols-2';
+    return 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3';
   };
 
   return (
@@ -176,16 +179,11 @@ export default function EventoDetailPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
+                <div className={`grid ${getGridClass(mockEvent.horariosLargada.length)} gap-3`}>
                   {mockEvent.horariosLargada.map((item, idx) => (
-                    <div key={idx} className="flex items-start justify-between p-4 border rounded-md hover-elevate">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-1">
-                          <Badge variant="secondary">{item.distancia}</Badge>
-                          <span className="font-semibold text-foreground text-lg">{item.horario}</span>
-                        </div>
-                        <p className="text-sm text-muted-foreground">{item.descricao}</p>
-                      </div>
+                    <div key={idx} className="p-3 border rounded-md text-center">
+                      <Badge variant="secondary" className="mb-2">{item.distancia}</Badge>
+                      <p className="font-semibold text-foreground text-lg">{item.horario}</p>
                     </div>
                   ))}
                 </div>
@@ -221,23 +219,19 @@ export default function EventoDetailPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {mockEvent.percursos.map((percurso, idx) => (
-                    <div key={idx} className="p-4 border rounded-md space-y-2">
-                      <div className="flex items-center gap-3">
-                        <Badge variant="secondary" className="text-base">{percurso.distancia}</Badge>
-                      </div>
-                      <p className="text-muted-foreground">{percurso.descricao}</p>
-                      <div className="grid grid-cols-2 gap-4 pt-2">
-                        <div>
-                          <p className="text-xs text-muted-foreground">Elevação</p>
-                          <p className="text-sm font-medium text-foreground">{percurso.elevacao}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground">Tipo de Piso</p>
-                          <p className="text-sm font-medium text-foreground">{percurso.tipo}</p>
-                        </div>
-                      </div>
+                    <div key={idx} className="p-4 border rounded-md space-y-3">
+                      <Badge variant="secondary" className="text-base">{percurso.distancia}</Badge>
+                      <Button
+                        variant="outline"
+                        className="w-full"
+                        onClick={() => handleVerPercurso(percurso.mapaUrl, percurso.distancia)}
+                        data-testid={`button-ver-percurso-${idx}`}
+                      >
+                        <Map className="h-4 w-4 mr-2" />
+                        Ver Percurso
+                      </Button>
                     </div>
                   ))}
                 </div>
