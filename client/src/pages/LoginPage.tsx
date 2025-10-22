@@ -40,10 +40,10 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-primary-foreground mb-2">
-            RunBrasil
+            ST Eventos
           </h1>
           <p className="text-primary-foreground/80">
-            Portal de Inscrições de Corrida
+            Portal de Inscrições Sports&Textil
           </p>
         </div>
 
