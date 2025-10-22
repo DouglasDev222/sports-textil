@@ -12,6 +12,7 @@ import beachImage from '@assets/generated_images/Beach_running_race_event_8d3685
 const mockEvents = [
   {
     id: "1",
+    slug: "maratona-sao-paulo-2025",
     nome: "Maratona de São Paulo 2025",
     descricao: "A maior maratona do Brasil",
     data: "2025-05-15",
@@ -21,10 +22,10 @@ const mockEvents = [
     distancias: "5km, 10km, 21km, 42km",
     imagemUrl: heroImage,
     valor: "R$ 120,00",
-    vagasDisponiveis: "500",
   },
   {
     id: "2",
+    slug: "corrida-trail-serra-mar",
     nome: "Corrida Trail Serra do Mar",
     descricao: "Trail running na natureza",
     data: "2025-06-20",
@@ -34,10 +35,10 @@ const mockEvents = [
     distancias: "15km, 30km",
     imagemUrl: trailImage,
     valor: "R$ 150,00",
-    vagasDisponiveis: "200",
   },
   {
     id: "3",
+    slug: "meia-maratona-rio",
     nome: "Meia Maratona do Rio",
     descricao: "Corrida pela orla carioca",
     data: "2025-07-10",
@@ -47,10 +48,10 @@ const mockEvents = [
     distancias: "10km, 21km",
     imagemUrl: cityImage,
     valor: "R$ 100,00",
-    vagasDisponiveis: "800",
   },
   {
     id: "4",
+    slug: "corrida-praia-florianopolis",
     nome: "Corrida de Praia Florianópolis",
     descricao: "Corrida na areia da praia",
     data: "2025-08-05",
@@ -60,10 +61,10 @@ const mockEvents = [
     distancias: "5km, 10km",
     imagemUrl: beachImage,
     valor: "R$ 80,00",
-    vagasDisponiveis: "300",
   },
   {
     id: "5",
+    slug: "maratona-brasilia",
     nome: "Maratona de Brasília",
     descricao: "Corrida pela capital federal",
     data: "2025-09-15",
@@ -73,10 +74,10 @@ const mockEvents = [
     distancias: "5km, 10km, 21km, 42km",
     imagemUrl: heroImage,
     valor: "R$ 110,00",
-    vagasDisponiveis: "600",
   },
   {
     id: "6",
+    slug: "corrida-noturna-bh",
     nome: "Corrida Noturna BH",
     descricao: "Corrida noturna em Belo Horizonte",
     data: "2025-10-20",
@@ -86,7 +87,6 @@ const mockEvents = [
     distancias: "5km, 10km",
     imagemUrl: cityImage,
     valor: "R$ 90,00",
-    vagasDisponiveis: "400",
   },
 ];
 

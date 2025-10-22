@@ -67,11 +67,9 @@ export default function InscricaoCard({
               <span className="font-medium text-foreground">{distancia}</span>
             </div>
             <div className="flex gap-2 pt-2">
-              <Link href={`/evento/${id}`}>
-                <Button variant="outline" size="sm" data-testid={`button-view-details-${id}`}>
-                  Ver Detalhes
-                </Button>
-              </Link>
+              <Button variant="outline" size="sm" data-testid={`button-view-details-${id}`}>
+                Ver Detalhes
+              </Button>
             </div>
           </CardContent>
         </div>

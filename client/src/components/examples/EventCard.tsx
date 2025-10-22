@@ -7,6 +7,7 @@ export default function EventCardExample() {
       <div className="max-w-sm">
         <EventCard
           id="1"
+          slug="maratona-sao-paulo-2025"
           nome="Maratona de São Paulo 2025"
           data="2025-05-15"
           local="Parque Ibirapuera"
@@ -15,7 +16,6 @@ export default function EventCardExample() {
           distancias="5km, 10km, 21km, 42km"
           imagemUrl={heroImage}
           valor="R$ 120,00"
-          vagasDisponiveis="500"
         />
       </div>
     </div>

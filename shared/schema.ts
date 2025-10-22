@@ -19,6 +19,7 @@ export const athletes = pgTable("athletes", {
 
 export const events = pgTable("events", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  slug: text("slug").notNull().unique(),
   nome: text("nome").notNull(),
   descricao: text("descricao").notNull(),
   data: date("data").notNull(),
@@ -26,9 +27,12 @@ export const events = pgTable("events", {
   cidade: text("cidade").notNull(),
   estado: varchar("estado", { length: 2 }).notNull(),
   distancias: text("distancias").notNull(),
+  horariosLargada: text("horarios_largada").notNull(),
   imagemUrl: text("imagem_url").notNull(),
   valor: text("valor").notNull(),
-  vagasDisponiveis: text("vagas_disponiveis").notNull(),
+  retiradaKit: text("retirada_kit"),
+  regulamentoUrl: text("regulamento_url"),
+  documentos: text("documentos"),
 });
 
 export const inscricoes = pgTable("inscricoes", {

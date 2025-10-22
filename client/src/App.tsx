@@ -17,7 +17,7 @@ function Router() {
       <Route path="/" component={EventosPage} />
       <Route path="/login" component={LoginPage} />
       <Route path="/cadastro" component={CadastroPage} />
-      <Route path="/evento/:id" component={EventoDetailPage} />
+      <Route path="/evento/:slug" component={EventoDetailPage} />
       <Route path="/minhas-inscricoes" component={MinhasInscricoesPage} />
       <Route path="/minha-conta" component={MinhaContaPage} />
       <Route component={NotFound} />

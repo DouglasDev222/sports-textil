@@ -6,6 +6,7 @@ import { Link } from "wouter";
 
 interface EventCardProps {
   id: string;
+  slug: string;
   nome: string;
   data: string;
   local: string;
@@ -14,11 +15,11 @@ interface EventCardProps {
   distancias: string;
   imagemUrl: string;
   valor: string;
-  vagasDisponiveis: string;
 }
 
 export default function EventCard({
   id,
+  slug,
   nome,
   data,
   local,
@@ -27,7 +28,6 @@ export default function EventCard({
   distancias,
   imagemUrl,
   valor,
-  vagasDisponiveis,
 }: EventCardProps) {
   const formattedDate = new Date(data).toLocaleDateString('pt-BR', {
     day: '2-digit',
@@ -65,17 +65,13 @@ export default function EventCard({
           <MapPin className="h-4 w-4" />
           <span data-testid={`text-event-location-${id}`}>{cidade}, {estado}</span>
         </div>
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Users className="h-4 w-4" />
-          <span>{vagasDisponiveis} vagas disponíveis</span>
-        </div>
         <div className="pt-2">
           <p className="text-sm text-muted-foreground">A partir de</p>
           <p className="text-2xl font-bold text-foreground" data-testid={`text-event-price-${id}`}>{valor}</p>
         </div>
       </CardContent>
       <CardFooter>
-        <Link href={`/evento/${id}`} className="w-full">
+        <Link href={`/evento/${slug}`} className="w-full">
           <Button 
             variant="secondary" 
             className="w-full font-semibold"
