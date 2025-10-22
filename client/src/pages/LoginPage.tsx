@@ -93,10 +93,8 @@ export default function LoginPage() {
               <div className="text-center pt-4">
                 <p className="text-sm text-muted-foreground">
                   Não tem uma conta?{" "}
-                  <Link href="/cadastro">
-                    <a className="text-primary font-medium hover:underline" data-testid="link-cadastro">
-                      Cadastre-se aqui
-                    </a>
+                  <Link href="/cadastro" className="text-primary font-medium hover:underline" data-testid="link-cadastro">
+                    Cadastre-se aqui
                   </Link>
                 </p>
               </div>
