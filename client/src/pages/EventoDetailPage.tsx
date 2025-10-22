@@ -120,17 +120,16 @@ export default function EventoDetailPage() {
       </div>
 
       <div className="max-w-5xl mx-auto px-4 md:px-6 py-8 md:py-12">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                 <Calendar className="h-4 w-4" />
-                Data e Hora
+                Data
               </CardTitle>
             </CardHeader>
             <CardContent>
               <p className="font-semibold text-foreground">{formattedDate}</p>
-              <p className="text-sm text-muted-foreground">Primeira largada: {mockEvent.horario}</p>
             </CardContent>
           </Card>
 
@@ -144,6 +143,25 @@ export default function EventoDetailPage() {
             <CardContent>
               <p className="font-semibold text-foreground">{mockEvent.local}</p>
               <p className="text-sm text-muted-foreground">{mockEvent.cidade}, {mockEvent.estado}</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <Clock className="h-4 w-4" />
+                Largadas
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-1">
+                {mockEvent.horariosLargada.map((item, idx) => (
+                  <div key={idx} className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">{item.distancia}</span>
+                    <span className="font-medium text-foreground">{item.horario}</span>
+                  </div>
+                ))}
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -168,25 +186,6 @@ export default function EventoDetailPage() {
                 <p className="text-muted-foreground leading-relaxed">
                   {mockEvent.descricao}
                 </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Clock className="h-5 w-5" />
-                  Horários de Largada
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className={`grid ${getGridClass(mockEvent.horariosLargada.length)} gap-3`}>
-                  {mockEvent.horariosLargada.map((item, idx) => (
-                    <div key={idx} className="p-3 border rounded-md text-center">
-                      <Badge variant="secondary" className="mb-2">{item.distancia}</Badge>
-                      <p className="font-semibold text-foreground text-lg">{item.horario}</p>
-                    </div>
-                  ))}
-                </div>
               </CardContent>
             </Card>
 
