@@ -1,0 +1,90 @@
+import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Calendar, MapPin, Users } from "lucide-react";
+import { Link } from "wouter";
+
+interface EventCardProps {
+  id: string;
+  nome: string;
+  data: string;
+  local: string;
+  cidade: string;
+  estado: string;
+  distancias: string;
+  imagemUrl: string;
+  valor: string;
+  vagasDisponiveis: string;
+}
+
+export default function EventCard({
+  id,
+  nome,
+  data,
+  local,
+  cidade,
+  estado,
+  distancias,
+  imagemUrl,
+  valor,
+  vagasDisponiveis,
+}: EventCardProps) {
+  const formattedDate = new Date(data).toLocaleDateString('pt-BR', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric'
+  });
+
+  return (
+    <Card className="overflow-hidden hover-elevate transition-all" data-testid={`card-event-${id}`}>
+      <div className="aspect-[16/9] overflow-hidden">
+        <img
+          src={imagemUrl}
+          alt={nome}
+          className="w-full h-full object-cover"
+        />
+      </div>
+      <CardHeader className="space-y-2 pb-3">
+        <h3 className="text-xl font-bold text-foreground leading-tight" data-testid={`text-event-name-${id}`}>
+          {nome}
+        </h3>
+        <div className="flex flex-wrap gap-2">
+          {distancias.split(',').map((dist, idx) => (
+            <Badge key={idx} variant="secondary" className="text-xs">
+              {dist.trim()}
+            </Badge>
+          ))}
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-3 pb-4">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Calendar className="h-4 w-4" />
+          <span data-testid={`text-event-date-${id}`}>{formattedDate}</span>
+        </div>
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <MapPin className="h-4 w-4" />
+          <span data-testid={`text-event-location-${id}`}>{cidade}, {estado}</span>
+        </div>
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Users className="h-4 w-4" />
+          <span>{vagasDisponiveis} vagas disponíveis</span>
+        </div>
+        <div className="pt-2">
+          <p className="text-sm text-muted-foreground">A partir de</p>
+          <p className="text-2xl font-bold text-foreground" data-testid={`text-event-price-${id}`}>{valor}</p>
+        </div>
+      </CardContent>
+      <CardFooter>
+        <Link href={`/evento/${id}`} className="w-full">
+          <Button 
+            variant="secondary" 
+            className="w-full font-semibold"
+            data-testid={`button-view-event-${id}`}
+          >
+            Ver Detalhes
+          </Button>
+        </Link>
+      </CardFooter>
+    </Card>
+  );
+}
