@@ -26,7 +26,14 @@ const mockEvent = {
     { distancia: "42km", horario: "06:00", descricao: "Largada da maratona completa" },
   ],
   imagemUrl: heroImage,
-  valor: "R$ 120,00",
+  valor: "R$ 80,00",
+  categorias: [
+    { nome: "5km", valor: "R$ 80,00" },
+    { nome: "10km", valor: "R$ 100,00" },
+    { nome: "21km", valor: "R$ 150,00" },
+    { nome: "42km", valor: "R$ 200,00" },
+    { nome: "PCD (Pessoa com Deficiência)", valor: "R$ 40,00" },
+  ],
   retiradaKit: null,
   informacoes: [
     "Kit do atleta: Camiseta oficial, número de peito e chip de cronometragem",
@@ -119,212 +126,242 @@ export default function EventoDetailPage() {
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto px-4 md:px-6 py-8 md:py-12">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <Calendar className="h-4 w-4" />
-                Data
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="font-semibold text-foreground">{formattedDate}</p>
-            </CardContent>
-          </Card>
+      <div className="max-w-7xl mx-auto px-4 md:px-6 py-8 md:py-12">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="lg:col-span-2 pb-24 md:pb-0">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <Calendar className="h-4 w-4" />
+                    Data
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="font-semibold text-foreground">{formattedDate}</p>
+                </CardContent>
+              </Card>
 
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <MapPin className="h-4 w-4" />
-                Local
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="font-semibold text-foreground">{mockEvent.local}</p>
-              <p className="text-sm text-muted-foreground">{mockEvent.cidade}, {mockEvent.estado}</p>
-            </CardContent>
-          </Card>
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <MapPin className="h-4 w-4" />
+                    Local
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="font-semibold text-foreground">{mockEvent.local}</p>
+                  <p className="text-sm text-muted-foreground">{mockEvent.cidade}, {mockEvent.estado}</p>
+                </CardContent>
+              </Card>
 
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <Clock className="h-4 w-4" />
-                Largadas
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-1">
-                {mockEvent.horariosLargada.map((item, idx) => (
-                  <div key={idx} className="flex items-center justify-between text-xs">
-                    <span className="text-muted-foreground">{item.distancia}</span>
-                    <span className="font-medium text-foreground">{item.horario}</span>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <Tabs defaultValue="sobre" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="sobre" data-testid="tab-sobre">Sobre</TabsTrigger>
-            <TabsTrigger value="percursos" data-testid="tab-percursos">Percursos</TabsTrigger>
-            <TabsTrigger value="retirada" data-testid="tab-retirada">Retirada Kit</TabsTrigger>
-            <TabsTrigger value="documentos" data-testid="tab-documentos">Documentos</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="sobre" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Info className="h-5 w-5" />
-                  Sobre o Evento
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground leading-relaxed">
-                  {mockEvent.descricao}
-                </p>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="percursos" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Award className="h-5 w-5" />
-                  Percursos Disponíveis
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {mockEvent.percursos.map((percurso, idx) => (
-                    <div key={idx} className="p-4 border rounded-md space-y-3">
-                      <Badge variant="secondary" className="text-base">{percurso.distancia}</Badge>
-                      <Button
-                        variant="outline"
-                        className="w-full"
-                        onClick={() => handleVerPercurso(percurso.mapaUrl, percurso.distancia)}
-                        data-testid={`button-ver-percurso-${idx}`}
-                      >
-                        <Map className="h-4 w-4 mr-2" />
-                        Ver Percurso
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="retirada" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Package className="h-5 w-5" />
-                  Retirada de Kit
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {mockEvent.retiradaKit ? (
-                  <div className="text-muted-foreground">
-                    {mockEvent.retiradaKit}
-                  </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                    <p className="text-muted-foreground font-medium mb-2">
-                      Informações em breve
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      As informações sobre retirada de kit serão divulgadas em breve.
-                    </p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="documentos" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <FileText className="h-5 w-5" />
-                  Documentos do Evento
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {mockEvent.documentos.map((doc, idx) => (
-                    <div
-                      key={idx}
-                      className="flex items-center justify-between p-4 border rounded-md hover-elevate transition-all"
-                    >
-                      <div className="flex items-center gap-3">
-                        <FileText className="h-5 w-5 text-muted-foreground" />
-                        <div>
-                          <p className="font-medium text-foreground">{doc.nome}</p>
-                          <p className="text-xs text-muted-foreground">{doc.tipo}</p>
-                        </div>
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <Clock className="h-4 w-4" />
+                    Largadas
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-1">
+                    {mockEvent.horariosLargada.map((item, idx) => (
+                      <div key={idx} className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground">{item.distancia}</span>
+                        <span className="font-medium text-foreground">{item.horario}</span>
                       </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleDownload(doc.url, doc.nome)}
-                        data-testid={`button-download-${idx}`}
-                      >
-                        <Download className="h-4 w-4 mr-2" />
-                        Baixar
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-
-                {mockEvent.regulamentoUrl && (
-                  <div className="mt-6 pt-6 border-t">
-                    <Button
-                      variant="secondary"
-                      className="w-full"
-                      onClick={() => handleDownload(mockEvent.regulamentoUrl!, "Regulamento Oficial")}
-                      data-testid="button-regulamento"
-                    >
-                      <FileText className="h-4 w-4 mr-2" />
-                      Ver Regulamento Completo
-                    </Button>
+                    ))}
                   </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+                </CardContent>
+              </Card>
+            </div>
 
-        <Card className="mt-6">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Clock className="h-5 w-5" />
-              Valores
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-baseline justify-between mb-6">
-              <div>
-                <p className="text-sm text-muted-foreground">Inscrição a partir de</p>
-                <p className="text-3xl font-bold text-foreground">{mockEvent.valor}</p>
-              </div>
+            <Tabs defaultValue="sobre" className="space-y-6">
+              <TabsList className="grid w-full grid-cols-4">
+                <TabsTrigger value="sobre" data-testid="tab-sobre">Sobre</TabsTrigger>
+                <TabsTrigger value="percursos" data-testid="tab-percursos">Percursos</TabsTrigger>
+                <TabsTrigger value="retirada" data-testid="tab-retirada">Retirada Kit</TabsTrigger>
+                <TabsTrigger value="documentos" data-testid="tab-documentos">Documentos</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="sobre" className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Info className="h-5 w-5" />
+                      Sobre o Evento
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-muted-foreground leading-relaxed">
+                      {mockEvent.descricao}
+                    </p>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="percursos" className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Award className="h-5 w-5" />
+                      Percursos Disponíveis
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {mockEvent.percursos.map((percurso, idx) => (
+                        <div key={idx} className="p-4 border rounded-md space-y-3">
+                          <Badge variant="secondary" className="text-base">{percurso.distancia}</Badge>
+                          <Button
+                            variant="outline"
+                            className="w-full"
+                            onClick={() => handleVerPercurso(percurso.mapaUrl, percurso.distancia)}
+                            data-testid={`button-ver-percurso-${idx}`}
+                          >
+                            <Map className="h-4 w-4 mr-2" />
+                            Ver Percurso
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="retirada" className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Package className="h-5 w-5" />
+                      Retirada de Kit
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {mockEvent.retiradaKit ? (
+                      <div className="text-muted-foreground">
+                        {mockEvent.retiradaKit}
+                      </div>
+                    ) : (
+                      <div className="text-center py-8">
+                        <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                        <p className="text-muted-foreground font-medium mb-2">
+                          Informações em breve
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          As informações sobre retirada de kit serão divulgadas em breve.
+                        </p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="documentos" className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <FileText className="h-5 w-5" />
+                      Documentos do Evento
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {mockEvent.documentos.map((doc, idx) => (
+                        <div
+                          key={idx}
+                          className="flex items-center justify-between p-4 border rounded-md hover-elevate transition-all"
+                        >
+                          <div className="flex items-center gap-3">
+                            <FileText className="h-5 w-5 text-muted-foreground" />
+                            <div>
+                              <p className="font-medium text-foreground">{doc.nome}</p>
+                              <p className="text-xs text-muted-foreground">{doc.tipo}</p>
+                            </div>
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDownload(doc.url, doc.nome)}
+                            data-testid={`button-download-${idx}`}
+                          >
+                            <Download className="h-4 w-4 mr-2" />
+                            Baixar
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+
+                    {mockEvent.regulamentoUrl && (
+                      <div className="mt-6 pt-6 border-t">
+                        <Button
+                          variant="secondary"
+                          className="w-full"
+                          onClick={() => handleDownload(mockEvent.regulamentoUrl!, "Regulamento Oficial")}
+                          data-testid="button-regulamento"
+                        >
+                          <FileText className="h-4 w-4 mr-2" />
+                          Ver Regulamento Completo
+                        </Button>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
+          </div>
+
+          <div className="lg:col-span-1 hidden lg:block">
+            <div className="sticky top-8">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Clock className="h-5 w-5" />
+                    Valores
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3 mb-6">
+                    {mockEvent.categorias.map((categoria, idx) => (
+                      <div key={idx} className="flex items-center justify-between py-2 border-b last:border-b-0">
+                        <span className="text-sm text-muted-foreground">{categoria.nome}</span>
+                        <span className="font-semibold text-foreground">{categoria.valor}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <Button
+                    variant="secondary"
+                    size="lg"
+                    className="w-full font-semibold"
+                    onClick={handleInscricao}
+                    data-testid="button-inscricao"
+                  >
+                    Inscrever-se Agora
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-background border-t shadow-lg z-50">
+        <div className="px-4 py-3">
+          <div className="flex items-center justify-between mb-2">
+            <div>
+              <p className="text-xs text-muted-foreground">A partir de</p>
+              <p className="text-lg font-bold text-foreground">{mockEvent.valor}</p>
             </div>
             <Button
               variant="secondary"
               size="lg"
-              className="w-full font-semibold"
+              className="font-semibold"
               onClick={handleInscricao}
-              data-testid="button-inscricao"
+              data-testid="button-inscricao-mobile"
             >
               Inscrever-se Agora
             </Button>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
     </div>
   );
