@@ -199,18 +199,18 @@ export default function EventoDetailPage() {
                 </Card>
 
                 <Card className="lg:hidden">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Clock className="h-5 w-5" />
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                      <Clock className="h-4 w-4" />
                       Valores
                     </CardTitle>
                   </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
+                  <CardContent className="pt-0">
+                    <div className="space-y-0.5">
                       {mockEvent.categorias.map((categoria, idx) => (
-                        <div key={idx} className="flex items-center justify-between py-2 border-b last:border-b-0">
-                          <span className="text-sm text-muted-foreground">{categoria.nome}</span>
-                          <span className="font-semibold text-foreground">{categoria.valor}</span>
+                        <div key={idx} className="flex items-center justify-between text-xs py-0.5">
+                          <span className="text-muted-foreground">{categoria.nome}</span>
+                          <span className="font-medium text-foreground">{categoria.valor}</span>
                         </div>
                       ))}
                     </div>
