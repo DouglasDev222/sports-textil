@@ -188,25 +188,6 @@ export default function EventoDetailPage() {
                 </p>
               </CardContent>
             </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Award className="h-5 w-5" />
-                  O que está incluído
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-2">
-                  {mockEvent.informacoes.map((info, idx) => (
-                    <li key={idx} className="flex items-start gap-2 text-muted-foreground">
-                      <span className="text-accent mt-1">•</span>
-                      <span>{info}</span>
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-            </Card>
           </TabsContent>
 
           <TabsContent value="percursos" className="space-y-6">
