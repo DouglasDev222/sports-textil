@@ -1,4 +1,4 @@
-import { useRoute } from "wouter";
+import { useRoute, useLocation } from "wouter";
 import Header from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -71,6 +71,7 @@ const mockEvent = {
 
 export default function EventoDetailPage() {
   const [, params] = useRoute("/evento/:slug");
+  const [, setLocation] = useLocation();
 
   const formattedDate = new Date(mockEvent.data).toLocaleDateString('pt-BR', {
     day: '2-digit',
@@ -79,7 +80,7 @@ export default function EventoDetailPage() {
   });
 
   const handleInscricao = () => {
-    console.log('Inscrição iniciada para evento:', mockEvent.slug);
+    setLocation(`/evento/${mockEvent.slug}/inscricao/participante`);
   };
 
   const handleDownload = (url: string, nome: string) => {

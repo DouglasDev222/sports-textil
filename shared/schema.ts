@@ -39,7 +39,12 @@ export const inscricoes = pgTable("inscricoes", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   atletaId: varchar("atleta_id").notNull(),
   eventoId: varchar("evento_id").notNull(),
-  distancia: text("distancia").notNull(),
+  modalidade: text("modalidade").notNull(),
+  tamanhoCamisa: varchar("tamanho_camisa", { length: 10 }).notNull(),
+  equipe: text("equipe"),
+  cupomDesconto: text("cupom_desconto"),
+  valorOriginal: text("valor_original").notNull(),
+  valorPago: text("valor_pago").notNull(),
   status: varchar("status", { length: 20 }).notNull(),
   dataInscricao: date("data_inscricao").notNull(),
 });
