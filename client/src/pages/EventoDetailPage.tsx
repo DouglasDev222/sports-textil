@@ -197,6 +197,25 @@ export default function EventoDetailPage() {
                     </p>
                   </CardContent>
                 </Card>
+
+                <Card className="lg:hidden">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Clock className="h-5 w-5" />
+                      Valores
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {mockEvent.categorias.map((categoria, idx) => (
+                        <div key={idx} className="flex items-center justify-between py-2 border-b last:border-b-0">
+                          <span className="text-sm text-muted-foreground">{categoria.nome}</span>
+                          <span className="font-semibold text-foreground">{categoria.valor}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
               </TabsContent>
 
               <TabsContent value="percursos" className="space-y-6">
@@ -346,21 +365,15 @@ export default function EventoDetailPage() {
 
       <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-background border-t shadow-lg z-50">
         <div className="px-4 py-3">
-          <div className="flex items-center justify-between mb-2">
-            <div>
-              <p className="text-xs text-muted-foreground">A partir de</p>
-              <p className="text-lg font-bold text-foreground">{mockEvent.valor}</p>
-            </div>
-            <Button
-              variant="secondary"
-              size="lg"
-              className="font-semibold"
-              onClick={handleInscricao}
-              data-testid="button-inscricao-mobile"
-            >
-              Inscrever-se Agora
-            </Button>
-          </div>
+          <Button
+            variant="secondary"
+            size="lg"
+            className="w-full font-semibold"
+            onClick={handleInscricao}
+            data-testid="button-inscricao-mobile"
+          >
+            Inscrever-se Agora
+          </Button>
         </div>
       </div>
     </div>
