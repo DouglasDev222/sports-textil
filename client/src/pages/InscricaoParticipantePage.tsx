@@ -1,7 +1,7 @@
 import { useRoute, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { User, Users } from "lucide-react";
+import { User, Users, ArrowLeft } from "lucide-react";
 import Header from "@/components/Header";
 
 export default function InscricaoParticipantePage() {
@@ -20,11 +20,24 @@ export default function InscricaoParticipantePage() {
     console.log("Inscrição para outra pessoa - em desenvolvimento");
   };
 
+  const handleVoltar = () => {
+    setLocation(`/evento/${params?.slug}`);
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <Header />
       <div className="max-w-2xl mx-auto px-4 py-8 md:py-12">
         <div className="mb-8">
+          <Button 
+            variant="ghost" 
+            onClick={handleVoltar}
+            className="mb-4 -ml-4"
+            data-testid="button-voltar"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Voltar
+          </Button>
           <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-2">
             Nova Inscrição
           </h1>
