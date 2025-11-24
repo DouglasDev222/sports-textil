@@ -81,7 +81,8 @@ Preferred communication style: Simple, everyday language.
 
 **Authenticated Routes**
 - `/minhas-inscricoes` - User's registration history (upcoming and completed)
-- `/minha-conta` - Athlete profile management
+- `/minha-conta` - Athlete profile management with navigation to registrations and participants
+- `/participantes` - Participant management page (prepared for multi-participant feature)
 
 ### Key Architectural Decisions
 
