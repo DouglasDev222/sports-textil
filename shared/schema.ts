@@ -42,6 +42,7 @@ export const inscricoes = pgTable("inscricoes", {
   modalidade: text("modalidade").notNull(),
   tamanhoCamisa: varchar("tamanho_camisa", { length: 10 }).notNull(),
   equipe: text("equipe"),
+  codigoComprovacao: text("codigo_comprovacao"),
   cupomDesconto: text("cupom_desconto"),
   valorOriginal: text("valor_original").notNull(),
   valorPago: text("valor_pago").notNull(),

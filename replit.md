@@ -50,7 +50,7 @@ Preferred communication style: Simple, everyday language.
 **Database Schema**
 - `athletes` table: User profiles with CPF, personal data, contact info, and demographics
 - `events` table: Running events with details, locations, distances, pricing, and metadata
-- `inscricoes` table: Registration records linking athletes to events with modality, payment, and status
+- `inscricoes` table: Registration records linking athletes to events with modality, payment, status, and optional verification code for special categories
 
 **Development Infrastructure**
 - In-memory storage fallback for development (`MemStorage` class)
@@ -67,9 +67,17 @@ Preferred communication style: Simple, everyday language.
 
 **Registration Flow**
 - `/evento/:slug/inscricao/participante` - Select registration type (self/other)
-- `/evento/:slug/inscricao/modalidade` - Choose race distance and shirt size
+- `/evento/:slug/inscricao/modalidade` - Choose race distance, shirt size, and handle special category verification
 - `/evento/:slug/inscricao/resumo` - Review registration details and add team
 - `/evento/:slug/inscricao/pagamento` - Payment with discount code support
+
+**Special Category Verification System**
+- Support for race categories requiring verification (e.g., public servants, PCD)
+- Two verification types configurable per category:
+  - **Confirmation Code**: Participant must enter a verification code provided by organizers
+  - **Pre-approval**: Registration marked for manual review, participant notified via email
+- Admin can configure per category: verification requirement, type, and custom message
+- Verification codes stored in `inscricoes.codigoComprovacao` field
 
 **Authenticated Routes**
 - `/minhas-inscricoes` - User's registration history (upcoming and completed)

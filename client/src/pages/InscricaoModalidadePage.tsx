@@ -5,15 +5,30 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { ChevronLeft } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { ChevronLeft, ShieldCheck, AlertCircle } from "lucide-react";
 import Header from "@/components/Header";
 
 const mockCategorias = [
   { nome: "5km", valor: "R$ 80,00" },
   { nome: "10km", valor: "R$ 100,00" },
+  { 
+    nome: "5km - Servidores Públicos", 
+    valor: "R$ 50,00",
+    requerComprovacao: true,
+    tipoComprovacao: "codigo",
+    mensagemComprovacao: "Esta modalidade é exclusiva para servidores públicos. Insira o código de confirmação fornecido pelo seu órgão."
+  },
   { nome: "21km", valor: "R$ 150,00" },
   { nome: "42km", valor: "R$ 200,00" },
-  { nome: "PCD (Pessoa com Deficiência)", valor: "R$ 40,00" },
+  { 
+    nome: "PCD (Pessoa com Deficiência)", 
+    valor: "R$ 40,00",
+    requerComprovacao: true,
+    tipoComprovacao: "pre_aprovacao",
+    mensagemComprovacao: "Sua inscrição passará por análise prévia. Você receberá a confirmação por email em até 48 horas."
+  },
 ];
 
 const tamanhosCamisa = ["PP", "P", "M", "G", "GG", "XGG"];
@@ -23,6 +38,7 @@ export default function InscricaoModalidadePage() {
   const [, setLocation] = useLocation();
   const [modalidadeSelecionada, setModalidadeSelecionada] = useState("");
   const [tamanhoSelecionado, setTamanhoSelecionado] = useState("");
+  const [codigoComprovacao, setCodigoComprovacao] = useState("");
 
   const handleVoltar = () => {
     setLocation(`/evento/${params?.slug}/inscricao/participante`);
@@ -30,11 +46,28 @@ export default function InscricaoModalidadePage() {
 
   const handleContinuar = () => {
     if (modalidadeSelecionada && tamanhoSelecionado) {
-      setLocation(`/evento/${params?.slug}/inscricao/resumo?modalidade=${modalidadeSelecionada}&tamanho=${tamanhoSelecionado}`);
+      const categoriaAtual = mockCategorias.find(c => c.nome === modalidadeSelecionada);
+      
+      if (categoriaAtual?.requerComprovacao && categoriaAtual.tipoComprovacao === "codigo" && !codigoComprovacao) {
+        return;
+      }
+      
+      let url = `/evento/${params?.slug}/inscricao/resumo?modalidade=${modalidadeSelecionada}&tamanho=${tamanhoSelecionado}`;
+      if (codigoComprovacao) {
+        url += `&codigo=${encodeURIComponent(codigoComprovacao)}`;
+      }
+      
+      setLocation(url);
     }
   };
 
-  const modalidadeValor = mockCategorias.find(c => c.nome === modalidadeSelecionada)?.valor;
+  const categoriaAtual = mockCategorias.find(c => c.nome === modalidadeSelecionada);
+  const modalidadeValor = categoriaAtual?.valor;
+  
+  const podeAvancar = modalidadeSelecionada && tamanhoSelecionado && 
+    (!categoriaAtual?.requerComprovacao || 
+     categoriaAtual.tipoComprovacao === "pre_aprovacao" || 
+     codigoComprovacao.trim() !== "");
 
   return (
     <div className="min-h-screen bg-background pb-24 md:pb-8">
@@ -98,6 +131,39 @@ export default function InscricaoModalidadePage() {
             </CardContent>
           </Card>
 
+          {categoriaAtual?.requerComprovacao && (
+            <Alert className="border-primary/50 bg-primary/5">
+              <div className="flex gap-2">
+                {categoriaAtual.tipoComprovacao === "codigo" ? (
+                  <ShieldCheck className="h-5 w-5 text-primary" />
+                ) : (
+                  <AlertCircle className="h-5 w-5 text-primary" />
+                )}
+                <div className="flex-1">
+                  <AlertDescription className="text-sm">
+                    {categoriaAtual.mensagemComprovacao}
+                  </AlertDescription>
+                  
+                  {categoriaAtual.tipoComprovacao === "codigo" && (
+                    <div className="mt-3">
+                      <Label htmlFor="codigo-comprovacao" className="text-sm font-medium mb-2 block">
+                        Código de Confirmação
+                      </Label>
+                      <Input
+                        id="codigo-comprovacao"
+                        placeholder="Ex: SERV2025-ABC123"
+                        value={codigoComprovacao}
+                        onChange={(e) => setCodigoComprovacao(e.target.value)}
+                        className="max-w-xs"
+                        data-testid="input-codigo-comprovacao"
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            </Alert>
+          )}
+
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">Tamanho da Camisa</CardTitle>
@@ -133,7 +199,7 @@ export default function InscricaoModalidadePage() {
             <Button
               size="lg"
               onClick={handleContinuar}
-              disabled={!modalidadeSelecionada || !tamanhoSelecionado}
+              disabled={!podeAvancar}
               className="font-semibold"
               data-testid="button-continuar"
             >
