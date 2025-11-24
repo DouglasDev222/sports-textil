@@ -43,8 +43,8 @@ export default function LoginPage() {
       
       <div className="max-w-6xl mx-auto px-4 py-8 md:py-16">
         <div className="grid md:grid-cols-2 gap-8 items-start">
-          {/* Coluna da esquerda - Informações */}
-          <div className="space-y-6">
+          {/* Coluna da esquerda - Informações (escondida no mobile) */}
+          <div className="hidden md:block space-y-6">
             <div>
               <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-3">
                 Acesse sua Conta
