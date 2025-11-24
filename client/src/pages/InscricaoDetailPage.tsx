@@ -17,12 +17,14 @@ import {
   QrCode,
   Clock,
   Tag,
-  Users
+  Users,
+  Hash
 } from "lucide-react";
 import cityImage from '@assets/generated_images/City_marathon_aerial_view_94ce50b6.png';
 
 const mockInscricao = {
   id: "1",
+  numeroInscricao: "12345",
   codigoComprovacao: "MAR2025-A1B2C3",
   status: "confirmada",
   dataInscricao: "2025-03-15",
@@ -121,10 +123,14 @@ export default function InscricaoDetailPage() {
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Voltar
               </Button>
+              <div className="flex items-center gap-2 mb-2 text-white/80">
+                <Hash className="h-4 w-4" />
+                <span className="text-sm font-medium">Inscrição #{mockInscricao.numeroInscricao}</span>
+              </div>
               <h1 className="text-2xl md:text-4xl font-bold text-white mb-2">
                 {mockInscricao.evento.nome}
               </h1>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <Badge variant="secondary" className="text-sm">
                   {mockInscricao.modalidade}
                 </Badge>
@@ -249,6 +255,14 @@ export default function InscricaoDetailPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
+                <div>
+                  <p className="text-sm text-muted-foreground mb-1">Número da Inscrição</p>
+                  <p className="font-mono text-2xl font-bold text-primary flex items-center gap-2">
+                    <Hash className="h-5 w-5" />
+                    {mockInscricao.numeroInscricao}
+                  </p>
+                </div>
+                <Separator />
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm text-muted-foreground mb-1">Modalidade</p>
