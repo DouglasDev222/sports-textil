@@ -1,10 +1,12 @@
 import { useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
+import { LogIn, UserPlus } from "lucide-react";
+import Header from "@/components/Header";
 
 export default function LoginPage() {
   const [cpf, setCpf] = useState("");
@@ -36,71 +38,123 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-primary flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-primary-foreground mb-2">
-            ST Eventos
-          </h1>
-          <p className="text-primary-foreground/80">
-            Portal de Inscrições Sports&Textil
-          </p>
-        </div>
+    <div className="min-h-screen bg-background">
+      <Header />
+      
+      <div className="max-w-6xl mx-auto px-4 py-8 md:py-16">
+        <div className="grid md:grid-cols-2 gap-8 items-start">
+          {/* Coluna da esquerda - Informações */}
+          <div className="space-y-6">
+            <div>
+              <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-3">
+                Acesse sua Conta
+              </h1>
+              <p className="text-lg text-muted-foreground">
+                Entre para gerenciar suas inscrições, acompanhar eventos e manter seus dados atualizados.
+              </p>
+            </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Entrar</CardTitle>
-            <CardDescription>
-              Use seu CPF e data de nascimento para acessar sua conta
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="cpf">CPF</Label>
-                <Input
-                  id="cpf"
-                  type="text"
-                  placeholder="000.000.000-00"
-                  value={cpf}
-                  onChange={handleCPFChange}
-                  maxLength={14}
-                  required
-                  data-testid="input-cpf"
-                />
+            <div className="space-y-4 pt-4">
+              <div className="flex gap-3">
+                <div className="flex-shrink-0 w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center">
+                  <LogIn className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-foreground mb-1">Acesso Rápido</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Use seu CPF e data de nascimento para entrar de forma segura
+                  </p>
+                </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="dataNascimento">Data de Nascimento</Label>
-                <Input
-                  id="dataNascimento"
-                  type="date"
-                  value={dataNascimento}
-                  onChange={(e) => setDataNascimento(e.target.value)}
-                  required
-                  data-testid="input-data-nascimento"
-                />
+              <div className="flex gap-3">
+                <div className="flex-shrink-0 w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center">
+                  <UserPlus className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-foreground mb-1">Primeira Vez?</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Crie sua conta em minutos e comece a se inscrever em eventos
+                  </p>
+                </div>
               </div>
+            </div>
+          </div>
 
-              <Button
-                type="submit"
-                className="w-full"
-                data-testid="button-login"
-              >
-                Entrar
-              </Button>
+          {/* Coluna da direita - Formulário de Login */}
+          <div>
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-2xl">Entrar</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleSubmit} className="space-y-5">
+                  <div className="space-y-2">
+                    <Label htmlFor="cpf" className="text-sm font-medium">
+                      CPF
+                    </Label>
+                    <Input
+                      id="cpf"
+                      type="text"
+                      placeholder="000.000.000-00"
+                      value={cpf}
+                      onChange={handleCPFChange}
+                      maxLength={14}
+                      required
+                      data-testid="input-cpf"
+                    />
+                  </div>
 
-              <div className="text-center pt-4">
-                <p className="text-sm text-muted-foreground">
-                  Não tem uma conta?{" "}
-                  <Link href="/cadastro" className="text-primary font-medium hover:underline" data-testid="link-cadastro">
-                    Cadastre-se aqui
+                  <div className="space-y-2">
+                    <Label htmlFor="dataNascimento" className="text-sm font-medium">
+                      Data de Nascimento
+                    </Label>
+                    <Input
+                      id="dataNascimento"
+                      type="date"
+                      value={dataNascimento}
+                      onChange={(e) => setDataNascimento(e.target.value)}
+                      required
+                      data-testid="input-data-nascimento"
+                    />
+                  </div>
+
+                  <Button
+                    type="submit"
+                    size="lg"
+                    className="w-full font-semibold"
+                    data-testid="button-login"
+                  >
+                    Entrar
+                  </Button>
+
+                  <div className="relative my-6">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t"></div>
+                    </div>
+                    <div className="relative flex justify-center text-xs uppercase">
+                      <span className="bg-card px-2 text-muted-foreground">
+                        Não tem conta?
+                      </span>
+                    </div>
+                  </div>
+
+                  <Link href="/cadastro" data-testid="link-cadastro">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="lg"
+                      className="w-full font-semibold"
+                    >
+                      <UserPlus className="h-4 w-4 mr-2" />
+                      Criar Conta
+                    </Button>
                   </Link>
-                </p>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
+                </form>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       </div>
     </div>
   );
