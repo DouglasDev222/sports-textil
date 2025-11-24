@@ -26,7 +26,8 @@ export default function InscricaoResumoPage() {
 
   const mockUsuario = {
     nome: "João Silva",
-    cpf: "123.456.789-00"
+    cpf: "123.456.789-00",
+    dataNascimento: "15/03/1990"
   };
 
   const mockEvento = {
@@ -88,6 +89,7 @@ export default function InscricaoResumoPage() {
                 <p className="text-sm text-muted-foreground mb-1">Participante</p>
                 <p className="font-semibold text-foreground">{mockUsuario.nome}</p>
                 <p className="text-sm text-muted-foreground">CPF: {mockUsuario.cpf}</p>
+                <p className="text-sm text-muted-foreground">Data de Nascimento: {mockUsuario.dataNascimento}</p>
               </div>
 
               <div className="border-t pt-4">
