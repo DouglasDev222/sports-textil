@@ -15,6 +15,7 @@ import InscricaoParticipantePage from "@/pages/InscricaoParticipantePage";
 import InscricaoModalidadePage from "@/pages/InscricaoModalidadePage";
 import InscricaoResumoPage from "@/pages/InscricaoResumoPage";
 import InscricaoPagamentoPage from "@/pages/InscricaoPagamentoPage";
+import InscricaoDetailPage from "@/pages/InscricaoDetailPage";
 
 function Router() {
   return (
@@ -28,6 +29,7 @@ function Router() {
       <Route path="/evento/:slug/inscricao/resumo" component={InscricaoResumoPage} />
       <Route path="/evento/:slug/inscricao/pagamento" component={InscricaoPagamentoPage} />
       <Route path="/minhas-inscricoes" component={MinhasInscricoesPage} />
+      <Route path="/inscricao/:id" component={InscricaoDetailPage} />
       <Route path="/minha-conta" component={MinhaContaPage} />
       <Route path="/participantes" component={ParticipantesPage} />
       <Route component={NotFound} />
