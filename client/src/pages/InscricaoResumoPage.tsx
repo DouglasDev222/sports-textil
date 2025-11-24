@@ -80,41 +80,38 @@ export default function InscricaoResumoPage() {
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
                 <User className="h-5 w-5" />
-                Participante
+                Dados do Participante
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-1">
+            <CardContent className="space-y-4">
+              <div>
+                <p className="text-sm text-muted-foreground mb-1">Participante</p>
                 <p className="font-semibold text-foreground">{mockUsuario.nome}</p>
                 <p className="text-sm text-muted-foreground">CPF: {mockUsuario.cpf}</p>
               </div>
-            </CardContent>
-          </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Award className="h-5 w-5" />
-                Modalidade
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-between">
-                <p className="font-semibold text-foreground">{modalidade}</p>
-                <p className="text-lg font-bold text-primary">{modalidadeValor}</p>
+              <div className="border-t pt-4">
+                <div className="flex items-start gap-2 mb-2">
+                  <Award className="h-4 w-4 text-muted-foreground mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-sm text-muted-foreground mb-1">Modalidade</p>
+                    <div className="flex items-center justify-between">
+                      <p className="font-semibold text-foreground">{modalidade}</p>
+                      <p className="text-lg font-bold text-primary">{modalidadeValor}</p>
+                    </div>
+                  </div>
+                </div>
               </div>
-            </CardContent>
-          </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Shirt className="h-5 w-5" />
-                Tamanho da Camisa
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="font-semibold text-foreground">{tamanho}</p>
+              <div className="border-t pt-4">
+                <div className="flex items-start gap-2">
+                  <Shirt className="h-4 w-4 text-muted-foreground mt-0.5" />
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-1">Tamanho da Camisa</p>
+                    <p className="font-semibold text-foreground">{tamanho}</p>
+                  </div>
+                </div>
+              </div>
             </CardContent>
           </Card>
 
