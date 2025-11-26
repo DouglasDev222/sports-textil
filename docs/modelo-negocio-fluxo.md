@@ -2,10 +2,34 @@
 
 ## Visao Geral do Sistema
 
-O ST Eventos e uma plataforma de inscricoes para eventos de corrida (maratonas, trail runs, corridas de rua). O sistema possui dois lados principais:
+O ST Eventos e uma plataforma de inscricoes para eventos de corrida (maratonas, trail runs, corridas de rua). O sistema possui tres lados principais:
 
-1. **Painel Administrativo**: Onde organizadores criam e gerenciam eventos
-2. **Portal do Atleta**: Onde atletas se inscrevem e acompanham suas inscricoes
+1. **Painel Administrativo (Admin)**: Onde o administrador do sistema cria, configura e gerencia eventos. Apenas o admin pode criar/editar eventos para evitar configuracoes erradas.
+2. **Painel do Organizador**: Dashboard somente leitura onde organizadores visualizam dados do seu evento (inscricoes, faturamento, exportacao de dados). SEM permissao de edicao.
+3. **Portal do Atleta**: Onde atletas se inscrevem e acompanham suas inscricoes
+
+---
+
+## Papeis e Permissoes
+
+### Administrador do Sistema
+- Criar e editar organizadores
+- Criar e editar eventos completos (dados, modalidades, lotes, precos, camisas, anexos)
+- Publicar/cancelar/finalizar eventos
+- Visualizar todos os dados do sistema
+- Gerenciar configuracoes do sistema
+
+### Organizador do Evento (SOMENTE LEITURA)
+- **NAO PODE** criar ou editar eventos
+- **NAO PODE** alterar precos, modalidades, lotes ou qualquer configuracao
+- **PODE APENAS** visualizar dados do seu evento via dashboard:
+  - Numero total de inscritos
+  - Lista completa de inscritos (com exportacao CSV/Excel)
+  - Dados de cada inscrito (nome, CPF, email, telefone, modalidade, camisa)
+  - Pedidos e status de pagamento
+  - Faturamento bruto e liquido
+  - Grade de camisas (quantas de cada tamanho)
+  - Graficos de inscricoes por dia/semana
 
 ---
 
@@ -53,7 +77,7 @@ ORGANIZADOR
 
 ### FASE 2: Criacao do Evento (Admin)
 
-**Responsavel:** Organizador (via painel admin)
+**Responsavel:** Administrador do Sistema (organizador NAO tem acesso)
 
 | Passo | Acao | Campos |
 |-------|------|--------|
@@ -77,7 +101,7 @@ ORGANIZADOR
 
 ### FASE 3: Configuracao das Modalidades (Admin)
 
-**Responsavel:** Organizador
+**Responsavel:** Administrador do Sistema
 
 | Passo | Acao | Campos |
 |-------|------|--------|
@@ -103,7 +127,7 @@ SE soma(limiteVagas de todas modalidades) > limiteVagasTotal do evento
 
 ### FASE 4: Configuracao dos Lotes (Admin)
 
-**Responsavel:** Organizador
+**Responsavel:** Administrador do Sistema
 
 | Passo | Acao | Campos |
 |-------|------|--------|
@@ -129,7 +153,7 @@ SE lote.dataTermino <= agora() OU lote.quantidadeUtilizada >= lote.quantidadeMax
 
 ### FASE 5: Matriz de Precos (Admin)
 
-**Responsavel:** Organizador
+**Responsavel:** Administrador do Sistema
 
 | Passo | Acao | Campos |
 |-------|------|--------|
@@ -154,7 +178,7 @@ SE lote.dataTermino <= agora() OU lote.quantidadeUtilizada >= lote.quantidadeMax
 
 ### FASE 6: Grade de Camisas (Admin)
 
-**Responsavel:** Organizador
+**Responsavel:** Administrador do Sistema
 
 | Passo | Acao | Campos |
 |-------|------|--------|
@@ -180,7 +204,7 @@ SE evento.usarGradePorModalidade = true
 
 ### FASE 7: Arquivos Anexos (Admin)
 
-**Responsavel:** Organizador
+**Responsavel:** Administrador do Sistema
 
 | Passo | Acao | Campos |
 |-------|------|--------|
@@ -202,7 +226,7 @@ SE evento.usarGradePorModalidade = true
 
 ### FASE 8: Publicacao do Evento (Admin)
 
-**Responsavel:** Organizador
+**Responsavel:** Administrador do Sistema
 
 | Passo | Acao | Validacao |
 |-------|------|-----------|
@@ -227,6 +251,80 @@ SE evento.usarGradePorModalidade = true
 - [ ] Botao "Publicar Evento"
 - [ ] Confirmacao de publicacao
 - [ ] Opcao de cancelar evento publicado
+
+---
+
+## Painel do Organizador (Dashboard - SOMENTE LEITURA)
+
+**IMPORTANTE:** O organizador NAO tem permissao para criar ou editar eventos. Toda configuracao e feita pelo Administrador do Sistema para garantir que nao haja erros de configuracao.
+
+### Funcionalidades do Dashboard do Organizador
+
+| Funcionalidade | Descricao | Permissao |
+|----------------|-----------|-----------|
+| Visao Geral | Cards com metricas principais | Visualizar |
+| Lista de Inscritos | Tabela completa com todos os dados | Visualizar + Exportar |
+| Pedidos | Lista de pedidos com status de pagamento | Visualizar |
+| Grade de Camisas | Quantas camisas de cada tamanho | Visualizar |
+| Faturamento | Valores bruto e liquido | Visualizar |
+| Graficos | Inscricoes por dia, modalidade, etc. | Visualizar |
+
+### Metricas da Visao Geral
+
+```
+DASHBOARD DO ORGANIZADOR
+├── Numero Total de Inscritos
+├── Vagas Restantes
+├── Inscricoes por Modalidade
+├── Faturamento Bruto (total arrecadado)
+├── Faturamento Liquido (apos taxas)
+├── Pedidos Pagos vs Pendentes
+└── Inscricoes por Dia (grafico)
+```
+
+### Lista de Inscritos (Exportavel)
+
+Dados disponiveis para visualizacao e exportacao CSV/Excel:
+
+| Campo | Descricao |
+|-------|-----------|
+| Numero Inscricao | ID unico da inscricao |
+| Nome Completo | Nome do atleta |
+| CPF | Documento do atleta |
+| Email | Email de contato |
+| Telefone | Telefone de contato |
+| Data Nascimento | Para calculo de idade |
+| Sexo | Masculino/Feminino |
+| Cidade/Estado | Localizacao do atleta |
+| Modalidade | Em qual modalidade se inscreveu |
+| Tamanho Camisa | PP, P, M, G, GG, 3G |
+| Status | Confirmada, Pendente, Cancelada |
+| Data Inscricao | Quando se inscreveu |
+| Valor Pago | Valor da inscricao |
+
+### Grade de Camisas (Resumo)
+
+| Tamanho | Quantidade Pedida | % do Total |
+|---------|-------------------|------------|
+| PP | 15 | 5% |
+| P | 45 | 15% |
+| M | 90 | 30% |
+| G | 75 | 25% |
+| GG | 45 | 15% |
+| 3G | 30 | 10% |
+
+### Checklist Painel do Organizador
+
+- [ ] Tela de login exclusiva para organizadores
+- [ ] Dashboard com cards de metricas
+- [ ] Lista de inscritos com filtros e busca
+- [ ] Botao de exportar para CSV/Excel
+- [ ] Visualizacao de pedidos
+- [ ] Grafico de inscricoes por dia
+- [ ] Resumo da grade de camisas
+- [ ] Visualizacao de faturamento (bruto e liquido)
+- [ ] Filtros por modalidade, status, data
+- [ ] SEM botoes de edicao ou exclusao
 
 ---
 
@@ -374,9 +472,18 @@ PEDIDO (orders)
 
 ## Proximos Passos
 
-Apos o admin estar funcional:
+### Fase 1 - Painel Admin (Prioridade)
 1. Integrar gateway de pagamento (Stripe, PagSeguro, etc.)
 2. Sistema de vouchers/cupons de desconto
 3. Notificacoes por email
-4. Painel do organizador (self-service)
-5. App mobile para atletas
+
+### Fase 2 - Painel do Organizador (Somente Leitura)
+4. Dashboard com metricas do evento
+5. Lista de inscritos com exportacao
+6. Visualizacao de faturamento
+7. Grade de camisas
+
+### Fase 3 - Melhorias
+8. App mobile para atletas
+9. Relatorios avancados
+10. Integracao com sistemas de cronometragem
