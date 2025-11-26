@@ -1,7 +1,91 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, date, integer } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, date, integer, timestamp, boolean, decimal, pgEnum } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+
+export const eventStatusEnum = pgEnum("event_status", ["rascunho", "publicado", "cancelado", "finalizado"]);
+export const modalityAccessEnum = pgEnum("modality_access", ["gratuita", "paga", "voucher", "pcd", "aprovacao_manual"]);
+export const registrationStatusEnum = pgEnum("registration_status", ["pendente", "confirmada", "cancelada", "no_show"]);
+
+export const organizers = pgTable("organizers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  nome: text("nome").notNull(),
+  cpfCnpj: varchar("cpf_cnpj", { length: 20 }).notNull().unique(),
+  email: text("email").notNull(),
+  telefone: varchar("telefone", { length: 20 }).notNull(),
+  dataCadastro: timestamp("data_cadastro").defaultNow().notNull(),
+});
+
+export const events = pgTable("events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizerId: varchar("organizer_id").notNull().references(() => organizers.id),
+  slug: text("slug").notNull().unique(),
+  nome: text("nome").notNull(),
+  descricao: text("descricao").notNull(),
+  dataEvento: date("data_evento").notNull(),
+  endereco: text("endereco").notNull(),
+  cidade: text("cidade").notNull(),
+  estado: varchar("estado", { length: 2 }).notNull(),
+  bannerUrl: text("banner_url"),
+  aberturaInscricoes: timestamp("abertura_inscricoes").notNull(),
+  encerramentoInscricoes: timestamp("encerramento_inscricoes").notNull(),
+  status: eventStatusEnum("status").default("rascunho").notNull(),
+  entregaCamisaNoKit: boolean("entrega_camisa_no_kit").default(true).notNull(),
+  usarGradePorModalidade: boolean("usar_grade_por_modalidade").default(false).notNull(),
+  dataCriacao: timestamp("data_criacao").defaultNow().notNull(),
+});
+
+export const modalities = pgTable("modalities", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  eventId: varchar("event_id").notNull().references(() => events.id),
+  nome: text("nome").notNull(),
+  distancia: decimal("distancia", { precision: 10, scale: 2 }).notNull(),
+  unidadeDistancia: varchar("unidade_distancia", { length: 10 }).default("km").notNull(),
+  horarioLargada: text("horario_largada").notNull(),
+  descricao: text("descricao"),
+  imagemUrl: text("imagem_url"),
+  mapaPercursoUrl: text("mapa_percurso_url"),
+  limiteVagas: integer("limite_vagas"),
+  tipoAcesso: modalityAccessEnum("tipo_acesso").default("paga").notNull(),
+  ordem: integer("ordem").default(0).notNull(),
+});
+
+export const shirtSizes = pgTable("shirt_sizes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  eventId: varchar("event_id").notNull().references(() => events.id),
+  modalityId: varchar("modality_id").references(() => modalities.id),
+  tamanho: varchar("tamanho", { length: 10 }).notNull(),
+  quantidadeTotal: integer("quantidade_total").notNull(),
+  quantidadeDisponivel: integer("quantidade_disponivel").notNull(),
+});
+
+export const registrationBatches = pgTable("registration_batches", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  eventId: varchar("event_id").notNull().references(() => events.id),
+  nome: text("nome").notNull(),
+  dataInicio: timestamp("data_inicio").notNull(),
+  dataTermino: timestamp("data_termino"),
+  quantidadeMaxima: integer("quantidade_maxima"),
+  quantidadeUtilizada: integer("quantidade_utilizada").default(0).notNull(),
+  ativo: boolean("ativo").default(true).notNull(),
+  ordem: integer("ordem").default(0).notNull(),
+});
+
+export const prices = pgTable("prices", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  modalityId: varchar("modality_id").notNull().references(() => modalities.id),
+  batchId: varchar("batch_id").notNull().references(() => registrationBatches.id),
+  valor: decimal("valor", { precision: 10, scale: 2 }).notNull(),
+});
+
+export const attachments = pgTable("attachments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  eventId: varchar("event_id").notNull().references(() => events.id),
+  nome: text("nome").notNull(),
+  url: text("url").notNull(),
+  obrigatorioAceitar: boolean("obrigatorio_aceitar").default(false).notNull(),
+  ordem: integer("ordem").default(0).notNull(),
+});
 
 export const athletes = pgTable("athletes", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -13,68 +97,73 @@ export const athletes = pgTable("athletes", {
   telefone: varchar("telefone", { length: 20 }).notNull(),
   estado: varchar("estado", { length: 2 }).notNull(),
   cidade: text("cidade").notNull(),
-  escolaridade: text("escolaridade").notNull(),
-  profissao: text("profissao").notNull(),
+  escolaridade: text("escolaridade"),
+  profissao: text("profissao"),
+  dataCadastro: timestamp("data_cadastro").defaultNow().notNull(),
 });
 
-export const events = pgTable("events", {
+export const registrations = pgTable("registrations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  slug: text("slug").notNull().unique(),
-  nome: text("nome").notNull(),
-  descricao: text("descricao").notNull(),
-  data: date("data").notNull(),
-  local: text("local").notNull(),
-  cidade: text("cidade").notNull(),
-  estado: varchar("estado", { length: 2 }).notNull(),
-  distancias: text("distancias").notNull(),
-  horariosLargada: text("horarios_largada").notNull(),
-  imagemUrl: text("imagem_url").notNull(),
-  valor: text("valor").notNull(),
-  retiradaKit: text("retirada_kit"),
-  regulamentoUrl: text("regulamento_url"),
-  documentos: text("documentos"),
-});
-
-export const pedidos = pgTable("pedidos", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  numeroPedido: integer("numero_pedido").notNull().unique(),
-  usuarioId: varchar("usuario_id").notNull(),
-  status: varchar("status", { length: 20 }).notNull(),
-  valorTotal: text("valor_total").notNull(),
-  cupomDesconto: text("cupom_desconto"),
-  valorDesconto: text("valor_desconto"),
-  dataPedido: date("data_pedido").notNull(),
-});
-
-export const inscricoes = pgTable("inscricoes", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  numeroInscricao: integer("numero_inscricao").notNull().unique(),
-  pedidoId: varchar("pedido_id").notNull(),
-  atletaId: varchar("atleta_id").notNull(),
-  eventoId: varchar("evento_id").notNull(),
-  modalidade: text("modalidade").notNull(),
-  tamanhoCamisa: varchar("tamanho_camisa", { length: 10 }).notNull(),
+  numeroInscricao: integer("numero_inscricao").notNull(),
+  eventId: varchar("event_id").notNull().references(() => events.id),
+  modalityId: varchar("modality_id").notNull().references(() => modalities.id),
+  batchId: varchar("batch_id").notNull().references(() => registrationBatches.id),
+  athleteId: varchar("athlete_id").notNull().references(() => athletes.id),
+  tamanhoCamisa: varchar("tamanho_camisa", { length: 10 }),
+  valorPago: decimal("valor_pago", { precision: 10, scale: 2 }).notNull(),
+  codigoVoucher: text("codigo_voucher"),
+  status: registrationStatusEnum("status").default("pendente").notNull(),
+  dataPagamento: timestamp("data_pagamento"),
+  idPagamentoGateway: text("id_pagamento_gateway"),
   equipe: text("equipe"),
-  codigoComprovacao: text("codigo_comprovacao"),
-  valorOriginal: text("valor_original").notNull(),
-  valorPago: text("valor_pago").notNull(),
-  status: varchar("status", { length: 20 }).notNull(),
-  dataInscricao: date("data_inscricao").notNull(),
+  dataInscricao: timestamp("data_inscricao").defaultNow().notNull(),
 });
 
-export const insertAthleteSchema = createInsertSchema(athletes).omit({ id: true });
-export const insertEventSchema = createInsertSchema(events).omit({ id: true });
-export const insertPedidoSchema = createInsertSchema(pedidos).omit({ id: true });
-export const insertInscricaoSchema = createInsertSchema(inscricoes).omit({ id: true });
+export const documentAcceptances = pgTable("document_acceptances", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  registrationId: varchar("registration_id").notNull().references(() => registrations.id),
+  attachmentId: varchar("attachment_id").notNull().references(() => attachments.id),
+  dataAceite: timestamp("data_aceite").defaultNow().notNull(),
+  ipAceite: varchar("ip_aceite", { length: 45 }),
+});
 
-export type InsertAthlete = z.infer<typeof insertAthleteSchema>;
-export type Athlete = typeof athletes.$inferSelect;
+export const insertOrganizerSchema = createInsertSchema(organizers).omit({ id: true, dataCadastro: true });
+export const insertEventSchema = createInsertSchema(events).omit({ id: true, dataCriacao: true });
+export const insertModalitySchema = createInsertSchema(modalities).omit({ id: true });
+export const insertShirtSizeSchema = createInsertSchema(shirtSizes).omit({ id: true });
+export const insertRegistrationBatchSchema = createInsertSchema(registrationBatches).omit({ id: true });
+export const insertPriceSchema = createInsertSchema(prices).omit({ id: true });
+export const insertAttachmentSchema = createInsertSchema(attachments).omit({ id: true });
+export const insertAthleteSchema = createInsertSchema(athletes).omit({ id: true, dataCadastro: true });
+export const insertRegistrationSchema = createInsertSchema(registrations).omit({ id: true, dataInscricao: true });
+export const insertDocumentAcceptanceSchema = createInsertSchema(documentAcceptances).omit({ id: true, dataAceite: true });
+
+export type InsertOrganizer = z.infer<typeof insertOrganizerSchema>;
+export type Organizer = typeof organizers.$inferSelect;
 
 export type InsertEvent = z.infer<typeof insertEventSchema>;
 export type Event = typeof events.$inferSelect;
 
-export type InsertPedido = z.infer<typeof insertPedidoSchema>;
-export type Pedido = typeof pedidos.$inferSelect;
+export type InsertModality = z.infer<typeof insertModalitySchema>;
+export type Modality = typeof modalities.$inferSelect;
 
-export type InsertInscricao = z.infer<typeof insertInscricaoSchema>;
-export type Inscricao = typeof inscricoes.$inferSelect;
+export type InsertShirtSize = z.infer<typeof insertShirtSizeSchema>;
+export type ShirtSize = typeof shirtSizes.$inferSelect;
+
+export type InsertRegistrationBatch = z.infer<typeof insertRegistrationBatchSchema>;
+export type RegistrationBatch = typeof registrationBatches.$inferSelect;
+
+export type InsertPrice = z.infer<typeof insertPriceSchema>;
+export type Price = typeof prices.$inferSelect;
+
+export type InsertAttachment = z.infer<typeof insertAttachmentSchema>;
+export type Attachment = typeof attachments.$inferSelect;
+
+export type InsertAthlete = z.infer<typeof insertAthleteSchema>;
+export type Athlete = typeof athletes.$inferSelect;
+
+export type InsertRegistration = z.infer<typeof insertRegistrationSchema>;
+export type Registration = typeof registrations.$inferSelect;
+
+export type InsertDocumentAcceptance = z.infer<typeof insertDocumentAcceptanceSchema>;
+export type DocumentAcceptance = typeof documentAcceptances.$inferSelect;
