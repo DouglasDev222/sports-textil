@@ -1,4 +1,4 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -17,7 +17,15 @@ import InscricaoResumoPage from "@/pages/InscricaoResumoPage";
 import InscricaoPagamentoPage from "@/pages/InscricaoPagamentoPage";
 import InscricaoDetailPage from "@/pages/InscricaoDetailPage";
 
-function Router() {
+import { AdminAuthProvider } from "@/contexts/AdminAuthContext";
+import AdminLoginPage from "@/pages/admin/AdminLoginPage";
+import AdminDashboardPage from "@/pages/admin/AdminDashboardPage";
+import AdminOrganizersPage from "@/pages/admin/AdminOrganizersPage";
+import AdminEventsPage from "@/pages/admin/AdminEventsPage";
+import AdminNotFound from "@/pages/admin/AdminNotFound";
+import ProtectedAdminRoute from "@/pages/admin/ProtectedAdminRoute";
+
+function PublicRouter() {
   return (
     <Switch>
       <Route path="/" component={EventosPage} />
@@ -37,12 +45,52 @@ function Router() {
   );
 }
 
+function AdminRoutes() {
+  return (
+    <AdminAuthProvider>
+      <Switch>
+        <Route path="/admin/login" component={AdminLoginPage} />
+        <Route path="/admin/organizadores">
+          <ProtectedAdminRoute>
+            <AdminOrganizersPage />
+          </ProtectedAdminRoute>
+        </Route>
+        <Route path="/admin/eventos">
+          <ProtectedAdminRoute>
+            <AdminEventsPage />
+          </ProtectedAdminRoute>
+        </Route>
+        <Route path="/admin">
+          <ProtectedAdminRoute>
+            <AdminDashboardPage />
+          </ProtectedAdminRoute>
+        </Route>
+        <Route>
+          <ProtectedAdminRoute>
+            <AdminNotFound />
+          </ProtectedAdminRoute>
+        </Route>
+      </Switch>
+    </AdminAuthProvider>
+  );
+}
+
+function AppRouter() {
+  const [location] = useLocation();
+  
+  if (location.startsWith("/admin")) {
+    return <AdminRoutes />;
+  }
+  
+  return <PublicRouter />;
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <Toaster />
-        <Router />
+        <AppRouter />
       </TooltipProvider>
     </QueryClientProvider>
   );
