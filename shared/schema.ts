@@ -6,6 +6,7 @@ import { z } from "zod";
 export const eventStatusEnum = pgEnum("event_status", ["rascunho", "publicado", "cancelado", "finalizado"]);
 export const modalityAccessEnum = pgEnum("modality_access", ["gratuita", "paga", "voucher", "pcd", "aprovacao_manual"]);
 export const registrationStatusEnum = pgEnum("registration_status", ["pendente", "confirmada", "cancelada", "no_show"]);
+export const orderStatusEnum = pgEnum("order_status", ["pendente", "pago", "cancelado", "reembolsado", "expirado"]);
 
 export const organizers = pgTable("organizers", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -102,19 +103,34 @@ export const athletes = pgTable("athletes", {
   dataCadastro: timestamp("data_cadastro").defaultNow().notNull(),
 });
 
+export const orders = pgTable("orders", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  numeroPedido: integer("numero_pedido").notNull(),
+  eventId: varchar("event_id").notNull().references(() => events.id),
+  compradorId: varchar("comprador_id").notNull().references(() => athletes.id),
+  valorTotal: decimal("valor_total", { precision: 10, scale: 2 }).notNull(),
+  valorDesconto: decimal("valor_desconto", { precision: 10, scale: 2 }).default("0").notNull(),
+  codigoVoucher: text("codigo_voucher"),
+  status: orderStatusEnum("status").default("pendente").notNull(),
+  idPagamentoGateway: text("id_pagamento_gateway"),
+  metodoPagamento: text("metodo_pagamento"),
+  dataPedido: timestamp("data_pedido").defaultNow().notNull(),
+  dataPagamento: timestamp("data_pagamento"),
+  dataExpiracao: timestamp("data_expiracao"),
+  ipComprador: varchar("ip_comprador", { length: 45 }),
+});
+
 export const registrations = pgTable("registrations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   numeroInscricao: integer("numero_inscricao").notNull(),
+  orderId: varchar("order_id").notNull().references(() => orders.id),
   eventId: varchar("event_id").notNull().references(() => events.id),
   modalityId: varchar("modality_id").notNull().references(() => modalities.id),
   batchId: varchar("batch_id").notNull().references(() => registrationBatches.id),
   athleteId: varchar("athlete_id").notNull().references(() => athletes.id),
   tamanhoCamisa: varchar("tamanho_camisa", { length: 10 }),
-  valorPago: decimal("valor_pago", { precision: 10, scale: 2 }).notNull(),
-  codigoVoucher: text("codigo_voucher"),
+  valorUnitario: decimal("valor_unitario", { precision: 10, scale: 2 }).notNull(),
   status: registrationStatusEnum("status").default("pendente").notNull(),
-  dataPagamento: timestamp("data_pagamento"),
-  idPagamentoGateway: text("id_pagamento_gateway"),
   equipe: text("equipe"),
   dataInscricao: timestamp("data_inscricao").defaultNow().notNull(),
 });
@@ -135,6 +151,7 @@ export const insertRegistrationBatchSchema = createInsertSchema(registrationBatc
 export const insertPriceSchema = createInsertSchema(prices).omit({ id: true });
 export const insertAttachmentSchema = createInsertSchema(attachments).omit({ id: true });
 export const insertAthleteSchema = createInsertSchema(athletes).omit({ id: true, dataCadastro: true });
+export const insertOrderSchema = createInsertSchema(orders).omit({ id: true, dataPedido: true });
 export const insertRegistrationSchema = createInsertSchema(registrations).omit({ id: true, dataInscricao: true });
 export const insertDocumentAcceptanceSchema = createInsertSchema(documentAcceptances).omit({ id: true, dataAceite: true });
 
@@ -161,6 +178,9 @@ export type Attachment = typeof attachments.$inferSelect;
 
 export type InsertAthlete = z.infer<typeof insertAthleteSchema>;
 export type Athlete = typeof athletes.$inferSelect;
+
+export type InsertOrder = z.infer<typeof insertOrderSchema>;
+export type Order = typeof orders.$inferSelect;
 
 export type InsertRegistration = z.infer<typeof insertRegistrationSchema>;
 export type Registration = typeof registrations.$inferSelect;

@@ -158,28 +158,53 @@ Cadastro de atletas/usuarios.
 | profissao | text | Profissao |
 | dataCadastro | timestamp | Data de cadastro |
 
-### 9. Inscricoes (`registrations`)
+### 9. Pedidos (`orders`)
 
-Registro de cada inscricao.
+Agrupa uma ou mais inscricoes em um unico pedido de compra.
+
+| Campo | Tipo | Descricao |
+|-------|------|-----------|
+| id | varchar (UUID) | Identificador unico |
+| numeroPedido | integer | Numero do pedido |
+| eventId | varchar | Referencia ao evento |
+| compradorId | varchar | Atleta que realizou a compra |
+| valorTotal | decimal | Valor total do pedido |
+| valorDesconto | decimal | Valor de desconto aplicado |
+| codigoVoucher | text | Codigo de voucher usado |
+| status | enum | pendente, pago, cancelado, reembolsado, expirado |
+| idPagamentoGateway | text | ID no gateway de pagamento |
+| metodoPagamento | text | Metodo de pagamento (PIX, cartao, etc.) |
+| dataPedido | timestamp | Data de criacao do pedido |
+| dataPagamento | timestamp | Data da confirmacao do pagamento |
+| dataExpiracao | timestamp | Data de expiracao do pedido |
+| ipComprador | varchar(45) | IP do comprador |
+
+**Regras de Negocio:**
+- Um pedido pode conter varias inscricoes
+- Inscricoes podem ser de atletas diferentes (ex: pai inscrevendo os filhos)
+- Inscricoes podem ser do mesmo atleta em modalidades diferentes
+- O pagamento e feito por pedido, nao por inscricao individual
+
+### 10. Inscricoes (`registrations`)
+
+Registro de cada inscricao individual, vinculada a um pedido.
 
 | Campo | Tipo | Descricao |
 |-------|------|-----------|
 | id | varchar (UUID) | Identificador unico |
 | numeroInscricao | integer | Numero da inscricao |
+| orderId | varchar | Referencia ao pedido |
 | eventId | varchar | Referencia ao evento |
 | modalityId | varchar | Referencia a modalidade |
 | batchId | varchar | Referencia ao lote |
-| athleteId | varchar | Referencia ao atleta |
+| athleteId | varchar | Referencia ao atleta inscrito |
 | tamanhoCamisa | varchar(10) | Tamanho escolhido |
-| valorPago | decimal | Valor pago |
-| codigoVoucher | text | Codigo de voucher usado |
+| valorUnitario | decimal | Valor individual da inscricao |
 | status | enum | pendente, confirmada, cancelada, no_show |
-| dataPagamento | timestamp | Data do pagamento |
-| idPagamentoGateway | text | ID no gateway de pagamento |
 | equipe | text | Nome da equipe |
 | dataInscricao | timestamp | Data da inscricao |
 
-### 10. Aceite de Documentos (`document_acceptances`)
+### 11. Aceite de Documentos (`document_acceptances`)
 
 Rastreia quais documentos cada atleta aceitou.
 
@@ -205,12 +230,23 @@ Organizador (1) ──────< Evento (N)
                            ├──< Grade de Camisas (N)
                            │    (global ou por modalidade)
                            │
-                           └──< Arquivo Anexo (N)
+                           ├──< Arquivo Anexo (N)
+                           │
+                           └──< Pedido (N)
+                                    │
+                                    └──< Inscricao (N) ──< Aceite de Documento (N)
 
-Atleta (1) ──────< Inscricao (N) ──────< Aceite de Documento (N)
-                       │
-                       └── vinculada a Evento, Modalidade, Lote
+Atleta (1) ──┬──< Pedido (N)           (como comprador)
+             │
+             └──< Inscricao (N)        (como atleta inscrito)
 ```
+
+**Fluxo de Inscricao:**
+1. Atleta (comprador) cria um Pedido
+2. Adiciona uma ou mais Inscricoes ao Pedido
+3. Cada Inscricao pode ser para o proprio comprador ou outro atleta
+4. Pagamento e feito no nivel do Pedido
+5. Quando pago, todas as Inscricoes do Pedido sao confirmadas
 
 ## Regras de Negocio Implementadas
 
