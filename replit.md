@@ -50,7 +50,14 @@ Preferred communication style: Simple, everyday language.
 **Database Schema**
 - `athletes` table: User profiles with CPF, personal data, contact info, and demographics
 - `events` table: Running events with details, locations, distances, pricing, and metadata
-- `inscricoes` table: Registration records linking athletes to events with modality, payment, status, and optional verification code for special categories
+- `pedidos` table: Order records that group one or more registrations, with order number, user reference, status, total value, and discount info
+- `inscricoes` table: Registration records linked to pedidos and events, containing registration number, athlete, modality, payment, status, and verification codes
+
+**Order/Registration Hierarchy**
+- A "Pedido" (order) groups one or more "Inscrições" (registrations)
+- Users can register multiple participants for the same or different events in a single order
+- Each registration has a unique `numeroInscricao` for identification
+- Each order has a unique `numeroPedido` for tracking
 
 **Development Infrastructure**
 - In-memory storage fallback for development (`MemStorage` class)
@@ -80,7 +87,8 @@ Preferred communication style: Simple, everyday language.
 - Verification codes stored in `inscricoes.codigoComprovacao` field
 
 **Authenticated Routes**
-- `/minhas-inscricoes` - User's registration history (upcoming and completed)
+- `/minhas-inscricoes` - User's orders and registrations grouped by pedido (upcoming and completed)
+- `/inscricao/:id` - Individual registration detail page with QR code, event info, participant data, and payment summary
 - `/minha-conta` - Athlete profile management with navigation to registrations and participants
 - `/participantes` - Participant management page (prepared for multi-participant feature)
 
