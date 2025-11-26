@@ -27,7 +27,13 @@ router.get("/", requireAuth, async (req, res) => {
     const user = req.adminUser;
     let events;
     
-    if (user?.role === "organizador" && user.organizerId) {
+    if (user?.role === "organizador") {
+      if (!user.organizerId) {
+        return res.status(403).json({
+          success: false,
+          error: { code: "FORBIDDEN", message: "Usuario organizador sem organizacao vinculada" }
+        });
+      }
       events = await storage.getEventsByOrganizer(user.organizerId);
     } else {
       events = await storage.getEvents();
@@ -53,7 +59,7 @@ router.get("/:id", requireAuth, async (req, res) => {
       });
     }
 
-    const hasAccess = await checkEventOwnership(req, res, event.id);
+    const hasAccess = await checkEventOwnership(req, res, event.id, event);
     if (!hasAccess) {
       return res.status(403).json({
         success: false,
@@ -81,7 +87,7 @@ router.get("/:id/full", requireAuth, async (req, res) => {
       });
     }
 
-    const hasAccess = await checkEventOwnership(req, res, event.id);
+    const hasAccess = await checkEventOwnership(req, res, event.id, event);
     if (!hasAccess) {
       return res.status(403).json({
         success: false,

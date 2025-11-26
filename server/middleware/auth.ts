@@ -65,7 +65,7 @@ export function requireRole(...allowedRoles: UserRole[]) {
   };
 }
 
-export async function checkEventOwnership(req: Request, res: Response, eventId: string): Promise<boolean> {
+export async function checkEventOwnership(req: Request, res: Response, eventId: string, preloadedEvent?: { organizerId: string | null }): Promise<boolean> {
   if (!req.adminUser) return false;
   
   if (req.adminUser.role === "superadmin" || req.adminUser.role === "admin") {
@@ -73,8 +73,12 @@ export async function checkEventOwnership(req: Request, res: Response, eventId: 
   }
   
   if (req.adminUser.role === "organizador") {
-    const event = await storage.getEvent(eventId);
-    if (!event) return true;
+    if (!req.adminUser.organizerId) {
+      return false;
+    }
+    
+    const event = preloadedEvent || await storage.getEvent(eventId);
+    if (!event) return false;
     
     return event.organizerId === req.adminUser.organizerId;
   }
