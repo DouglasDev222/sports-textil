@@ -7,6 +7,8 @@ export const eventStatusEnum = pgEnum("event_status", ["rascunho", "publicado", 
 export const modalityAccessEnum = pgEnum("modality_access", ["gratuita", "paga", "voucher", "pcd", "aprovacao_manual"]);
 export const registrationStatusEnum = pgEnum("registration_status", ["pendente", "confirmada", "cancelada", "no_show"]);
 export const orderStatusEnum = pgEnum("order_status", ["pendente", "pago", "cancelado", "reembolsado", "expirado"]);
+export const userRoleEnum = pgEnum("user_role", ["superadmin", "admin", "organizador"]);
+export const userStatusEnum = pgEnum("user_status", ["ativo", "inativo", "bloqueado"]);
 
 export const organizers = pgTable("organizers", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -15,6 +17,33 @@ export const organizers = pgTable("organizers", {
   email: text("email").notNull(),
   telefone: varchar("telefone", { length: 20 }).notNull(),
   dataCadastro: timestamp("data_cadastro").defaultNow().notNull(),
+});
+
+export const adminUsers = pgTable("admin_users", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  email: text("email").notNull().unique(),
+  passwordHash: text("password_hash").notNull(),
+  nome: text("nome").notNull(),
+  role: userRoleEnum("role").notNull(),
+  status: userStatusEnum("status").default("ativo").notNull(),
+  organizerId: varchar("organizer_id").references(() => organizers.id),
+  ultimoLogin: timestamp("ultimo_login"),
+  dataCriacao: timestamp("data_criacao").defaultNow().notNull(),
+  dataAtualizacao: timestamp("data_atualizacao").defaultNow().notNull(),
+});
+
+export const permissions = pgTable("permissions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  codigo: varchar("codigo", { length: 100 }).notNull().unique(),
+  nome: text("nome").notNull(),
+  descricao: text("descricao"),
+  modulo: varchar("modulo", { length: 50 }).notNull(),
+});
+
+export const rolePermissions = pgTable("role_permissions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  role: userRoleEnum("role").notNull(),
+  permissionId: varchar("permission_id").notNull().references(() => permissions.id),
 });
 
 export const events = pgTable("events", {
@@ -145,6 +174,9 @@ export const documentAcceptances = pgTable("document_acceptances", {
 });
 
 export const insertOrganizerSchema = createInsertSchema(organizers).omit({ id: true, dataCadastro: true });
+export const insertAdminUserSchema = createInsertSchema(adminUsers).omit({ id: true, dataCriacao: true, dataAtualizacao: true, ultimoLogin: true });
+export const insertPermissionSchema = createInsertSchema(permissions).omit({ id: true });
+export const insertRolePermissionSchema = createInsertSchema(rolePermissions).omit({ id: true });
 export const insertEventSchema = createInsertSchema(events).omit({ id: true, dataCriacao: true });
 export const insertModalitySchema = createInsertSchema(modalities).omit({ id: true });
 export const insertShirtSizeSchema = createInsertSchema(shirtSizes).omit({ id: true });
@@ -158,6 +190,18 @@ export const insertDocumentAcceptanceSchema = createInsertSchema(documentAccepta
 
 export type InsertOrganizer = z.infer<typeof insertOrganizerSchema>;
 export type Organizer = typeof organizers.$inferSelect;
+
+export type InsertAdminUser = z.infer<typeof insertAdminUserSchema>;
+export type AdminUser = typeof adminUsers.$inferSelect;
+
+export type InsertPermission = z.infer<typeof insertPermissionSchema>;
+export type Permission = typeof permissions.$inferSelect;
+
+export type InsertRolePermission = z.infer<typeof insertRolePermissionSchema>;
+export type RolePermission = typeof rolePermissions.$inferSelect;
+
+export type UserRole = "superadmin" | "admin" | "organizador";
+export type UserStatus = "ativo" | "inativo" | "bloqueado";
 
 export type InsertEvent = z.infer<typeof insertEventSchema>;
 export type Event = typeof events.$inferSelect;
