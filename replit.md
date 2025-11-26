@@ -56,7 +56,8 @@ Preferred communication style: Simple, everyday language.
 - `prices` table: Price per Modality + Batch combination
 - `attachments` table: Event documents (regulations, terms) with mandatory acceptance flags
 - `athletes` table: User profiles with CPF, personal data, contact info
-- `registrations` table: Individual registrations linked to event, modality, batch, athlete
+- `orders` table: Groups multiple registrations into a single purchase order with payment info, voucher codes, and status (pendente, pago, cancelado, reembolsado, expirado)
+- `registrations` table: Individual registrations linked to order, event, modality, batch, athlete with unit price
 - `document_acceptances` table: Tracks which documents each athlete accepted and when
 
 **Entity Relationships**
@@ -66,9 +67,18 @@ Preferred communication style: Simple, everyday language.
 - 1 Event -> many Registration Batches
 - 1 Modality + 1 Batch -> 1 Price
 - 1 Event -> many Attachments
+- 1 Event -> many Orders
+- 1 Order -> many Registrations (same or different athletes)
+- 1 Athlete -> many Orders (as buyer)
+- 1 Athlete -> many Registrations (as participant)
 - 1 Registration -> many Document Acceptances
 
 **Business Rules**
+- Order-based checkout: Multiple registrations can be grouped in a single order for unified payment
+- Order can include registrations for different athletes (e.g., parent registering children)
+- Order can include same athlete in different modalities
+- Payment is processed at order level, not individual registration
+- When order is paid, all associated registrations are confirmed
 - Batch auto-switching: When a batch reaches its quantity limit or end date, the next batch becomes active
 - Shirt inventory: Decremented atomically during registration, throws error if exhausted
 - Price lookup: Determined by active batch + selected modality combination
