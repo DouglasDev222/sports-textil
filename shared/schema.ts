@@ -78,6 +78,7 @@ export const modalities = pgTable("modalities", {
   mapaPercursoUrl: text("mapa_percurso_url"),
   limiteVagas: integer("limite_vagas"),
   tipoAcesso: modalityAccessEnum("tipo_acesso").default("paga").notNull(),
+  taxaComodidade: decimal("taxa_comodidade", { precision: 10, scale: 2 }).default("0").notNull(),
   ordem: integer("ordem").default(0).notNull(),
 });
 
