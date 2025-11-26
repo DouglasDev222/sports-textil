@@ -49,8 +49,8 @@ Preferred communication style: Simple, everyday language.
 
 **Database Schema (Supabase PostgreSQL)**
 - `organizers` table: Event organizers (companies or individuals) with CPF/CNPJ, contact info
-- `events` table: Running events with status (rascunho, publicado, cancelado, finalizado), inscription dates, shirt delivery options
-- `modalities` table: Race modalities (5km, 10km, 21km, Kids, PCD) with distance, schedule, access type (free, paid, voucher, PCD, manual approval)
+- `events` table: Running events with mandatory total capacity limit (`limiteVagasTotal`), status (rascunho, publicado, cancelado, finalizado), inscription dates, shirt delivery options
+- `modalities` table: Race modalities (5km, 10km, 21km, Kids, PCD) with distance, schedule, optional per-modality capacity limit (`limiteVagas`), access type (free, paid, voucher, PCD, manual approval)
 - `shirt_sizes` table: T-shirt inventory - global per event OR per modality (rare case)
 - `registration_batches` table: Pricing lots with automatic switching based on date or quantity limits
 - `prices` table: Price per Modality + Batch combination
@@ -74,6 +74,8 @@ Preferred communication style: Simple, everyday language.
 - 1 Registration -> many Document Acceptances
 
 **Business Rules**
+- **Event capacity (Priority 1)**: Every event MUST have a total capacity limit (`limiteVagasTotal`) - no unlimited option
+- **Modality capacity (Priority 2)**: Per-modality limits (`limiteVagas`) are optional; if set, sum cannot exceed event total capacity
 - Order-based checkout: Multiple registrations can be grouped in a single order for unified payment
 - Order can include registrations for different athletes (e.g., parent registering children)
 - Order can include same athlete in different modalities

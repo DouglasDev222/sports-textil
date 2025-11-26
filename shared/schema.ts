@@ -30,6 +30,7 @@ export const events = pgTable("events", {
   bannerUrl: text("banner_url"),
   aberturaInscricoes: timestamp("abertura_inscricoes").notNull(),
   encerramentoInscricoes: timestamp("encerramento_inscricoes").notNull(),
+  limiteVagasTotal: integer("limite_vagas_total").notNull(),
   status: eventStatusEnum("status").default("rascunho").notNull(),
   entregaCamisaNoKit: boolean("entrega_camisa_no_kit").default(true).notNull(),
   usarGradePorModalidade: boolean("usar_grade_por_modalidade").default(false).notNull(),

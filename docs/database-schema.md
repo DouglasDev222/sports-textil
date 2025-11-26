@@ -44,10 +44,16 @@ Contem todas as informacoes gerais do evento de corrida.
 | bannerUrl | text | URL da imagem de capa |
 | aberturaInscricoes | timestamp | Inicio das inscricoes |
 | encerramentoInscricoes | timestamp | Fim das inscricoes |
+| **limiteVagasTotal** | **integer** | **Limite total de vagas do evento (OBRIGATORIO)** |
 | status | enum | rascunho, publicado, cancelado, finalizado |
 | entregaCamisaNoKit | boolean | Se entrega camisa (padrao: true) |
 | usarGradePorModalidade | boolean | Grade separada por modalidade (padrao: false) |
 | dataCriacao | timestamp | Data de criacao do registro |
+
+**Regra de Capacidade:**
+- Todo evento DEVE ter um limite de vagas definido (nao existe opcao ilimitado)
+- Se limites por modalidade forem definidos, a soma NAO pode ultrapassar o `limiteVagasTotal`
+- Exemplo: Evento com 1000 vagas pode ter 5km (500), 10km (300), 21km (200) = 1000 total
 
 ### 3. Modalidades (`modalities`)
 
@@ -64,9 +70,14 @@ Cada evento pode ter varias modalidades (5km, 10km, 21km, Kids, etc.).
 | descricao | text | Descricao especifica |
 | imagemUrl | text | Imagem da modalidade |
 | mapaPercursoUrl | text | Mapa do percurso |
-| limiteVagas | integer | Limite de vagas (null = ilimitado) |
+| limiteVagas | integer | Limite de vagas por modalidade (OPCIONAL) |
 | tipoAcesso | enum | gratuita, paga, voucher, pcd, aprovacao_manual |
 | ordem | integer | Ordem de exibicao |
+
+**Regra de Limite por Modalidade:**
+- O limite de vagas por modalidade e OPCIONAL (prioridade 2)
+- Se definido, a SOMA de todas as modalidades NAO pode ultrapassar o `limiteVagasTotal` do evento
+- Se nao definido (null), as vagas sao controladas apenas pelo limite global do evento
 
 ### 4. Grade de Camisas (`shirt_sizes`)
 
