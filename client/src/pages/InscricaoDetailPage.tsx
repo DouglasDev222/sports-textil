@@ -18,19 +18,25 @@ import {
   Clock,
   Tag,
   Users,
-  Hash
+  Hash,
+  Package
 } from "lucide-react";
 import cityImage from '@assets/generated_images/City_marathon_aerial_view_94ce50b6.png';
 
 const mockInscricao = {
   id: "1",
-  numeroInscricao: "12345",
+  numeroInscricao: 12345,
   codigoComprovacao: "MAR2025-A1B2C3",
   status: "confirmada",
   dataInscricao: "2025-03-15",
   valorPago: "150.00",
   valorOriginal: "150.00",
   cupomDesconto: null,
+  pedido: {
+    id: "p1",
+    numeroPedido: 98765,
+    totalInscricoes: 2,
+  },
   participante: {
     nome: "João Silva",
     cpf: "123.456.789-00",
@@ -123,9 +129,16 @@ export default function InscricaoDetailPage() {
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Voltar
               </Button>
-              <div className="flex items-center gap-2 mb-2 text-white/80">
-                <Hash className="h-4 w-4" />
-                <span className="text-sm font-medium">Inscrição #{mockInscricao.numeroInscricao}</span>
+              <div className="flex items-center gap-3 mb-2 text-white/80 flex-wrap">
+                <div className="flex items-center gap-1">
+                  <Package className="h-4 w-4" />
+                  <span className="text-sm font-medium">Pedido #{mockInscricao.pedido.numeroPedido}</span>
+                </div>
+                <span className="text-white/50">|</span>
+                <div className="flex items-center gap-1">
+                  <Hash className="h-4 w-4" />
+                  <span className="text-sm font-medium">Inscrição #{mockInscricao.numeroInscricao}</span>
+                </div>
               </div>
               <h1 className="text-2xl md:text-4xl font-bold text-white mb-2">
                 {mockInscricao.evento.nome}
