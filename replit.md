@@ -47,17 +47,31 @@ Preferred communication style: Simple, everyday language.
 - PostgreSQL database (configured for Neon serverless)
 - Schema-first approach with Drizzle-Zod integration for runtime validation
 
-**Database Schema**
-- `athletes` table: User profiles with CPF, personal data, contact info, and demographics
-- `events` table: Running events with details, locations, distances, pricing, and metadata
-- `pedidos` table: Order records that group one or more registrations, with order number, user reference, status, total value, and discount info
-- `inscricoes` table: Registration records linked to pedidos and events, containing registration number, athlete, modality, payment, status, and verification codes
+**Database Schema (Supabase PostgreSQL)**
+- `organizers` table: Event organizers (companies or individuals) with CPF/CNPJ, contact info
+- `events` table: Running events with status (rascunho, publicado, cancelado, finalizado), inscription dates, shirt delivery options
+- `modalities` table: Race modalities (5km, 10km, 21km, Kids, PCD) with distance, schedule, access type (free, paid, voucher, PCD, manual approval)
+- `shirt_sizes` table: T-shirt inventory - global per event OR per modality (rare case)
+- `registration_batches` table: Pricing lots with automatic switching based on date or quantity limits
+- `prices` table: Price per Modality + Batch combination
+- `attachments` table: Event documents (regulations, terms) with mandatory acceptance flags
+- `athletes` table: User profiles with CPF, personal data, contact info
+- `registrations` table: Individual registrations linked to event, modality, batch, athlete
+- `document_acceptances` table: Tracks which documents each athlete accepted and when
 
-**Order/Registration Hierarchy**
-- A "Pedido" (order) groups one or more "Inscrições" (registrations)
-- Users can register multiple participants for the same or different events in a single order
-- Each registration has a unique `numeroInscricao` for identification
-- Each order has a unique `numeroPedido` for tracking
+**Entity Relationships**
+- 1 Organizer -> many Events
+- 1 Event -> many Modalities
+- 1 Event -> 1 global Shirt Grid OR many per-modality Grids (rare)
+- 1 Event -> many Registration Batches
+- 1 Modality + 1 Batch -> 1 Price
+- 1 Event -> many Attachments
+- 1 Registration -> many Document Acceptances
+
+**Business Rules**
+- Batch auto-switching: When a batch reaches its quantity limit or end date, the next batch becomes active
+- Shirt inventory: Decremented atomically during registration, throws error if exhausted
+- Price lookup: Determined by active batch + selected modality combination
 
 **Development Infrastructure**
 - In-memory storage fallback for development (`MemStorage` class)
