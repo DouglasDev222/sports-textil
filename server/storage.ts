@@ -1,5 +1,6 @@
 import {
   type Organizer, type InsertOrganizer,
+  type AdminUser, type InsertAdminUser,
   type Event, type InsertEvent,
   type Modality, type InsertModality,
   type ShirtSize, type InsertShirtSize,
@@ -7,66 +8,110 @@ import {
   type Price, type InsertPrice,
   type Attachment, type InsertAttachment,
   type Athlete, type InsertAthlete,
+  type Order, type InsertOrder,
   type Registration, type InsertRegistration,
   type DocumentAcceptance, type InsertDocumentAcceptance,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
+  // Admin Users
+  getAdminUser(id: string): Promise<AdminUser | undefined>;
+  getAdminUserByEmail(email: string): Promise<AdminUser | undefined>;
+  getAdminUsers(): Promise<AdminUser[]>;
+  createAdminUser(user: InsertAdminUser): Promise<AdminUser>;
+  updateAdminUser(id: string, user: Partial<InsertAdminUser>): Promise<AdminUser | undefined>;
+  deleteAdminUser(id: string): Promise<boolean>;
+  updateAdminUserLastLogin(id: string): Promise<void>;
+
+  // Organizers
   getOrganizer(id: string): Promise<Organizer | undefined>;
+  getOrganizerByCpfCnpj(cpfCnpj: string): Promise<Organizer | undefined>;
   getOrganizers(): Promise<Organizer[]>;
   createOrganizer(organizer: InsertOrganizer): Promise<Organizer>;
+  updateOrganizer(id: string, organizer: Partial<InsertOrganizer>): Promise<Organizer | undefined>;
+  deleteOrganizer(id: string): Promise<boolean>;
 
+  // Events
   getEvent(id: string): Promise<Event | undefined>;
   getEventBySlug(slug: string): Promise<Event | undefined>;
   getEvents(): Promise<Event[]>;
   getEventsByOrganizer(organizerId: string): Promise<Event[]>;
   createEvent(event: InsertEvent): Promise<Event>;
   updateEvent(id: string, event: Partial<InsertEvent>): Promise<Event | undefined>;
+  deleteEvent(id: string): Promise<boolean>;
 
+  // Modalities
   getModality(id: string): Promise<Modality | undefined>;
   getModalitiesByEvent(eventId: string): Promise<Modality[]>;
   createModality(modality: InsertModality): Promise<Modality>;
   updateModality(id: string, modality: Partial<InsertModality>): Promise<Modality | undefined>;
   deleteModality(id: string): Promise<boolean>;
 
+  // Shirt Sizes
+  getShirtSize(id: string): Promise<ShirtSize | undefined>;
   getShirtSizesByEvent(eventId: string): Promise<ShirtSize[]>;
   getShirtSizesByModality(modalityId: string): Promise<ShirtSize[]>;
   createShirtSize(shirtSize: InsertShirtSize): Promise<ShirtSize>;
   updateShirtSize(id: string, shirtSize: Partial<InsertShirtSize>): Promise<ShirtSize | undefined>;
+  deleteShirtSize(id: string): Promise<boolean>;
   decrementShirtSize(id: string): Promise<boolean>;
 
+  // Batches (Lotes)
+  getBatch(id: string): Promise<RegistrationBatch | undefined>;
   getBatchesByEvent(eventId: string): Promise<RegistrationBatch[]>;
   getActiveBatch(eventId: string): Promise<RegistrationBatch | undefined>;
   createBatch(batch: InsertRegistrationBatch): Promise<RegistrationBatch>;
   updateBatch(id: string, batch: Partial<InsertRegistrationBatch>): Promise<RegistrationBatch | undefined>;
+  deleteBatch(id: string): Promise<boolean>;
 
+  // Prices
   getPrice(modalityId: string, batchId: string): Promise<Price | undefined>;
+  getPriceById(id: string): Promise<Price | undefined>;
   getPricesByModality(modalityId: string): Promise<Price[]>;
   getPricesByBatch(batchId: string): Promise<Price[]>;
+  getPricesByEvent(eventId: string): Promise<Price[]>;
   createPrice(price: InsertPrice): Promise<Price>;
   updatePrice(id: string, price: Partial<InsertPrice>): Promise<Price | undefined>;
+  deletePrice(id: string): Promise<boolean>;
 
+  // Attachments
+  getAttachment(id: string): Promise<Attachment | undefined>;
   getAttachmentsByEvent(eventId: string): Promise<Attachment[]>;
   createAttachment(attachment: InsertAttachment): Promise<Attachment>;
+  updateAttachment(id: string, attachment: Partial<InsertAttachment>): Promise<Attachment | undefined>;
   deleteAttachment(id: string): Promise<boolean>;
 
+  // Athletes
   getAthlete(id: string): Promise<Athlete | undefined>;
   getAthleteByCpf(cpf: string): Promise<Athlete | undefined>;
   createAthlete(athlete: InsertAthlete): Promise<Athlete>;
   updateAthlete(id: string, athlete: Partial<InsertAthlete>): Promise<Athlete | undefined>;
 
+  // Orders
+  getOrder(id: string): Promise<Order | undefined>;
+  getOrdersByEvent(eventId: string): Promise<Order[]>;
+  getOrdersByBuyer(buyerId: string): Promise<Order[]>;
+  createOrder(order: InsertOrder): Promise<Order>;
+  updateOrder(id: string, order: Partial<InsertOrder>): Promise<Order | undefined>;
+  getNextOrderNumber(eventId: string): Promise<number>;
+
+  // Registrations
   getRegistration(id: string): Promise<Registration | undefined>;
   getRegistrationsByEvent(eventId: string): Promise<Registration[]>;
   getRegistrationsByAthlete(athleteId: string): Promise<Registration[]>;
+  getRegistrationsByOrder(orderId: string): Promise<Registration[]>;
   createRegistration(registration: InsertRegistration): Promise<Registration>;
   updateRegistration(id: string, registration: Partial<InsertRegistration>): Promise<Registration | undefined>;
+  getNextRegistrationNumber(eventId: string): Promise<number>;
 
+  // Document Acceptances
   getDocumentAcceptancesByRegistration(registrationId: string): Promise<DocumentAcceptance[]>;
   createDocumentAcceptance(acceptance: InsertDocumentAcceptance): Promise<DocumentAcceptance>;
 }
 
 export class MemStorage implements IStorage {
+  private adminUsers: Map<string, AdminUser> = new Map();
   private organizers: Map<string, Organizer> = new Map();
   private events: Map<string, Event> = new Map();
   private modalities: Map<string, Modality> = new Map();
@@ -75,11 +120,65 @@ export class MemStorage implements IStorage {
   private prices: Map<string, Price> = new Map();
   private attachments: Map<string, Attachment> = new Map();
   private athletes: Map<string, Athlete> = new Map();
+  private orders: Map<string, Order> = new Map();
   private registrations: Map<string, Registration> = new Map();
   private documentAcceptances: Map<string, DocumentAcceptance> = new Map();
 
+  // Admin Users
+  async getAdminUser(id: string): Promise<AdminUser | undefined> {
+    return this.adminUsers.get(id);
+  }
+
+  async getAdminUserByEmail(email: string): Promise<AdminUser | undefined> {
+    return Array.from(this.adminUsers.values()).find(u => u.email.toLowerCase() === email.toLowerCase());
+  }
+
+  async getAdminUsers(): Promise<AdminUser[]> {
+    return Array.from(this.adminUsers.values());
+  }
+
+  async createAdminUser(insertUser: InsertAdminUser): Promise<AdminUser> {
+    const id = randomUUID();
+    const user: AdminUser = {
+      ...insertUser,
+      id,
+      status: insertUser.status ?? "ativo",
+      organizerId: insertUser.organizerId ?? null,
+      ultimoLogin: null,
+      dataCriacao: new Date(),
+      dataAtualizacao: new Date()
+    };
+    this.adminUsers.set(id, user);
+    return user;
+  }
+
+  async updateAdminUser(id: string, userData: Partial<InsertAdminUser>): Promise<AdminUser | undefined> {
+    const user = this.adminUsers.get(id);
+    if (!user) return undefined;
+    const updated = { ...user, ...userData, dataAtualizacao: new Date() };
+    this.adminUsers.set(id, updated);
+    return updated;
+  }
+
+  async deleteAdminUser(id: string): Promise<boolean> {
+    return this.adminUsers.delete(id);
+  }
+
+  async updateAdminUserLastLogin(id: string): Promise<void> {
+    const user = this.adminUsers.get(id);
+    if (user) {
+      user.ultimoLogin = new Date();
+      this.adminUsers.set(id, user);
+    }
+  }
+
+  // Organizers
   async getOrganizer(id: string): Promise<Organizer | undefined> {
     return this.organizers.get(id);
+  }
+
+  async getOrganizerByCpfCnpj(cpfCnpj: string): Promise<Organizer | undefined> {
+    return Array.from(this.organizers.values()).find(o => o.cpfCnpj === cpfCnpj);
   }
 
   async getOrganizers(): Promise<Organizer[]> {
@@ -95,6 +194,18 @@ export class MemStorage implements IStorage {
     };
     this.organizers.set(id, organizer);
     return organizer;
+  }
+
+  async updateOrganizer(id: string, organizerData: Partial<InsertOrganizer>): Promise<Organizer | undefined> {
+    const organizer = this.organizers.get(id);
+    if (!organizer) return undefined;
+    const updated = { ...organizer, ...organizerData };
+    this.organizers.set(id, updated);
+    return updated;
+  }
+
+  async deleteOrganizer(id: string): Promise<boolean> {
+    return this.organizers.delete(id);
   }
 
   async getEvent(id: string): Promise<Event | undefined> {
@@ -136,6 +247,10 @@ export class MemStorage implements IStorage {
     return updated;
   }
 
+  async deleteEvent(id: string): Promise<boolean> {
+    return this.events.delete(id);
+  }
+
   async getModality(id: string): Promise<Modality | undefined> {
     return this.modalities.get(id);
   }
@@ -155,6 +270,7 @@ export class MemStorage implements IStorage {
       mapaPercursoUrl: insertModality.mapaPercursoUrl ?? null,
       limiteVagas: insertModality.limiteVagas ?? null,
       tipoAcesso: insertModality.tipoAcesso ?? "paga",
+      taxaComodidade: insertModality.taxaComodidade ?? "0",
       ordem: insertModality.ordem ?? 0
     };
     this.modalities.set(id, modality);
@@ -171,6 +287,10 @@ export class MemStorage implements IStorage {
 
   async deleteModality(id: string): Promise<boolean> {
     return this.modalities.delete(id);
+  }
+
+  async getShirtSize(id: string): Promise<ShirtSize | undefined> {
+    return this.shirtSizes.get(id);
   }
 
   async getShirtSizesByEvent(eventId: string): Promise<ShirtSize[]> {
@@ -200,11 +320,19 @@ export class MemStorage implements IStorage {
     return updated;
   }
 
+  async deleteShirtSize(id: string): Promise<boolean> {
+    return this.shirtSizes.delete(id);
+  }
+
   async decrementShirtSize(id: string): Promise<boolean> {
     const shirtSize = this.shirtSizes.get(id);
     if (!shirtSize || shirtSize.quantidadeDisponivel <= 0) return false;
     shirtSize.quantidadeDisponivel--;
     return true;
+  }
+
+  async getBatch(id: string): Promise<RegistrationBatch | undefined> {
+    return this.batches.get(id);
   }
 
   async getBatchesByEvent(eventId: string): Promise<RegistrationBatch[]> {
@@ -245,8 +373,16 @@ export class MemStorage implements IStorage {
     return updated;
   }
 
+  async deleteBatch(id: string): Promise<boolean> {
+    return this.batches.delete(id);
+  }
+
   async getPrice(modalityId: string, batchId: string): Promise<Price | undefined> {
     return Array.from(this.prices.values()).find(p => p.modalityId === modalityId && p.batchId === batchId);
+  }
+
+  async getPriceById(id: string): Promise<Price | undefined> {
+    return this.prices.get(id);
   }
 
   async getPricesByModality(modalityId: string): Promise<Price[]> {
@@ -255,6 +391,12 @@ export class MemStorage implements IStorage {
 
   async getPricesByBatch(batchId: string): Promise<Price[]> {
     return Array.from(this.prices.values()).filter(p => p.batchId === batchId);
+  }
+
+  async getPricesByEvent(eventId: string): Promise<Price[]> {
+    const eventModalities = await this.getModalitiesByEvent(eventId);
+    const modalityIds = new Set(eventModalities.map(m => m.id));
+    return Array.from(this.prices.values()).filter(p => modalityIds.has(p.modalityId));
   }
 
   async createPrice(insertPrice: InsertPrice): Promise<Price> {
@@ -272,6 +414,14 @@ export class MemStorage implements IStorage {
     return updated;
   }
 
+  async deletePrice(id: string): Promise<boolean> {
+    return this.prices.delete(id);
+  }
+
+  async getAttachment(id: string): Promise<Attachment | undefined> {
+    return this.attachments.get(id);
+  }
+
   async getAttachmentsByEvent(eventId: string): Promise<Attachment[]> {
     return Array.from(this.attachments.values()).filter(a => a.eventId === eventId);
   }
@@ -286,6 +436,14 @@ export class MemStorage implements IStorage {
     };
     this.attachments.set(id, attachment);
     return attachment;
+  }
+
+  async updateAttachment(id: string, attachmentData: Partial<InsertAttachment>): Promise<Attachment | undefined> {
+    const attachment = this.attachments.get(id);
+    if (!attachment) return undefined;
+    const updated = { ...attachment, ...attachmentData };
+    this.attachments.set(id, updated);
+    return updated;
   }
 
   async deleteAttachment(id: string): Promise<boolean> {
@@ -321,6 +479,53 @@ export class MemStorage implements IStorage {
     return updated;
   }
 
+  // Orders
+  async getOrder(id: string): Promise<Order | undefined> {
+    return this.orders.get(id);
+  }
+
+  async getOrdersByEvent(eventId: string): Promise<Order[]> {
+    return Array.from(this.orders.values()).filter(o => o.eventId === eventId);
+  }
+
+  async getOrdersByBuyer(buyerId: string): Promise<Order[]> {
+    return Array.from(this.orders.values()).filter(o => o.compradorId === buyerId);
+  }
+
+  async createOrder(insertOrder: InsertOrder): Promise<Order> {
+    const id = randomUUID();
+    const order: Order = {
+      ...insertOrder,
+      id,
+      valorDesconto: insertOrder.valorDesconto ?? "0",
+      codigoVoucher: insertOrder.codigoVoucher ?? null,
+      status: insertOrder.status ?? "pendente",
+      idPagamentoGateway: insertOrder.idPagamentoGateway ?? null,
+      metodoPagamento: insertOrder.metodoPagamento ?? null,
+      dataPedido: new Date(),
+      dataPagamento: insertOrder.dataPagamento ?? null,
+      dataExpiracao: insertOrder.dataExpiracao ?? null,
+      ipComprador: insertOrder.ipComprador ?? null
+    };
+    this.orders.set(id, order);
+    return order;
+  }
+
+  async updateOrder(id: string, orderData: Partial<InsertOrder>): Promise<Order | undefined> {
+    const order = this.orders.get(id);
+    if (!order) return undefined;
+    const updated = { ...order, ...orderData };
+    this.orders.set(id, updated);
+    return updated;
+  }
+
+  async getNextOrderNumber(eventId: string): Promise<number> {
+    const orders = await this.getOrdersByEvent(eventId);
+    if (orders.length === 0) return 1;
+    return Math.max(...orders.map(o => o.numeroPedido)) + 1;
+  }
+
+  // Registrations
   async getRegistration(id: string): Promise<Registration | undefined> {
     return this.registrations.get(id);
   }
@@ -331,6 +536,16 @@ export class MemStorage implements IStorage {
 
   async getRegistrationsByAthlete(athleteId: string): Promise<Registration[]> {
     return Array.from(this.registrations.values()).filter(r => r.athleteId === athleteId);
+  }
+
+  async getRegistrationsByOrder(orderId: string): Promise<Registration[]> {
+    return Array.from(this.registrations.values()).filter(r => r.orderId === orderId);
+  }
+
+  async getNextRegistrationNumber(eventId: string): Promise<number> {
+    const registrations = await this.getRegistrationsByEvent(eventId);
+    if (registrations.length === 0) return 1;
+    return Math.max(...registrations.map(r => r.numeroInscricao)) + 1;
   }
 
   async createRegistration(insertRegistration: InsertRegistration): Promise<Registration> {
@@ -388,9 +603,7 @@ export class MemStorage implements IStorage {
       id,
       status: insertRegistration.status ?? "pendente",
       tamanhoCamisa: insertRegistration.tamanhoCamisa ?? null,
-      codigoVoucher: insertRegistration.codigoVoucher ?? null,
-      dataPagamento: insertRegistration.dataPagamento ?? null,
-      idPagamentoGateway: insertRegistration.idPagamentoGateway ?? null,
+      taxaComodidade: insertRegistration.taxaComodidade ?? "0",
       equipe: insertRegistration.equipe ?? null,
       dataInscricao: new Date() 
     };

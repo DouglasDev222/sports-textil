@@ -104,7 +104,67 @@ Preferred communication style: Simple, everyday language.
 
 ### Route Structure
 
-**Public Routes**
+**Admin API Routes (Implemented)**
+
+*Authentication*
+- `POST /api/admin/auth/setup` - Initial superadmin setup (only works when no users exist)
+- `POST /api/admin/auth/login` - Admin login with email/password
+- `POST /api/admin/auth/logout` - Admin logout
+- `GET /api/admin/auth/me` - Get current admin user
+
+*Organizers CRUD*
+- `GET /api/admin/organizers` - List all organizers
+- `GET /api/admin/organizers/:id` - Get organizer by ID
+- `POST /api/admin/organizers` - Create organizer
+- `PATCH /api/admin/organizers/:id` - Update organizer
+- `DELETE /api/admin/organizers/:id` - Delete organizer
+
+*Events CRUD*
+- `GET /api/admin/events` - List events (filtered by organizer for organizador role)
+- `GET /api/admin/events/:id` - Get event by ID
+- `GET /api/admin/events/:id/full` - Get event with all related data
+- `POST /api/admin/events` - Create event
+- `PATCH /api/admin/events/:id` - Update event
+- `PATCH /api/admin/events/:id/status` - Change event status (with validation)
+- `DELETE /api/admin/events/:id` - Delete event (only draft without registrations)
+
+*Modalities CRUD*
+- `GET /api/admin/events/:eventId/modalities` - List modalities
+- `POST /api/admin/events/:eventId/modalities` - Create modality
+- `PATCH /api/admin/events/:eventId/modalities/:id` - Update modality
+- `PATCH /api/admin/events/:eventId/modalities/reorder` - Reorder modalities
+- `DELETE /api/admin/events/:eventId/modalities/:id` - Delete modality
+
+*Batches (Lotes) CRUD*
+- `GET /api/admin/events/:eventId/batches` - List batches
+- `POST /api/admin/events/:eventId/batches` - Create batch
+- `PATCH /api/admin/events/:eventId/batches/:id` - Update batch
+- `DELETE /api/admin/events/:eventId/batches/:id` - Delete batch
+
+*Prices CRUD*
+- `GET /api/admin/events/:eventId/prices` - List prices
+- `POST /api/admin/events/:eventId/prices` - Create price
+- `PATCH /api/admin/events/:eventId/prices/:id` - Update price
+- `PUT /api/admin/events/:eventId/prices/bulk` - Bulk create/update prices
+- `DELETE /api/admin/events/:eventId/prices/:id` - Delete price
+
+*Shirt Sizes CRUD*
+- `GET /api/admin/events/:eventId/shirts` - List shirt sizes
+- `POST /api/admin/events/:eventId/shirts` - Create shirt size
+- `PATCH /api/admin/events/:eventId/shirts/:id` - Update shirt size
+- `DELETE /api/admin/events/:eventId/shirts/:id` - Delete shirt size
+
+*Attachments CRUD*
+- `GET /api/admin/events/:eventId/attachments` - List attachments
+- `POST /api/admin/events/:eventId/attachments` - Create attachment
+- `PATCH /api/admin/events/:eventId/attachments/:id` - Update attachment
+- `DELETE /api/admin/events/:eventId/attachments/:id` - Delete attachment
+
+**Public API Routes**
+- `GET /api/events` - List published events
+- `GET /api/events/:slug` - Get published event with modalities, active batch, and prices
+
+**Public Frontend Routes**
 - `/` - Event listing page with search functionality
 - `/login` - Authentication via CPF and birth date
 - `/cadastro` - New athlete registration

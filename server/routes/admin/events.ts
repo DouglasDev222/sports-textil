@@ -1,0 +1,321 @@
+import { Router } from "express";
+import { z } from "zod";
+import { storage } from "../../storage";
+import { requireAuth, requireRole, checkEventOwnership } from "../../middleware/auth";
+import { slugify, generateUniqueSlug } from "../../utils/slugify";
+
+const router = Router();
+
+const eventSchema = z.object({
+  organizerId: z.string().min(1, "Organizador e obrigatorio"),
+  nome: z.string().min(3, "Nome deve ter pelo menos 3 caracteres"),
+  descricao: z.string().min(10, "Descricao deve ter pelo menos 10 caracteres"),
+  dataEvento: z.string().refine(val => !isNaN(Date.parse(val)), "Data do evento invalida"),
+  endereco: z.string().min(5, "Endereco deve ter pelo menos 5 caracteres"),
+  cidade: z.string().min(2, "Cidade deve ter pelo menos 2 caracteres"),
+  estado: z.string().length(2, "Estado deve ter 2 caracteres"),
+  bannerUrl: z.string().url().optional().nullable(),
+  aberturaInscricoes: z.string().refine(val => !isNaN(Date.parse(val)), "Data de abertura invalida"),
+  encerramentoInscricoes: z.string().refine(val => !isNaN(Date.parse(val)), "Data de encerramento invalida"),
+  limiteVagasTotal: z.number().int().positive("Limite de vagas deve ser positivo"),
+  entregaCamisaNoKit: z.boolean().optional(),
+  usarGradePorModalidade: z.boolean().optional()
+});
+
+router.get("/", requireAuth, async (req, res) => {
+  try {
+    const user = req.adminUser;
+    let events;
+    
+    if (user?.role === "organizador" && user.organizerId) {
+      events = await storage.getEventsByOrganizer(user.organizerId);
+    } else {
+      events = await storage.getEvents();
+    }
+    
+    res.json({ success: true, data: events });
+  } catch (error) {
+    console.error("Get events error:", error);
+    res.status(500).json({
+      success: false,
+      error: { code: "INTERNAL_ERROR", message: "Erro interno do servidor" }
+    });
+  }
+});
+
+router.get("/:id", requireAuth, async (req, res) => {
+  try {
+    const event = await storage.getEvent(req.params.id);
+    if (!event) {
+      return res.status(404).json({
+        success: false,
+        error: { code: "NOT_FOUND", message: "Evento nao encontrado" }
+      });
+    }
+
+    const hasAccess = await checkEventOwnership(req, res, event.id);
+    if (!hasAccess) {
+      return res.status(403).json({
+        success: false,
+        error: { code: "FORBIDDEN", message: "Sem permissao para acessar este evento" }
+      });
+    }
+
+    res.json({ success: true, data: event });
+  } catch (error) {
+    console.error("Get event error:", error);
+    res.status(500).json({
+      success: false,
+      error: { code: "INTERNAL_ERROR", message: "Erro interno do servidor" }
+    });
+  }
+});
+
+router.get("/:id/full", requireAuth, async (req, res) => {
+  try {
+    const event = await storage.getEvent(req.params.id);
+    if (!event) {
+      return res.status(404).json({
+        success: false,
+        error: { code: "NOT_FOUND", message: "Evento nao encontrado" }
+      });
+    }
+
+    const hasAccess = await checkEventOwnership(req, res, event.id);
+    if (!hasAccess) {
+      return res.status(403).json({
+        success: false,
+        error: { code: "FORBIDDEN", message: "Sem permissao para acessar este evento" }
+      });
+    }
+    
+    const [modalities, batches, prices, shirtSizes, attachments] = await Promise.all([
+      storage.getModalitiesByEvent(event.id),
+      storage.getBatchesByEvent(event.id),
+      storage.getPricesByEvent(event.id),
+      storage.getShirtSizesByEvent(event.id),
+      storage.getAttachmentsByEvent(event.id)
+    ]);
+    
+    res.json({ 
+      success: true, 
+      data: {
+        ...event,
+        modalities,
+        batches,
+        prices,
+        shirtSizes,
+        attachments
+      }
+    });
+  } catch (error) {
+    console.error("Get event full error:", error);
+    res.status(500).json({
+      success: false,
+      error: { code: "INTERNAL_ERROR", message: "Erro interno do servidor" }
+    });
+  }
+});
+
+router.post("/", requireAuth, requireRole("superadmin", "admin"), async (req, res) => {
+  try {
+    const validation = eventSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({
+        success: false,
+        error: { code: "VALIDATION_ERROR", message: validation.error.errors[0].message }
+      });
+    }
+
+    const organizer = await storage.getOrganizer(validation.data.organizerId);
+    if (!organizer) {
+      return res.status(400).json({
+        success: false,
+        error: { code: "INVALID_ORGANIZER", message: "Organizador nao encontrado" }
+      });
+    }
+
+    const allEvents = await storage.getEvents();
+    const existingSlugs = allEvents.map(e => e.slug);
+    const slug = generateUniqueSlug(validation.data.nome, existingSlugs);
+
+    const event = await storage.createEvent({
+      nome: validation.data.nome,
+      organizerId: validation.data.organizerId,
+      slug,
+      descricao: validation.data.descricao,
+      dataEvento: validation.data.dataEvento,
+      endereco: validation.data.endereco,
+      cidade: validation.data.cidade,
+      estado: validation.data.estado,
+      aberturaInscricoes: new Date(validation.data.aberturaInscricoes),
+      encerramentoInscricoes: new Date(validation.data.encerramentoInscricoes),
+      limiteVagasTotal: validation.data.limiteVagasTotal,
+      bannerUrl: validation.data.bannerUrl ?? null,
+      status: "rascunho",
+      entregaCamisaNoKit: validation.data.entregaCamisaNoKit ?? true,
+      usarGradePorModalidade: validation.data.usarGradePorModalidade ?? false
+    });
+
+    res.status(201).json({ success: true, data: event });
+  } catch (error) {
+    console.error("Create event error:", error);
+    res.status(500).json({
+      success: false,
+      error: { code: "INTERNAL_ERROR", message: "Erro interno do servidor" }
+    });
+  }
+});
+
+router.patch("/:id", requireAuth, requireRole("superadmin", "admin"), async (req, res) => {
+  try {
+    const event = await storage.getEvent(req.params.id);
+    if (!event) {
+      return res.status(404).json({
+        success: false,
+        error: { code: "NOT_FOUND", message: "Evento nao encontrado" }
+      });
+    }
+
+    const updateSchema = eventSchema.partial();
+    const validation = updateSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({
+        success: false,
+        error: { code: "VALIDATION_ERROR", message: validation.error.errors[0].message }
+      });
+    }
+
+    if (validation.data.organizerId) {
+      const organizer = await storage.getOrganizer(validation.data.organizerId);
+      if (!organizer) {
+        return res.status(400).json({
+          success: false,
+          error: { code: "INVALID_ORGANIZER", message: "Organizador nao encontrado" }
+        });
+      }
+    }
+
+    const updateData: Record<string, unknown> = { ...validation.data };
+    if (validation.data.aberturaInscricoes) {
+      updateData.aberturaInscricoes = new Date(validation.data.aberturaInscricoes);
+    }
+    if (validation.data.encerramentoInscricoes) {
+      updateData.encerramentoInscricoes = new Date(validation.data.encerramentoInscricoes);
+    }
+
+    const updated = await storage.updateEvent(req.params.id, updateData);
+    res.json({ success: true, data: updated });
+  } catch (error) {
+    console.error("Update event error:", error);
+    res.status(500).json({
+      success: false,
+      error: { code: "INTERNAL_ERROR", message: "Erro interno do servidor" }
+    });
+  }
+});
+
+router.patch("/:id/status", requireAuth, requireRole("superadmin", "admin"), async (req, res) => {
+  try {
+    const event = await storage.getEvent(req.params.id);
+    if (!event) {
+      return res.status(404).json({
+        success: false,
+        error: { code: "NOT_FOUND", message: "Evento nao encontrado" }
+      });
+    }
+
+    const statusSchema = z.object({
+      status: z.enum(["rascunho", "publicado", "cancelado", "finalizado"])
+    });
+
+    const validation = statusSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({
+        success: false,
+        error: { code: "VALIDATION_ERROR", message: "Status invalido" }
+      });
+    }
+
+    const newStatus = validation.data.status;
+
+    if (newStatus === "publicado") {
+      const modalities = await storage.getModalitiesByEvent(event.id);
+      if (modalities.length === 0) {
+        return res.status(400).json({
+          success: false,
+          error: { code: "NO_MODALITIES", message: "Evento precisa ter pelo menos uma modalidade" }
+        });
+      }
+
+      const batches = await storage.getBatchesByEvent(event.id);
+      const activeBatches = batches.filter(b => b.ativo);
+      if (activeBatches.length === 0) {
+        return res.status(400).json({
+          success: false,
+          error: { code: "NO_ACTIVE_BATCHES", message: "Evento precisa ter pelo menos um lote ativo" }
+        });
+      }
+
+      const paidModalities = modalities.filter(m => m.tipoAcesso === "paga");
+      const prices = await storage.getPricesByEvent(event.id);
+      
+      for (const modality of paidModalities) {
+        const hasPrice = prices.some(p => p.modalityId === modality.id);
+        if (!hasPrice) {
+          return res.status(400).json({
+            success: false,
+            error: { code: "MISSING_PRICE", message: `Modalidade "${modality.nome}" precisa ter preco definido` }
+          });
+        }
+      }
+    }
+
+    const updated = await storage.updateEvent(req.params.id, { status: newStatus });
+    res.json({ success: true, data: updated });
+  } catch (error) {
+    console.error("Update event status error:", error);
+    res.status(500).json({
+      success: false,
+      error: { code: "INTERNAL_ERROR", message: "Erro interno do servidor" }
+    });
+  }
+});
+
+router.delete("/:id", requireAuth, requireRole("superadmin", "admin"), async (req, res) => {
+  try {
+    const event = await storage.getEvent(req.params.id);
+    if (!event) {
+      return res.status(404).json({
+        success: false,
+        error: { code: "NOT_FOUND", message: "Evento nao encontrado" }
+      });
+    }
+
+    if (event.status !== "rascunho") {
+      return res.status(400).json({
+        success: false,
+        error: { code: "CANNOT_DELETE", message: "Apenas eventos em rascunho podem ser excluidos" }
+      });
+    }
+
+    const registrations = await storage.getRegistrationsByEvent(event.id);
+    if (registrations.length > 0) {
+      return res.status(400).json({
+        success: false,
+        error: { code: "HAS_REGISTRATIONS", message: "Evento possui inscricoes e nao pode ser excluido" }
+      });
+    }
+
+    await storage.deleteEvent(req.params.id);
+    res.json({ success: true, data: { message: "Evento removido com sucesso" } });
+  } catch (error) {
+    console.error("Delete event error:", error);
+    res.status(500).json({
+      success: false,
+      error: { code: "INTERNAL_ERROR", message: "Erro interno do servidor" }
+    });
+  }
+});
+
+export default router;
