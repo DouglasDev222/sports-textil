@@ -161,6 +161,7 @@ export const registrations = pgTable("registrations", {
   athleteId: varchar("athlete_id").notNull().references(() => athletes.id),
   tamanhoCamisa: varchar("tamanho_camisa", { length: 10 }),
   valorUnitario: decimal("valor_unitario", { precision: 10, scale: 2 }).notNull(),
+  taxaComodidade: decimal("taxa_comodidade", { precision: 10, scale: 2 }).default("0").notNull(),
   status: registrationStatusEnum("status").default("pendente").notNull(),
   equipe: text("equipe"),
   dataInscricao: timestamp("data_inscricao").defaultNow().notNull(),
