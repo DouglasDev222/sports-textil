@@ -48,6 +48,13 @@ Preferred communication style: Simple, everyday language.
 - Schema-first approach with Drizzle-Zod integration for runtime validation
 
 **Database Schema (Supabase PostgreSQL)**
+
+*Authentication & Authorization Tables:*
+- `admin_users` table: Administrative users (superadmin, admin, organizer) with email/password authentication, role-based permissions, status (ativo, inativo, bloqueado), and optional link to organizer
+- `permissions` table: System permissions by module (eventos.criar, inscricoes.exportar, etc.)
+- `role_permissions` table: Links roles to their allowed permissions
+
+*Business Entity Tables:*
 - `organizers` table: Event organizers (companies or individuals) with CPF/CNPJ, contact info
 - `events` table: Running events with mandatory total capacity limit (`limiteVagasTotal`), status (rascunho, publicado, cancelado, finalizado), inscription dates, shirt delivery options
 - `modalities` table: Race modalities (5km, 10km, 21km, Kids, PCD) with distance, schedule, optional per-modality capacity limit (`limiteVagas`), access type (free, paid, voucher, PCD, manual approval)
@@ -59,6 +66,11 @@ Preferred communication style: Simple, everyday language.
 - `orders` table: Groups multiple registrations into a single purchase order with payment info, voucher codes, and status (pendente, pago, cancelado, reembolsado, expirado)
 - `registrations` table: Individual registrations linked to order, event, modality, batch, athlete with unit price
 - `document_acceptances` table: Tracks which documents each athlete accepted and when
+
+**User Roles & Permissions**
+- `superadmin`: Full system access, can manage all admins and users
+- `admin`: Can create/edit organizers and events, but cannot manage other admins
+- `organizador`: Read-only access to their own event data (dashboard, registrations, exports)
 
 **Entity Relationships**
 - 1 Organizer -> many Events

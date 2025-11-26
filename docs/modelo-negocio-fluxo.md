@@ -12,14 +12,21 @@ O ST Eventos e uma plataforma de inscricoes para eventos de corrida (maratonas, 
 
 ## Papeis e Permissoes
 
-### Administrador do Sistema
+### Super Administrador (superadmin)
+- Acesso total ao sistema
+- Criar/editar/remover administradores
+- Criar/editar/remover organizadores
+- Gerenciar configuracoes globais do sistema
+- Visualizar todos os eventos e dados
+
+### Administrador (admin)
 - Criar e editar organizadores
 - Criar e editar eventos completos (dados, modalidades, lotes, precos, camisas, anexos)
 - Publicar/cancelar/finalizar eventos
 - Visualizar todos os dados do sistema
-- Gerenciar configuracoes do sistema
+- NAO pode criar outros administradores
 
-### Organizador do Evento (SOMENTE LEITURA)
+### Organizador do Evento (organizador) - SOMENTE LEITURA
 - **NAO PODE** criar ou editar eventos
 - **NAO PODE** alterar precos, modalidades, lotes ou qualquer configuracao
 - **PODE APENAS** visualizar dados do seu evento via dashboard:
@@ -30,6 +37,87 @@ O ST Eventos e uma plataforma de inscricoes para eventos de corrida (maratonas, 
   - Faturamento bruto e liquido
   - Grade de camisas (quantas de cada tamanho)
   - Graficos de inscricoes por dia/semana
+
+---
+
+## Estrutura de Autenticacao (Banco de Dados)
+
+### Tabela: admin_users
+| Campo | Tipo | Descricao |
+|-------|------|-----------|
+| id | UUID | Identificador unico |
+| email | TEXT | Email para login (unico) |
+| password_hash | TEXT | Senha criptografada (bcrypt/argon2) |
+| nome | TEXT | Nome do usuario |
+| role | ENUM | superadmin, admin, organizador |
+| status | ENUM | ativo, inativo, bloqueado |
+| organizer_id | UUID | Vinculo com organizador (apenas para role=organizador) |
+| ultimo_login | TIMESTAMP | Data/hora do ultimo acesso |
+| data_criacao | TIMESTAMP | Data de criacao |
+| data_atualizacao | TIMESTAMP | Data da ultima atualizacao |
+
+### Tabela: permissions
+| Campo | Tipo | Descricao |
+|-------|------|-----------|
+| id | UUID | Identificador unico |
+| codigo | VARCHAR | Codigo unico da permissao (ex: eventos.criar) |
+| nome | TEXT | Nome legivel |
+| descricao | TEXT | Descricao da permissao |
+| modulo | VARCHAR | Modulo do sistema (eventos, inscricoes, etc) |
+
+### Tabela: role_permissions
+| Campo | Tipo | Descricao |
+|-------|------|-----------|
+| id | UUID | Identificador unico |
+| role | ENUM | Role que recebe a permissao |
+| permission_id | UUID | Referencia a permissao |
+
+### Permissoes por Modulo
+
+**Modulo: Organizadores**
+- `organizadores.listar` - Listar organizadores
+- `organizadores.criar` - Criar organizador
+- `organizadores.editar` - Editar organizador
+- `organizadores.excluir` - Excluir organizador
+
+**Modulo: Eventos**
+- `eventos.listar` - Listar eventos
+- `eventos.visualizar` - Ver detalhes do evento
+- `eventos.criar` - Criar evento
+- `eventos.editar` - Editar evento
+- `eventos.publicar` - Publicar evento
+- `eventos.cancelar` - Cancelar evento
+
+**Modulo: Inscricoes**
+- `inscricoes.listar` - Listar inscricoes
+- `inscricoes.visualizar` - Ver detalhes de inscricao
+- `inscricoes.exportar` - Exportar lista de inscritos
+
+**Modulo: Dashboard**
+- `dashboard.visualizar` - Ver metricas do evento
+- `dashboard.faturamento` - Ver faturamento
+
+**Modulo: Usuarios**
+- `usuarios.listar` - Listar usuarios admin
+- `usuarios.criar` - Criar usuario admin
+- `usuarios.editar` - Editar usuario admin
+- `usuarios.excluir` - Excluir usuario admin
+
+### Matriz de Permissoes por Role
+
+| Permissao | Superadmin | Admin | Organizador |
+|-----------|------------|-------|-------------|
+| organizadores.* | SIM | SIM | NAO |
+| eventos.listar | SIM | SIM | SIM (proprio) |
+| eventos.visualizar | SIM | SIM | SIM (proprio) |
+| eventos.criar | SIM | SIM | NAO |
+| eventos.editar | SIM | SIM | NAO |
+| eventos.publicar | SIM | SIM | NAO |
+| inscricoes.listar | SIM | SIM | SIM (proprio) |
+| inscricoes.exportar | SIM | SIM | SIM (proprio) |
+| dashboard.visualizar | SIM | SIM | SIM (proprio) |
+| dashboard.faturamento | SIM | SIM | SIM (proprio) |
+| usuarios.* | SIM | NAO | NAO |
 
 ---
 
