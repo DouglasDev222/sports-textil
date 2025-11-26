@@ -11,20 +11,24 @@ import { ChevronLeft, ShieldCheck, AlertCircle } from "lucide-react";
 import Header from "@/components/Header";
 
 const mockCategorias = [
-  { nome: "5km", valor: "R$ 80,00" },
-  { nome: "10km", valor: "R$ 100,00" },
+  { nome: "5km", valor: "R$ 80,00", valorNumerico: 80, taxaComodidade: 5 },
+  { nome: "10km", valor: "R$ 100,00", valorNumerico: 100, taxaComodidade: 7.50 },
   { 
     nome: "5km - Servidores Públicos", 
     valor: "R$ 50,00",
+    valorNumerico: 50,
+    taxaComodidade: 3,
     requerComprovacao: true,
     tipoComprovacao: "codigo",
     mensagemComprovacao: "Esta modalidade é exclusiva para servidores públicos. Insira o código de confirmação fornecido pelo seu órgão."
   },
-  { nome: "21km", valor: "R$ 150,00" },
-  { nome: "42km", valor: "R$ 200,00" },
+  { nome: "21km", valor: "R$ 150,00", valorNumerico: 150, taxaComodidade: 10 },
+  { nome: "42km", valor: "R$ 200,00", valorNumerico: 200, taxaComodidade: 15 },
   { 
     nome: "PCD (Pessoa com Deficiência)", 
     valor: "R$ 40,00",
+    valorNumerico: 40,
+    taxaComodidade: 0,
     requerComprovacao: true,
     tipoComprovacao: "pre_aprovacao",
     mensagemComprovacao: "Sua inscrição passará por análise prévia. Você receberá a confirmação por email em até 48 horas."
@@ -52,7 +56,10 @@ export default function InscricaoModalidadePage() {
         return;
       }
       
-      let url = `/evento/${params?.slug}/inscricao/resumo?modalidade=${modalidadeSelecionada}&tamanho=${tamanhoSelecionado}`;
+      const taxaComodidade = categoriaAtual?.taxaComodidade ?? 0;
+      const valorModalidade = categoriaAtual?.valorNumerico ?? 0;
+      
+      let url = `/evento/${params?.slug}/inscricao/resumo?modalidade=${encodeURIComponent(modalidadeSelecionada)}&tamanho=${tamanhoSelecionado}&valor=${valorModalidade}&taxaComodidade=${taxaComodidade}`;
       if (codigoComprovacao) {
         url += `&codigo=${encodeURIComponent(codigoComprovacao)}`;
       }
@@ -63,6 +70,8 @@ export default function InscricaoModalidadePage() {
 
   const categoriaAtual = mockCategorias.find(c => c.nome === modalidadeSelecionada);
   const modalidadeValor = categoriaAtual?.valor;
+  const taxaComodidadeValor = categoriaAtual?.taxaComodidade ?? 0;
+  const valorTotal = (categoriaAtual?.valorNumerico ?? 0) + taxaComodidadeValor;
   
   const podeAvancar = modalidadeSelecionada && tamanhoSelecionado && 
     (!categoriaAtual?.requerComprovacao || 
@@ -191,10 +200,23 @@ export default function InscricaoModalidadePage() {
         <div className="max-w-2xl mx-auto px-4 py-3">
           <div className="flex items-center justify-between gap-4 mb-3">
             <div>
-              <p className="text-xs text-muted-foreground">Total</p>
-              <p className="text-lg md:text-xl font-bold text-foreground">
-                {modalidadeValor || "Selecione uma modalidade"}
-              </p>
+              {modalidadeSelecionada ? (
+                <>
+                  <p className="text-xs text-muted-foreground">
+                    {modalidadeValor} + Taxa R$ {taxaComodidadeValor.toFixed(2)}
+                  </p>
+                  <p className="text-lg md:text-xl font-bold text-foreground">
+                    Total: R$ {valorTotal.toFixed(2)}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-xs text-muted-foreground">Total</p>
+                  <p className="text-lg md:text-xl font-bold text-foreground">
+                    Selecione uma modalidade
+                  </p>
+                </>
+              )}
             </div>
             <Button
               size="lg"

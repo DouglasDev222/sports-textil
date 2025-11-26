@@ -9,13 +9,6 @@ import { ChevronLeft, Tag, CreditCard, CheckCircle2 } from "lucide-react";
 import Header from "@/components/Header";
 import { useToast } from "@/hooks/use-toast";
 
-const mockCategorias = [
-  { nome: "5km", valor: "R$ 80,00", valorNumerico: 80 },
-  { nome: "10km", valor: "R$ 100,00", valorNumerico: 100 },
-  { nome: "21km", valor: "R$ 150,00", valorNumerico: 150 },
-  { nome: "42km", valor: "R$ 200,00", valorNumerico: 200 },
-  { nome: "PCD (Pessoa com Deficiência)", valor: "R$ 40,00", valorNumerico: 40 },
-];
 
 const cuponsValidos = {
   "DESCONTO10": { desconto: 10, tipo: "percentual" },
@@ -35,9 +28,10 @@ export default function InscricaoPagamentoPage() {
   const modalidade = searchParams.get("modalidade") || "";
   const tamanho = searchParams.get("tamanho") || "";
   const equipe = searchParams.get("equipe") || "";
+  const valorModalidade = parseFloat(searchParams.get("valor") || "0");
+  const taxaComodidade = parseFloat(searchParams.get("taxaComodidade") || "0");
 
-  const categoriaInfo = mockCategorias.find(c => c.nome === modalidade);
-  const valorOriginal = categoriaInfo?.valorNumerico || 0;
+  const valorOriginal = valorModalidade + taxaComodidade;
   
   let valorDesconto = 0;
   if (cupomAplicado && cuponsValidos[cupomAplicado as keyof typeof cuponsValidos]) {
@@ -52,7 +46,7 @@ export default function InscricaoPagamentoPage() {
   const valorFinal = valorOriginal - valorDesconto;
 
   const handleVoltar = () => {
-    setLocation(`/evento/${params?.slug}/inscricao/resumo?modalidade=${modalidade}&tamanho=${tamanho}`);
+    setLocation(`/evento/${params?.slug}/inscricao/resumo?modalidade=${encodeURIComponent(modalidade)}&tamanho=${tamanho}&valor=${valorModalidade}&taxaComodidade=${taxaComodidade}`);
   };
 
   const handleAplicarCupom = () => {
@@ -192,7 +186,13 @@ export default function InscricaoPagamentoPage() {
                 <div className="flex items-center justify-between py-2 border-b">
                   <span className="text-sm text-muted-foreground">Valor da Inscrição</span>
                   <span className="font-medium text-foreground">
-                    R$ {valorOriginal.toFixed(2)}
+                    R$ {valorModalidade.toFixed(2)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between py-2 border-b">
+                  <span className="text-sm text-muted-foreground">Taxa de Comodidade</span>
+                  <span className="font-medium text-foreground">
+                    R$ {taxaComodidade.toFixed(2)}
                   </span>
                 </div>
                 {cupomAplicado && (

@@ -7,13 +7,6 @@ import { Label } from "@/components/ui/label";
 import { ChevronLeft, User, Shirt, Award } from "lucide-react";
 import Header from "@/components/Header";
 
-const mockCategorias = [
-  { nome: "5km", valor: "R$ 80,00" },
-  { nome: "10km", valor: "R$ 100,00" },
-  { nome: "21km", valor: "R$ 150,00" },
-  { nome: "42km", valor: "R$ 200,00" },
-  { nome: "PCD (Pessoa com Deficiência)", valor: "R$ 40,00" },
-];
 
 export default function InscricaoResumoPage() {
   const [, params] = useRoute("/evento/:slug/inscricao/resumo");
@@ -23,6 +16,9 @@ export default function InscricaoResumoPage() {
   const searchParams = new URLSearchParams(window.location.search);
   const modalidade = searchParams.get("modalidade") || "";
   const tamanho = searchParams.get("tamanho") || "";
+  const valorModalidade = parseFloat(searchParams.get("valor") || "0");
+  const taxaComodidade = parseFloat(searchParams.get("taxaComodidade") || "0");
+  const valorTotal = valorModalidade + taxaComodidade;
 
   const mockUsuario = {
     nome: "João Silva",
@@ -34,14 +30,12 @@ export default function InscricaoResumoPage() {
     nome: "Maratona de São Paulo 2025"
   };
 
-  const modalidadeValor = mockCategorias.find(c => c.nome === modalidade)?.valor;
-
   const handleVoltar = () => {
     setLocation(`/evento/${params?.slug}/inscricao/modalidade`);
   };
 
   const handleContinuar = () => {
-    setLocation(`/evento/${params?.slug}/inscricao/pagamento?modalidade=${modalidade}&tamanho=${tamanho}&equipe=${encodeURIComponent(equipe)}`);
+    setLocation(`/evento/${params?.slug}/inscricao/pagamento?modalidade=${encodeURIComponent(modalidade)}&tamanho=${tamanho}&valor=${valorModalidade}&taxaComodidade=${taxaComodidade}&equipe=${encodeURIComponent(equipe)}`);
   };
 
   return (
@@ -99,8 +93,14 @@ export default function InscricaoResumoPage() {
                     <p className="text-sm text-muted-foreground mb-1">Modalidade</p>
                     <div className="flex items-center justify-between">
                       <p className="font-semibold text-foreground">{modalidade}</p>
-                      <p className="text-lg font-bold text-primary">{modalidadeValor}</p>
+                      <p className="text-lg font-bold text-foreground">R$ {valorModalidade.toFixed(2)}</p>
                     </div>
+                    {taxaComodidade > 0 && (
+                      <div className="flex items-center justify-between mt-1">
+                        <p className="text-sm text-muted-foreground">Taxa de comodidade</p>
+                        <p className="text-sm text-muted-foreground">R$ {taxaComodidade.toFixed(2)}</p>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -143,8 +143,12 @@ export default function InscricaoResumoPage() {
         <div className="max-w-2xl mx-auto px-4 py-3">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <p className="text-xs text-muted-foreground">Total</p>
-              <p className="text-lg md:text-xl font-bold text-foreground">{modalidadeValor}</p>
+              <p className="text-xs text-muted-foreground">
+                R$ {valorModalidade.toFixed(2)} + Taxa R$ {taxaComodidade.toFixed(2)}
+              </p>
+              <p className="text-lg md:text-xl font-bold text-foreground">
+                Total: R$ {valorTotal.toFixed(2)}
+              </p>
             </div>
             <Button
               size="lg"
