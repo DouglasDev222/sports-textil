@@ -1,5 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import express from "express";
+import path from "path";
 import { storage } from "./storage";
 
 import authRoutes from "./routes/admin/auth";
@@ -11,8 +13,11 @@ import batchesRoutes from "./routes/admin/batches";
 import pricesRoutes from "./routes/admin/prices";
 import shirtsRoutes from "./routes/admin/shirts";
 import attachmentsRoutes from "./routes/admin/attachments";
+import uploadsRoutes from "./routes/admin/uploads";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
+
   app.use("/api/admin/auth", authRoutes);
   app.use("/api/admin/users", usersRoutes);
   app.use("/api/admin/organizers", organizersRoutes);
@@ -22,6 +27,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/admin/events/:eventId/prices", pricesRoutes);
   app.use("/api/admin/events/:eventId/shirts", shirtsRoutes);
   app.use("/api/admin/events/:eventId/attachments", attachmentsRoutes);
+  app.use("/api/admin/uploads", uploadsRoutes);
 
   app.get("/api/events", async (req, res) => {
     try {

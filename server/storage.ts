@@ -7,12 +7,13 @@ import {
   type RegistrationBatch, type InsertRegistrationBatch,
   type Price, type InsertPrice,
   type Attachment, type InsertAttachment,
+  type EventBanner, type InsertEventBanner,
   type Athlete, type InsertAthlete,
   type Order, type InsertOrder,
   type Registration, type InsertRegistration,
   type DocumentAcceptance, type InsertDocumentAcceptance,
   organizers, adminUsers, events, modalities, shirtSizes,
-  registrationBatches, prices, attachments, athletes, orders,
+  registrationBatches, prices, attachments, eventBanners, athletes, orders,
   registrations, documentAcceptances
 } from "@shared/schema";
 import { db } from "./db";
@@ -78,6 +79,13 @@ export interface IStorage {
   createAttachment(attachment: InsertAttachment): Promise<Attachment>;
   updateAttachment(id: string, attachment: Partial<InsertAttachment>): Promise<Attachment | undefined>;
   deleteAttachment(id: string): Promise<boolean>;
+
+  getEventBanner(id: string): Promise<EventBanner | undefined>;
+  getEventBannersByEvent(eventId: string): Promise<EventBanner[]>;
+  createEventBanner(banner: InsertEventBanner): Promise<EventBanner>;
+  updateEventBanner(id: string, banner: Partial<InsertEventBanner>): Promise<EventBanner | undefined>;
+  deleteEventBanner(id: string): Promise<boolean>;
+  deleteEventBannersByEvent(eventId: string): Promise<boolean>;
 
   getAthlete(id: string): Promise<Athlete | undefined>;
   getAthleteByCpf(cpf: string): Promise<Athlete | undefined>;
@@ -405,6 +413,38 @@ export class DbStorage implements IStorage {
   async deleteAttachment(id: string): Promise<boolean> {
     const result = await db.delete(attachments).where(eq(attachments.id, id)).returning();
     return result.length > 0;
+  }
+
+  async getEventBanner(id: string): Promise<EventBanner | undefined> {
+    const [banner] = await db.select().from(eventBanners).where(eq(eventBanners.id, id));
+    return banner;
+  }
+
+  async getEventBannersByEvent(eventId: string): Promise<EventBanner[]> {
+    return db.select().from(eventBanners).where(eq(eventBanners.eventId, eventId));
+  }
+
+  async createEventBanner(insertBanner: InsertEventBanner): Promise<EventBanner> {
+    const [banner] = await db.insert(eventBanners).values(insertBanner).returning();
+    return banner;
+  }
+
+  async updateEventBanner(id: string, bannerData: Partial<InsertEventBanner>): Promise<EventBanner | undefined> {
+    const [banner] = await db.update(eventBanners)
+      .set(bannerData)
+      .where(eq(eventBanners.id, id))
+      .returning();
+    return banner;
+  }
+
+  async deleteEventBanner(id: string): Promise<boolean> {
+    const result = await db.delete(eventBanners).where(eq(eventBanners.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async deleteEventBannersByEvent(eventId: string): Promise<boolean> {
+    const result = await db.delete(eventBanners).where(eq(eventBanners.eventId, eventId)).returning();
+    return result.length >= 0;
   }
 
   async getAthlete(id: string): Promise<Athlete | undefined> {
