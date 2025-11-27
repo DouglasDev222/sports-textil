@@ -26,6 +26,7 @@ export interface IStorage {
   updateAdminUser(id: string, user: Partial<InsertAdminUser>): Promise<AdminUser | undefined>;
   deleteAdminUser(id: string): Promise<boolean>;
   updateAdminUserLastLogin(id: string): Promise<void>;
+  getAdminUsersByOrganizer(organizerId: string): Promise<AdminUser[]>;
 
   getOrganizer(id: string): Promise<Organizer | undefined>;
   getOrganizerByCpfCnpj(cpfCnpj: string): Promise<Organizer | undefined>;
@@ -142,6 +143,10 @@ export class DbStorage implements IStorage {
     await db.update(adminUsers)
       .set({ ultimoLogin: new Date() })
       .where(eq(adminUsers.id, id));
+  }
+
+  async getAdminUsersByOrganizer(organizerId: string): Promise<AdminUser[]> {
+    return db.select().from(adminUsers).where(eq(adminUsers.organizerId, organizerId));
   }
 
   async getOrganizer(id: string): Promise<Organizer | undefined> {

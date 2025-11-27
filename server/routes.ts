@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 
 import authRoutes from "./routes/admin/auth";
+import usersRoutes from "./routes/admin/users";
 import organizersRoutes from "./routes/admin/organizers";
 import eventsRoutes from "./routes/admin/events";
 import modalitiesRoutes from "./routes/admin/modalities";
@@ -13,6 +14,7 @@ import attachmentsRoutes from "./routes/admin/attachments";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/admin/auth", authRoutes);
+  app.use("/api/admin/users", usersRoutes);
   app.use("/api/admin/organizers", organizersRoutes);
   app.use("/api/admin/events", eventsRoutes);
   app.use("/api/admin/events/:eventId/modalities", modalitiesRoutes);
