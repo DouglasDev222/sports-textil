@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -6,7 +6,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
-import { Plus, Pencil, Trash2, GripVertical } from "lucide-react";
+import { Plus, Pencil, Trash2, GripVertical, Upload, X, ImageIcon, Loader2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import type { EventFormData } from "../EventWizard";
 import type { Modality } from "@shared/schema";
 
@@ -38,6 +39,9 @@ export function EventModalitiesStep({ formData, updateFormData }: EventModalitie
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [currentModality, setCurrentModality] = useState<Partial<Modality>>(emptyModality);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+  const { toast } = useToast();
 
   const openNewDialog = () => {
     setCurrentModality({ ...emptyModality, ordem: formData.modalities.length });
@@ -70,6 +74,46 @@ export function EventModalitiesStep({ formData, updateFormData }: EventModalitie
   const updateCurrentModality = (field: string, value: any) => {
     setCurrentModality(prev => ({ ...prev, [field]: value }));
   };
+
+  const handleImageUpload = useCallback(async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+
+    const file = files[0];
+    if (!file.type.startsWith("image/")) {
+      toast({
+        title: "Arquivo invalido",
+        description: "Apenas imagens sao permitidas",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsUploadingImage(true);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      updateCurrentModality("imagemUrl", e.target?.result as string);
+      setIsUploadingImage(false);
+    };
+    reader.onerror = () => {
+      toast({
+        title: "Erro ao carregar imagem",
+        description: "Nao foi possivel carregar a imagem",
+        variant: "destructive"
+      });
+      setIsUploadingImage(false);
+    };
+    reader.readAsDataURL(file);
+  }, [toast]);
+
+  const handleImageRemove = () => {
+    updateCurrentModality("imagemUrl", null);
+  };
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    handleImageUpload(e.dataTransfer.files);
+  }, [handleImageUpload]);
 
   return (
     <div className="space-y-6">
@@ -211,21 +255,89 @@ export function EventModalitiesStep({ formData, updateFormData }: EventModalitie
                 />
               </div>
 
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="mod-imagem">URL da Imagem</Label>
-                  <Input
-                    id="mod-imagem"
-                    type="url"
-                    value={currentModality.imagemUrl || ""}
-                    onChange={(e) => updateCurrentModality("imagemUrl", e.target.value)}
-                    placeholder="https://..."
-                    data-testid="input-modality-image"
-                  />
+                  <Label>Imagem do Percurso</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Adicione uma imagem do percurso desta modalidade
+                  </p>
+                  
+                  {currentModality.imagemUrl ? (
+                    <div className="relative max-w-md">
+                      <Card className="relative overflow-hidden group aspect-video">
+                        <img
+                          src={currentModality.imagemUrl}
+                          alt="Imagem do percurso"
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                          <label className="cursor-pointer">
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="sr-only"
+                              onChange={(e) => handleImageUpload(e.target.files)}
+                              disabled={isUploadingImage}
+                            />
+                            <Button size="sm" variant="secondary" asChild>
+                              <span>
+                                <Upload className="h-4 w-4 mr-2" />
+                                Trocar
+                              </span>
+                            </Button>
+                          </label>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={handleImageRemove}
+                            data-testid="button-remove-modality-image"
+                          >
+                            <X className="h-4 w-4 mr-2" />
+                            Remover
+                          </Button>
+                        </div>
+                      </Card>
+                    </div>
+                  ) : (
+                    <label
+                      className={`
+                        relative flex flex-col items-center justify-center 
+                        border-2 border-dashed rounded-lg cursor-pointer
+                        transition-colors aspect-video max-w-md
+                        ${dragOver ? "border-primary bg-primary/10" : "border-muted-foreground/25 hover:border-primary/50"}
+                        ${isUploadingImage ? "pointer-events-none opacity-50" : ""}
+                      `}
+                      onDrop={handleDrop}
+                      onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                      onDragLeave={(e) => { e.preventDefault(); setDragOver(false); }}
+                      data-testid="input-modality-image-upload"
+                    >
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="sr-only"
+                        onChange={(e) => handleImageUpload(e.target.files)}
+                        disabled={isUploadingImage}
+                      />
+                      {isUploadingImage ? (
+                        <Loader2 className="h-10 w-10 animate-spin text-muted-foreground" />
+                      ) : (
+                        <>
+                          <ImageIcon className="h-10 w-10 text-muted-foreground mb-3" />
+                          <span className="text-sm text-muted-foreground">
+                            Clique ou arraste uma imagem
+                          </span>
+                        </>
+                      )}
+                    </label>
+                  )}
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="mod-mapa">URL do Mapa do Percurso</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Link do Google Maps, Strava ou outro app de corrida
+                  </p>
                   <Input
                     id="mod-mapa"
                     type="url"
