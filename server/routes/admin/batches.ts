@@ -2,7 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { storage } from "../../storage";
 import { requireAuth, requireRole, checkEventOwnership } from "../../middleware/auth";
-import { localToBrazilUTC, utcToBrazilLocal } from "../../utils/timezone";
+import { localToBrazilUTC, localToBrazilUTCOptional, utcToBrazilLocal } from "../../utils/timezone";
 
 const router = Router({ mergeParams: true });
 
@@ -81,7 +81,7 @@ router.post("/", requireAuth, requireRole("superadmin", "admin"), async (req, re
       ...validation.data,
       eventId,
       dataInicio: localToBrazilUTC(validation.data.dataInicio),
-      dataTermino: validation.data.dataTermino ? localToBrazilUTC(validation.data.dataTermino) : null,
+      dataTermino: localToBrazilUTCOptional(validation.data.dataTermino),
       ativo: validation.data.ativo ?? true,
       ordem: validation.data.ordem ?? nextOrder
     });
@@ -129,7 +129,7 @@ router.patch("/:id", requireAuth, requireRole("superadmin", "admin"), async (req
       updateData.dataInicio = localToBrazilUTC(validation.data.dataInicio);
     }
     if (validation.data.dataTermino !== undefined) {
-      updateData.dataTermino = validation.data.dataTermino ? localToBrazilUTC(validation.data.dataTermino) : null;
+      updateData.dataTermino = localToBrazilUTCOptional(validation.data.dataTermino);
     }
 
     const updated = await storage.updateBatch(req.params.id, updateData);

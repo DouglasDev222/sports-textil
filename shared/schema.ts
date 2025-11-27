@@ -16,7 +16,7 @@ export const organizers = pgTable("organizers", {
   cpfCnpj: varchar("cpf_cnpj", { length: 20 }).notNull().unique(),
   email: text("email").notNull(),
   telefone: varchar("telefone", { length: 20 }).notNull(),
-  dataCadastro: timestamp("data_cadastro").defaultNow().notNull(),
+  dataCadastro: timestamp("data_cadastro", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export const adminUsers = pgTable("admin_users", {
@@ -27,9 +27,9 @@ export const adminUsers = pgTable("admin_users", {
   role: userRoleEnum("role").notNull(),
   status: userStatusEnum("status").default("ativo").notNull(),
   organizerId: varchar("organizer_id").references(() => organizers.id),
-  ultimoLogin: timestamp("ultimo_login"),
-  dataCriacao: timestamp("data_criacao").defaultNow().notNull(),
-  dataAtualizacao: timestamp("data_atualizacao").defaultNow().notNull(),
+  ultimoLogin: timestamp("ultimo_login", { withTimezone: true }),
+  dataCriacao: timestamp("data_criacao", { withTimezone: true }).defaultNow().notNull(),
+  dataAtualizacao: timestamp("data_atualizacao", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export const permissions = pgTable("permissions", {
@@ -57,15 +57,15 @@ export const events = pgTable("events", {
   cidade: text("cidade").notNull(),
   estado: varchar("estado", { length: 2 }).notNull(),
   bannerUrl: text("banner_url"),
-  aberturaInscricoes: timestamp("abertura_inscricoes").notNull(),
-  encerramentoInscricoes: timestamp("encerramento_inscricoes").notNull(),
+  aberturaInscricoes: timestamp("abertura_inscricoes", { withTimezone: true }).notNull(),
+  encerramentoInscricoes: timestamp("encerramento_inscricoes", { withTimezone: true }).notNull(),
   limiteVagasTotal: integer("limite_vagas_total").notNull(),
   status: eventStatusEnum("status").default("rascunho").notNull(),
   entregaCamisaNoKit: boolean("entrega_camisa_no_kit").default(true).notNull(),
   usarGradePorModalidade: boolean("usar_grade_por_modalidade").default(false).notNull(),
   informacoesRetiradaKit: text("informacoes_retirada_kit"),
   imagemPercursoUrl: text("imagem_percurso_url"),
-  dataCriacao: timestamp("data_criacao").defaultNow().notNull(),
+  dataCriacao: timestamp("data_criacao", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export const modalities = pgTable("modalities", {
@@ -97,8 +97,8 @@ export const registrationBatches = pgTable("registration_batches", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   eventId: varchar("event_id").notNull().references(() => events.id),
   nome: text("nome").notNull(),
-  dataInicio: timestamp("data_inicio").notNull(),
-  dataTermino: timestamp("data_termino"),
+  dataInicio: timestamp("data_inicio", { withTimezone: true }).notNull(),
+  dataTermino: timestamp("data_termino", { withTimezone: true }),
   quantidadeMaxima: integer("quantidade_maxima"),
   quantidadeUtilizada: integer("quantidade_utilizada").default(0).notNull(),
   ativo: boolean("ativo").default(true).notNull(),
@@ -126,7 +126,7 @@ export const eventBanners = pgTable("event_banners", {
   eventId: varchar("event_id").notNull().references(() => events.id),
   imagemUrl: text("imagem_url").notNull(),
   ordem: integer("ordem").default(0).notNull(),
-  dataCriacao: timestamp("data_criacao").defaultNow().notNull(),
+  dataCriacao: timestamp("data_criacao", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export const athletes = pgTable("athletes", {
@@ -141,7 +141,7 @@ export const athletes = pgTable("athletes", {
   cidade: text("cidade").notNull(),
   escolaridade: text("escolaridade"),
   profissao: text("profissao"),
-  dataCadastro: timestamp("data_cadastro").defaultNow().notNull(),
+  dataCadastro: timestamp("data_cadastro", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export const orders = pgTable("orders", {
@@ -155,9 +155,9 @@ export const orders = pgTable("orders", {
   status: orderStatusEnum("status").default("pendente").notNull(),
   idPagamentoGateway: text("id_pagamento_gateway"),
   metodoPagamento: text("metodo_pagamento"),
-  dataPedido: timestamp("data_pedido").defaultNow().notNull(),
-  dataPagamento: timestamp("data_pagamento"),
-  dataExpiracao: timestamp("data_expiracao"),
+  dataPedido: timestamp("data_pedido", { withTimezone: true }).defaultNow().notNull(),
+  dataPagamento: timestamp("data_pagamento", { withTimezone: true }),
+  dataExpiracao: timestamp("data_expiracao", { withTimezone: true }),
   ipComprador: varchar("ip_comprador", { length: 45 }),
 });
 
@@ -174,14 +174,14 @@ export const registrations = pgTable("registrations", {
   taxaComodidade: decimal("taxa_comodidade", { precision: 10, scale: 2 }).default("0").notNull(),
   status: registrationStatusEnum("status").default("pendente").notNull(),
   equipe: text("equipe"),
-  dataInscricao: timestamp("data_inscricao").defaultNow().notNull(),
+  dataInscricao: timestamp("data_inscricao", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export const documentAcceptances = pgTable("document_acceptances", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   registrationId: varchar("registration_id").notNull().references(() => registrations.id),
   attachmentId: varchar("attachment_id").notNull().references(() => attachments.id),
-  dataAceite: timestamp("data_aceite").defaultNow().notNull(),
+  dataAceite: timestamp("data_aceite", { withTimezone: true }).defaultNow().notNull(),
   ipAceite: varchar("ip_aceite", { length: 45 }),
 });
 

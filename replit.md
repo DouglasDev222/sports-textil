@@ -198,6 +198,24 @@ Preferred communication style: Simple, everyday language.
 - `/minha-conta` - Athlete profile management with navigation to registrations and participants
 - `/participantes` - Participant management page (prepared for multi-participant feature)
 
+### Timezone Handling
+
+**Brazil Timezone (UTC-3)**
+
+The application operates in São Paulo timezone (America/Sao_Paulo). All date/time handling follows these principles:
+
+- **Database Storage**: All timestamps stored in UTC using `TIMESTAMPTZ` columns
+- **API Input**: Frontend sends local São Paulo time strings, backend converts to UTC using `localToBrazilUTC()`
+- **API Output**: Backend converts UTC to São Paulo local time using `utcToBrazilLocal()` before sending to frontend
+- **Library**: Uses `date-fns-tz` for timezone conversions
+
+**Key Files:**
+- `server/utils/timezone.ts` - Backend timezone utilities
+- `client/src/lib/timezone.ts` - Frontend timezone utilities  
+- `docs/TIMEZONE.md` - Complete timezone documentation
+
+**Important**: Brazil ended permanent DST in 2019, so São Paulo is always UTC-3 (no seasonal variations).
+
 ### Key Architectural Decisions
 
 **Path Aliasing**
