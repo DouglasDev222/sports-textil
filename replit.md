@@ -62,6 +62,7 @@ Preferred communication style: Simple, everyday language.
 - `registration_batches` table: Pricing lots with automatic switching based on date or quantity limits
 - `prices` table: Price per Modality + Batch combination
 - `attachments` table: Event documents (regulations, terms) with mandatory acceptance flags
+- `event_banners` table: Multiple banner images per event with ordering support (Instagram format 4:5)
 - `athletes` table: User profiles with CPF, personal data, contact info
 - `orders` table: Groups multiple registrations into a single purchase order with payment info, voucher codes, and status (pendente, pago, cancelado, reembolsado, expirado)
 - `registrations` table: Individual registrations linked to order, event, modality, batch, athlete with unit price
@@ -79,6 +80,7 @@ Preferred communication style: Simple, everyday language.
 - 1 Event -> many Registration Batches
 - 1 Modality + 1 Batch -> 1 Price
 - 1 Event -> many Attachments
+- 1 Event -> many Banners
 - 1 Event -> many Orders
 - 1 Order -> many Registrations (same or different athletes)
 - 1 Athlete -> many Orders (as buyer)
@@ -159,6 +161,12 @@ Preferred communication style: Simple, everyday language.
 - `POST /api/admin/events/:eventId/attachments` - Create attachment
 - `PATCH /api/admin/events/:eventId/attachments/:id` - Update attachment
 - `DELETE /api/admin/events/:eventId/attachments/:id` - Delete attachment
+
+*File Uploads*
+- `POST /api/admin/uploads/banners/:eventId` - Upload multiple banner images (Instagram format 4:5, max 10 images)
+- `DELETE /api/admin/uploads/banner/:bannerId` - Delete a banner image
+- `POST /api/admin/uploads/route/:eventId` - Upload route map image
+- `DELETE /api/admin/uploads/route/:eventId` - Delete route map image
 
 **Public API Routes**
 - `GET /api/events` - List published events
