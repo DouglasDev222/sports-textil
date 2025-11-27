@@ -135,34 +135,36 @@ export default function EventWizard({ mode, eventId, initialData }: EventWizardP
         }
       }
 
-      const modalitiesResponse = await fetch(`/api/admin/events/${createdEventId}/modalities`, { credentials: "include" });
-      const modalitiesResult = await modalitiesResponse.json();
-      const savedModalities = modalitiesResult.data || [];
+      if (mode === "create") {
+        const modalitiesResponse = await fetch(`/api/admin/events/${createdEventId}/modalities`, { credentials: "include" });
+        const modalitiesResult = await modalitiesResponse.json();
+        const savedModalities = modalitiesResult.data || [];
 
-      const batchesResponse = await fetch(`/api/admin/events/${createdEventId}/batches`, { credentials: "include" });
-      const batchesResult = await batchesResponse.json();
-      const savedBatches = batchesResult.data || [];
+        const batchesResponse = await fetch(`/api/admin/events/${createdEventId}/batches`, { credentials: "include" });
+        const batchesResult = await batchesResponse.json();
+        const savedBatches = batchesResult.data || [];
 
-      for (const priceEntry of formData.prices) {
-        const modalityId = savedModalities[priceEntry.modalityIndex]?.id;
-        const batchId = savedBatches[priceEntry.batchIndex]?.id;
-        if (modalityId && batchId) {
-          await apiRequest("POST", `/api/admin/events/${createdEventId}/prices`, {
-            modalityId,
-            batchId,
-            valor: priceEntry.valor,
-          });
+        for (const priceEntry of formData.prices) {
+          const modalityId = savedModalities[priceEntry.modalityIndex]?.id;
+          const batchId = savedBatches[priceEntry.batchIndex]?.id;
+          if (modalityId && batchId) {
+            await apiRequest("POST", `/api/admin/events/${createdEventId}/prices`, {
+              modalityId,
+              batchId,
+              valor: priceEntry.valor,
+            });
+          }
         }
-      }
 
-      for (const shirt of formData.shirts) {
-        const shirtData = { ...shirt, eventId: createdEventId };
-        await apiRequest("POST", `/api/admin/events/${createdEventId}/shirts`, shirtData);
-      }
+        for (const shirt of formData.shirts) {
+          const shirtData = { ...shirt, eventId: createdEventId };
+          await apiRequest("POST", `/api/admin/events/${createdEventId}/shirts`, shirtData);
+        }
 
-      for (const attachment of formData.attachments) {
-        const attachmentData = { ...attachment, eventId: createdEventId };
-        await apiRequest("POST", `/api/admin/events/${createdEventId}/attachments`, attachmentData);
+        for (const attachment of formData.attachments) {
+          const attachmentData = { ...attachment, eventId: createdEventId };
+          await apiRequest("POST", `/api/admin/events/${createdEventId}/attachments`, attachmentData);
+        }
       }
 
       queryClient.invalidateQueries({ queryKey: ["/api/admin/events"] });
