@@ -26,6 +26,14 @@ import AdminUsersPage from "@/pages/admin/AdminUsersPage";
 import AdminNotFound from "@/pages/admin/AdminNotFound";
 import ProtectedAdminRoute from "@/pages/admin/ProtectedAdminRoute";
 
+import { OrganizerAuthProvider } from "@/contexts/OrganizerAuthContext";
+import OrganizerLoginPage from "@/pages/organizador/OrganizerLoginPage";
+import OrganizerDashboardPage from "@/pages/organizador/OrganizerDashboardPage";
+import OrganizerInscritosPage from "@/pages/organizador/OrganizerInscritosPage";
+import OrganizerRelatoriosPage from "@/pages/organizador/OrganizerRelatoriosPage";
+import OrganizerNotFound from "@/pages/organizador/OrganizerNotFound";
+import ProtectedOrganizerRoute from "@/pages/organizador/ProtectedOrganizerRoute";
+
 function PublicRouter() {
   return (
     <Switch>
@@ -81,11 +89,45 @@ function AdminRoutes() {
   );
 }
 
+function OrganizerRoutes() {
+  return (
+    <OrganizerAuthProvider>
+      <Switch>
+        <Route path="/organizadores/login" component={OrganizerLoginPage} />
+        <Route path="/organizadores/inscritos">
+          <ProtectedOrganizerRoute>
+            <OrganizerInscritosPage />
+          </ProtectedOrganizerRoute>
+        </Route>
+        <Route path="/organizadores/relatorios">
+          <ProtectedOrganizerRoute>
+            <OrganizerRelatoriosPage />
+          </ProtectedOrganizerRoute>
+        </Route>
+        <Route path="/organizadores">
+          <ProtectedOrganizerRoute>
+            <OrganizerDashboardPage />
+          </ProtectedOrganizerRoute>
+        </Route>
+        <Route>
+          <ProtectedOrganizerRoute>
+            <OrganizerNotFound />
+          </ProtectedOrganizerRoute>
+        </Route>
+      </Switch>
+    </OrganizerAuthProvider>
+  );
+}
+
 function AppRouter() {
   const [location] = useLocation();
   
   if (location.startsWith("/admin")) {
     return <AdminRoutes />;
+  }
+  
+  if (location.startsWith("/organizadores")) {
+    return <OrganizerRoutes />;
   }
   
   return <PublicRouter />;

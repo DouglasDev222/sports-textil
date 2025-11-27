@@ -1,5 +1,5 @@
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
-import { AdminSidebar } from "./AdminSidebar";
+import { OrganizerSidebar } from "./OrganizerSidebar";
 import { Separator } from "@/components/ui/separator";
 import {
   Breadcrumb,
@@ -10,13 +10,13 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 
-interface AdminLayoutProps {
+interface OrganizerLayoutProps {
   children: React.ReactNode;
   title: string;
   breadcrumbs?: { label: string; href?: string }[];
 }
 
-export function AdminLayout({ children, title, breadcrumbs = [] }: AdminLayoutProps) {
+export function OrganizerLayout({ children, title, breadcrumbs = [] }: OrganizerLayoutProps) {
   const sidebarStyle = {
     "--sidebar-width": "16rem",
     "--sidebar-width-icon": "3rem",
@@ -25,7 +25,7 @@ export function AdminLayout({ children, title, breadcrumbs = [] }: AdminLayoutPr
   return (
     <SidebarProvider style={sidebarStyle}>
       <div className="flex min-h-screen w-full">
-        <AdminSidebar />
+        <OrganizerSidebar />
         <SidebarInset className="flex flex-col flex-1">
           <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
             <SidebarTrigger className="-ml-1" data-testid="button-sidebar-toggle" />
@@ -33,7 +33,7 @@ export function AdminLayout({ children, title, breadcrumbs = [] }: AdminLayoutPr
             <Breadcrumb>
               <BreadcrumbList>
                 <BreadcrumbItem>
-                  <BreadcrumbLink href="/admin">Admin</BreadcrumbLink>
+                  <BreadcrumbLink href="/organizadores">Organizador</BreadcrumbLink>
                 </BreadcrumbItem>
                 {breadcrumbs.map((crumb, index) => (
                   <>

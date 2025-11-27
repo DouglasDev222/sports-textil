@@ -3,28 +3,28 @@ import { useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useAdminAuth } from "@/contexts/AdminAuthContext";
+import { useOrganizerAuth } from "@/contexts/OrganizerAuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Lock } from "lucide-react";
+import { Loader2, Building2 } from "lucide-react";
 
 const loginSchema = z.object({
-  email: z.string().email("Email inválido"),
+  email: z.string().email("Email invalido"),
   password: z.string().min(6, "Senha deve ter pelo menos 6 caracteres"),
 });
 
-type LoginFormData = z.infer<typeof loginSchema>;
+type LoginForm = z.infer<typeof loginSchema>;
 
-export default function AdminLoginPage() {
-  const [, setLocation] = useLocation();
-  const { login, isAuthenticated, isLoading } = useAdminAuth();
-  const { toast } = useToast();
+export default function OrganizerLoginPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { login, isAuthenticated, isLoading } = useOrganizerAuth();
+  const [, setLocation] = useLocation();
+  const { toast } = useToast();
 
-  const form = useForm<LoginFormData>({
+  const form = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
       email: "",
@@ -32,28 +32,23 @@ export default function AdminLoginPage() {
     },
   });
 
-  const { user } = useAdminAuth();
-
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
-      if (user?.role === "organizador") {
-        setLocation("/organizadores");
-      } else {
-        setLocation("/admin");
-      }
+      setLocation("/organizadores");
     }
-  }, [isLoading, isAuthenticated, user, setLocation]);
+  }, [isLoading, isAuthenticated, setLocation]);
 
-  const onSubmit = async (data: LoginFormData) => {
+  const onSubmit = async (data: LoginForm) => {
     setIsSubmitting(true);
-    
     const result = await login(data.email, data.password);
-    
+    setIsSubmitting(false);
+
     if (result.success) {
       toast({
         title: "Login realizado",
-        description: "Bem-vindo ao painel administrativo",
+        description: "Bem-vindo ao painel do organizador!",
       });
+      setLocation("/organizadores");
     } else {
       toast({
         title: "Erro no login",
@@ -61,8 +56,6 @@ export default function AdminLoginPage() {
         variant: "destructive",
       });
     }
-    
-    setIsSubmitting(false);
   };
 
   if (isLoading) {
@@ -73,24 +66,16 @@ export default function AdminLoginPage() {
     );
   }
 
-  if (isAuthenticated) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+    <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary">
-            <Lock className="h-6 w-6 text-primary-foreground" />
+            <Building2 className="h-6 w-6 text-primary-foreground" />
           </div>
-          <CardTitle className="text-2xl">Painel Admin</CardTitle>
+          <CardTitle className="text-2xl">Portal do Organizador</CardTitle>
           <CardDescription>
-            ST Eventos - Acesso Administrativo
+            Acesse o painel para visualizar os dados do seu evento
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -103,12 +88,11 @@ export default function AdminLoginPage() {
                   <FormItem>
                     <FormLabel>Email</FormLabel>
                     <FormControl>
-                      <Input
-                        type="email"
-                        placeholder="admin@steventos.com"
-                        autoComplete="email"
+                      <Input 
+                        type="email" 
+                        placeholder="seu@email.com" 
                         data-testid="input-email"
-                        {...field}
+                        {...field} 
                       />
                     </FormControl>
                     <FormMessage />
@@ -122,21 +106,20 @@ export default function AdminLoginPage() {
                   <FormItem>
                     <FormLabel>Senha</FormLabel>
                     <FormControl>
-                      <Input
-                        type="password"
-                        placeholder="******"
-                        autoComplete="current-password"
+                      <Input 
+                        type="password" 
+                        placeholder="******" 
                         data-testid="input-password"
-                        {...field}
+                        {...field} 
                       />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              <Button
-                type="submit"
-                className="w-full"
+              <Button 
+                type="submit" 
+                className="w-full" 
                 disabled={isSubmitting}
                 data-testid="button-login"
               >
