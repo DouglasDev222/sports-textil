@@ -18,10 +18,19 @@ import {
   Users, 
   Calendar, 
   LogOut,
-  Shield
+  Shield,
+  UserCog,
+  Building2
 } from "lucide-react";
 
-const menuItems = [
+interface MenuItem {
+  title: string;
+  url: string;
+  icon: React.ComponentType<{ className?: string }>;
+  roles?: string[];
+}
+
+const menuItems: MenuItem[] = [
   {
     title: "Dashboard",
     url: "/admin",
@@ -30,12 +39,19 @@ const menuItems = [
   {
     title: "Organizadores",
     url: "/admin/organizadores",
-    icon: Users,
+    icon: Building2,
+    roles: ["superadmin", "admin"],
   },
   {
     title: "Eventos",
     url: "/admin/eventos",
     icon: Calendar,
+  },
+  {
+    title: "Usuarios",
+    url: "/admin/usuarios",
+    icon: UserCog,
+    roles: ["superadmin"],
   },
 ];
 
@@ -66,25 +82,27 @@ export function AdminSidebar() {
           <SidebarGroupLabel>Menu</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {menuItems.map((item) => {
-                const isActive = location === item.url || 
-                  (item.url !== "/admin" && location.startsWith(item.url));
-                
-                return (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton 
-                      asChild 
-                      isActive={isActive}
-                      data-testid={`nav-${item.title.toLowerCase()}`}
-                    >
-                      <Link href={item.url}>
-                        <item.icon className="h-4 w-4" />
-                        <span>{item.title}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
-              })}
+              {menuItems
+                .filter((item) => !item.roles || (user?.role && item.roles.includes(user.role)))
+                .map((item) => {
+                  const isActive = location === item.url || 
+                    (item.url !== "/admin" && location.startsWith(item.url));
+                  
+                  return (
+                    <SidebarMenuItem key={item.title}>
+                      <SidebarMenuButton 
+                        asChild 
+                        isActive={isActive}
+                        data-testid={`nav-${item.title.toLowerCase()}`}
+                      >
+                        <Link href={item.url}>
+                          <item.icon className="h-4 w-4" />
+                          <span>{item.title}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
