@@ -16,7 +16,7 @@ interface ImageUploadProps {
 
 export function ImageUpload({
   eventId,
-  images,
+  images = [],
   onImagesChange,
   maxImages = 10,
   aspectRatio = "portrait",
@@ -26,6 +26,8 @@ export function ImageUpload({
   const [isUploading, setIsUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const { toast } = useToast();
+  
+  const safeImages = images || [];
 
   const aspectRatioClass = {
     square: "aspect-square",
@@ -36,7 +38,7 @@ export function ImageUpload({
   const handleUpload = useCallback(async (files: FileList | null) => {
     if (!files || files.length === 0) return;
 
-    const remainingSlots = maxImages - images.length;
+    const remainingSlots = maxImages - safeImages.length;
     if (remainingSlots <= 0) {
       toast({
         title: "Limite atingido",
@@ -82,7 +84,7 @@ export function ImageUpload({
             url: banner.imagemUrl,
             ordem: banner.ordem
           }));
-          onImagesChange([...images, ...newImages]);
+          onImagesChange([...safeImages, ...newImages]);
           toast({
             title: "Upload concluido",
             description: `${newImages.length} imagem(ns) adicionada(s)`
@@ -106,19 +108,19 @@ export function ImageUpload({
             reader.onload = (e) => {
               resolve({
                 url: e.target?.result as string,
-                ordem: images.length
+                ordem: safeImages.length
               });
             };
             reader.readAsDataURL(file);
           });
         })
       );
-      onImagesChange([...images, ...newImages]);
+      onImagesChange([...safeImages, ...newImages]);
     }
-  }, [eventId, images, maxImages, onImagesChange, toast]);
+  }, [eventId, safeImages, maxImages, onImagesChange, toast]);
 
   const handleRemove = useCallback(async (index: number) => {
-    const image = images[index];
+    const image = safeImages[index];
     
     if (eventId && image.id) {
       try {
@@ -141,9 +143,9 @@ export function ImageUpload({
       }
     }
 
-    const newImages = images.filter((_, i) => i !== index);
+    const newImages = safeImages.filter((_, i) => i !== index);
     onImagesChange(newImages);
-  }, [eventId, images, onImagesChange, toast]);
+  }, [eventId, safeImages, onImagesChange, toast]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -169,12 +171,12 @@ export function ImageUpload({
           <p className="text-sm text-muted-foreground">{description}</p>
         </div>
         <p className="text-sm text-muted-foreground">
-          {images.length}/{maxImages}
+          {safeImages.length}/{maxImages}
         </p>
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-        {images.map((image, index) => (
+        {safeImages.map((image, index) => (
           <Card
             key={image.id || index}
             className={`relative overflow-hidden group ${aspectRatioClass}`}
@@ -201,7 +203,7 @@ export function ImageUpload({
           </Card>
         ))}
 
-        {images.length < maxImages && (
+        {safeImages.length < maxImages && (
           <label
             className={`
               relative flex flex-col items-center justify-center 

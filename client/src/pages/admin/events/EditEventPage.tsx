@@ -42,7 +42,7 @@ export default function EditEventPage() {
     );
   }
 
-  const { modalities, batches, prices, shirtSizes, attachments, ...event } = eventData;
+  const { modalities, batches, prices, shirtSizes, attachments, banners, ...event } = eventData;
 
   const initialData: EventFormData = {
     event,
@@ -55,6 +55,11 @@ export default function EditEventPage() {
     }),
     shirts: shirtSizes || [],
     attachments: attachments || [],
+    banners: (banners || []).map((b: any) => ({
+      id: b.id,
+      url: b.imagemUrl,
+      ordem: b.ordem
+    })),
   };
 
   return <EventWizard mode="edit" eventId={eventId} initialData={initialData} />;

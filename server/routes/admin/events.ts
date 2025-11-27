@@ -97,12 +97,13 @@ router.get("/:id/full", requireAuth, async (req, res) => {
       });
     }
     
-    const [modalities, batches, prices, shirtSizes, attachments] = await Promise.all([
+    const [modalities, batches, prices, shirtSizes, attachments, banners] = await Promise.all([
       storage.getModalitiesByEvent(event.id),
       storage.getBatchesByEvent(event.id),
       storage.getPricesByEvent(event.id),
       storage.getShirtSizesByEvent(event.id),
-      storage.getAttachmentsByEvent(event.id)
+      storage.getAttachmentsByEvent(event.id),
+      storage.getEventBannersByEvent(event.id)
     ]);
     
     res.json({ 
@@ -113,7 +114,8 @@ router.get("/:id/full", requireAuth, async (req, res) => {
         batches,
         prices,
         shirtSizes,
-        attachments
+        attachments,
+        banners
       }
     });
   } catch (error) {
