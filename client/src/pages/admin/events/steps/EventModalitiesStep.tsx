@@ -43,16 +43,30 @@ export function EventModalitiesStep({ formData, updateFormData }: EventModalitie
   const [dragOver, setDragOver] = useState(false);
   const { toast } = useToast();
 
+  const resetDialogState = () => {
+    setIsUploadingImage(false);
+    setDragOver(false);
+  };
+
   const openNewDialog = () => {
     setCurrentModality({ ...emptyModality, ordem: formData.modalities.length });
     setEditingIndex(null);
+    resetDialogState();
     setDialogOpen(true);
   };
 
   const openEditDialog = (index: number) => {
     setCurrentModality({ ...formData.modalities[index] });
     setEditingIndex(index);
+    resetDialogState();
     setDialogOpen(true);
+  };
+
+  const handleDialogChange = (open: boolean) => {
+    if (!open) {
+      resetDialogState();
+    }
+    setDialogOpen(open);
   };
 
   const handleSave = () => {
@@ -63,6 +77,7 @@ export function EventModalitiesStep({ formData, updateFormData }: EventModalitie
       newModalities.push(currentModality);
     }
     updateFormData({ modalities: newModalities });
+    resetDialogState();
     setDialogOpen(false);
   };
 
@@ -123,7 +138,7 @@ export function EventModalitiesStep({ formData, updateFormData }: EventModalitie
             Adicione as modalidades (categorias) do evento. Ex: 5km, 10km, 21km
           </p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <Dialog open={dialogOpen} onOpenChange={handleDialogChange}>
           <DialogTrigger asChild>
             <Button onClick={openNewDialog} data-testid="button-add-modality">
               <Plus className="mr-2 h-4 w-4" />
