@@ -136,9 +136,12 @@ export function EventBatchesStep({ formData, updateFormData }: EventBatchesStepP
                     <Input
                       id="batch-inicio"
                       type="datetime-local"
-                      value={currentBatch.dataInicio ? 
-                        new Date(currentBatch.dataInicio).toISOString().slice(0, 16) : ""}
-                      onChange={(e) => updateCurrentBatch("dataInicio", new Date(e.target.value))}
+                      value={typeof currentBatch.dataInicio === 'string' 
+                        ? currentBatch.dataInicio 
+                        : currentBatch.dataInicio 
+                          ? currentBatch.dataInicio.toISOString().slice(0, 16)
+                          : ""}
+                      onChange={(e) => updateCurrentBatch("dataInicio", e.target.value)}
                       data-testid="input-batch-start"
                     />
                   </div>
@@ -148,9 +151,12 @@ export function EventBatchesStep({ formData, updateFormData }: EventBatchesStepP
                     <Input
                       id="batch-termino"
                       type="datetime-local"
-                      value={currentBatch.dataTermino ? 
-                        new Date(currentBatch.dataTermino).toISOString().slice(0, 16) : ""}
-                      onChange={(e) => updateCurrentBatch("dataTermino", e.target.value ? new Date(e.target.value) : undefined)}
+                      value={typeof currentBatch.dataTermino === 'string' 
+                        ? currentBatch.dataTermino 
+                        : currentBatch.dataTermino 
+                          ? currentBatch.dataTermino.toISOString().slice(0, 16)
+                          : ""}
+                      onChange={(e) => updateCurrentBatch("dataTermino", e.target.value || undefined)}
                       data-testid="input-batch-end"
                     />
                   </div>

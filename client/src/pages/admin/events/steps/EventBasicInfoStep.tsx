@@ -245,9 +245,12 @@ export function EventBasicInfoStep({ formData, updateFormData }: EventBasicInfoS
           <Input
             id="aberturaInscricoes"
             type="datetime-local"
-            value={formData.event.aberturaInscricoes ? 
-              new Date(formData.event.aberturaInscricoes).toISOString().slice(0, 16) : ""}
-            onChange={(e) => updateEvent("aberturaInscricoes", new Date(e.target.value))}
+            value={typeof formData.event.aberturaInscricoes === 'string' 
+              ? formData.event.aberturaInscricoes 
+              : formData.event.aberturaInscricoes 
+                ? formData.event.aberturaInscricoes.toISOString().slice(0, 16)
+                : ""}
+            onChange={(e) => updateEvent("aberturaInscricoes", e.target.value)}
             data-testid="input-registration-start"
           />
         </div>
@@ -257,9 +260,12 @@ export function EventBasicInfoStep({ formData, updateFormData }: EventBasicInfoS
           <Input
             id="encerramentoInscricoes"
             type="datetime-local"
-            value={formData.event.encerramentoInscricoes ? 
-              new Date(formData.event.encerramentoInscricoes).toISOString().slice(0, 16) : ""}
-            onChange={(e) => updateEvent("encerramentoInscricoes", new Date(e.target.value))}
+            value={typeof formData.event.encerramentoInscricoes === 'string' 
+              ? formData.event.encerramentoInscricoes 
+              : formData.event.encerramentoInscricoes 
+                ? formData.event.encerramentoInscricoes.toISOString().slice(0, 16)
+                : ""}
+            onChange={(e) => updateEvent("encerramentoInscricoes", e.target.value)}
             data-testid="input-registration-end"
           />
         </div>
