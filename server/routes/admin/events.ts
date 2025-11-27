@@ -20,6 +20,7 @@ const eventSchema = z.object({
   limiteVagasTotal: z.number().int().positive("Limite de vagas deve ser positivo"),
   entregaCamisaNoKit: z.boolean().optional(),
   usarGradePorModalidade: z.boolean().optional(),
+  informacoesRetiradaKit: z.string().optional().nullable(),
   status: z.enum(["rascunho", "publicado", "cancelado", "finalizado"]).optional()
 });
 
@@ -161,7 +162,8 @@ router.post("/", requireAuth, requireRole("superadmin", "admin"), async (req, re
       bannerUrl: validation.data.bannerUrl ?? null,
       status: validation.data.status ?? "rascunho",
       entregaCamisaNoKit: validation.data.entregaCamisaNoKit ?? true,
-      usarGradePorModalidade: validation.data.usarGradePorModalidade ?? false
+      usarGradePorModalidade: validation.data.usarGradePorModalidade ?? false,
+      informacoesRetiradaKit: validation.data.informacoesRetiradaKit ?? null
     });
 
     res.status(201).json({ success: true, data: event });

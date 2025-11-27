@@ -2,10 +2,11 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
-import { Plus, Trash2, Shirt, FileText, AlertCircle } from "lucide-react";
+import { Plus, Trash2, Shirt, FileText, AlertCircle, Package } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import type { EventFormData } from "../EventWizard";
 import type { ShirtSize, Attachment } from "@shared/schema";
@@ -316,6 +317,33 @@ export function EventFinishStep({ formData, updateFormData }: EventFinishStepPro
               ))}
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center gap-2 space-y-0">
+          <Package className="h-5 w-5" />
+          <div>
+            <CardTitle>Retirada de Kit</CardTitle>
+            <p className="text-sm text-muted-foreground mt-1">
+              Informacoes sobre local, data e horario de retirada do kit (opcional)
+            </p>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-2">
+            <Label htmlFor="informacoesRetiradaKit">Informacoes da Retirada de Kit</Label>
+            <Textarea
+              id="informacoesRetiradaKit"
+              value={formData.event.informacoesRetiradaKit || ""}
+              onChange={(e) => updateFormData({
+                event: { ...formData.event, informacoesRetiradaKit: e.target.value }
+              })}
+              placeholder="Ex: Retirada no dia 10/01/2025 das 10h as 18h no Ginasio Municipal, Av. Principal, 1000. Levar documento com foto."
+              rows={4}
+              data-testid="input-kit-pickup-info"
+            />
+          </div>
         </CardContent>
       </Card>
 

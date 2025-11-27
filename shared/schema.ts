@@ -63,6 +63,7 @@ export const events = pgTable("events", {
   status: eventStatusEnum("status").default("rascunho").notNull(),
   entregaCamisaNoKit: boolean("entrega_camisa_no_kit").default(true).notNull(),
   usarGradePorModalidade: boolean("usar_grade_por_modalidade").default(false).notNull(),
+  informacoesRetiradaKit: text("informacoes_retirada_kit"),
   dataCriacao: timestamp("data_criacao").defaultNow().notNull(),
 });
 
