@@ -13,7 +13,13 @@ import { EventModalitiesStep } from "./steps/EventModalitiesStep";
 import { EventBatchesStep } from "./steps/EventBatchesStep";
 import { EventFinishStep } from "./steps/EventFinishStep";
 
-import type { Event, Modality, RegistrationBatch, Price, ShirtSize, Attachment } from "@shared/schema";
+import type { Event, Modality, RegistrationBatch, Price, ShirtSize, Attachment, EventBanner } from "@shared/schema";
+
+export interface BannerImage {
+  id?: string;
+  url: string;
+  ordem?: number;
+}
 
 export interface EventFormData {
   event: Partial<Event>;
@@ -22,6 +28,7 @@ export interface EventFormData {
   prices: { modalityIndex: number; batchIndex: number; valor: string }[];
   shirts: Partial<ShirtSize>[];
   attachments: Partial<Attachment>[];
+  banners: BannerImage[];
 }
 
 const STEPS = [
@@ -54,6 +61,7 @@ export default function EventWizard({ mode, eventId, initialData }: EventWizardP
     prices: [],
     shirts: [],
     attachments: [],
+    banners: [],
   });
 
   const updateFormData = (updates: Partial<EventFormData>) => {

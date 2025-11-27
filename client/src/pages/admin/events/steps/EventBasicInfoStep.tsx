@@ -4,7 +4,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import type { EventFormData } from "../EventWizard";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ImageUpload, SingleImageUpload } from "@/components/ImageUpload";
+import { Image, Map } from "lucide-react";
+import type { EventFormData, BannerImage } from "../EventWizard";
 import type { Organizer } from "@shared/schema";
 
 const ESTADOS_BRASIL = [
@@ -190,17 +193,51 @@ export function EventBasicInfoStep({ formData, updateFormData }: EventBasicInfoS
         </div>
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="bannerUrl">URL do Banner</Label>
-        <Input
-          id="bannerUrl"
-          type="url"
-          value={formData.event.bannerUrl || ""}
-          onChange={(e) => updateEvent("bannerUrl", e.target.value)}
-          placeholder="https://exemplo.com/banner.jpg"
-          data-testid="input-banner-url"
-        />
-      </div>
+      <Card>
+        <CardHeader className="flex flex-row items-center gap-2 space-y-0">
+          <Image className="h-5 w-5" />
+          <div>
+            <CardTitle className="text-base">Banners do Evento</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Adicione imagens no formato de post do Instagram (4:5)
+            </p>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <ImageUpload
+            eventId={formData.event.id as string | undefined}
+            images={formData.banners}
+            onImagesChange={(images) => updateFormData({ banners: images })}
+            maxImages={10}
+            aspectRatio="portrait"
+            label="Imagens do Banner"
+            description="Ate 10 imagens no formato 4:5 (Instagram)"
+          />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center gap-2 space-y-0">
+          <Map className="h-5 w-5" />
+          <div>
+            <CardTitle className="text-base">Mapa do Percurso</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Imagem do percurso geral do evento (opcional)
+            </p>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <SingleImageUpload
+            eventId={formData.event.id as string | undefined}
+            imageUrl={formData.event.imagemPercursoUrl || null}
+            onImageChange={(url) => updateEvent("imagemPercursoUrl", url)}
+            uploadType="route"
+            label="Imagem do Percurso"
+            description="Mapa ou imagem do percurso do evento"
+            aspectRatio="landscape"
+          />
+        </CardContent>
+      </Card>
 
       <div className="grid gap-4 md:grid-cols-2">
         <div className="space-y-2">
