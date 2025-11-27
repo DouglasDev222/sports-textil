@@ -38,9 +38,9 @@ export function EventBasicInfoStep({ formData, updateFormData }: EventBasicInfoS
       .replace(/(^-|-$)/g, "");
   };
 
-  const handleNameChange = (name: string) => {
-    updateEvent("nome", name);
-    if (!formData.event.slug || formData.event.slug === generateSlug(formData.event.nome || "")) {
+  const handleNameBlur = () => {
+    const name = formData.event.nome || "";
+    if (name && !formData.event.slug) {
       updateEvent("slug", generateSlug(name));
     }
   };
@@ -90,7 +90,8 @@ export function EventBasicInfoStep({ formData, updateFormData }: EventBasicInfoS
           <Input
             id="nome"
             value={formData.event.nome || ""}
-            onChange={(e) => handleNameChange(e.target.value)}
+            onChange={(e) => updateEvent("nome", e.target.value)}
+            onBlur={handleNameBlur}
             placeholder="Ex: Meia Maratona de Sao Paulo 2025"
             data-testid="input-event-name"
           />

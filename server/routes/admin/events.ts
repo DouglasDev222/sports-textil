@@ -19,7 +19,8 @@ const eventSchema = z.object({
   encerramentoInscricoes: z.string().refine(val => !isNaN(Date.parse(val)), "Data de encerramento invalida"),
   limiteVagasTotal: z.number().int().positive("Limite de vagas deve ser positivo"),
   entregaCamisaNoKit: z.boolean().optional(),
-  usarGradePorModalidade: z.boolean().optional()
+  usarGradePorModalidade: z.boolean().optional(),
+  status: z.enum(["rascunho", "publicado", "cancelado", "finalizado"]).optional()
 });
 
 router.get("/", requireAuth, async (req, res) => {
@@ -158,7 +159,7 @@ router.post("/", requireAuth, requireRole("superadmin", "admin"), async (req, re
       encerramentoInscricoes: new Date(validation.data.encerramentoInscricoes),
       limiteVagasTotal: validation.data.limiteVagasTotal,
       bannerUrl: validation.data.bannerUrl ?? null,
-      status: "rascunho",
+      status: validation.data.status ?? "rascunho",
       entregaCamisaNoKit: validation.data.entregaCamisaNoKit ?? true,
       usarGradePorModalidade: validation.data.usarGradePorModalidade ?? false
     });
