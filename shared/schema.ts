@@ -64,6 +64,7 @@ export const events = pgTable("events", {
   entregaCamisaNoKit: boolean("entrega_camisa_no_kit").default(true).notNull(),
   usarGradePorModalidade: boolean("usar_grade_por_modalidade").default(false).notNull(),
   informacoesRetiradaKit: text("informacoes_retirada_kit"),
+  imagemPercursoUrl: text("imagem_percurso_url"),
   dataCriacao: timestamp("data_criacao").defaultNow().notNull(),
 });
 
@@ -118,6 +119,14 @@ export const attachments = pgTable("attachments", {
   url: text("url").notNull(),
   obrigatorioAceitar: boolean("obrigatorio_aceitar").default(false).notNull(),
   ordem: integer("ordem").default(0).notNull(),
+});
+
+export const eventBanners = pgTable("event_banners", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  eventId: varchar("event_id").notNull().references(() => events.id),
+  imagemUrl: text("imagem_url").notNull(),
+  ordem: integer("ordem").default(0).notNull(),
+  dataCriacao: timestamp("data_criacao").defaultNow().notNull(),
 });
 
 export const athletes = pgTable("athletes", {
@@ -186,6 +195,7 @@ export const insertShirtSizeSchema = createInsertSchema(shirtSizes).omit({ id: t
 export const insertRegistrationBatchSchema = createInsertSchema(registrationBatches).omit({ id: true });
 export const insertPriceSchema = createInsertSchema(prices).omit({ id: true });
 export const insertAttachmentSchema = createInsertSchema(attachments).omit({ id: true });
+export const insertEventBannerSchema = createInsertSchema(eventBanners).omit({ id: true, dataCriacao: true });
 export const insertAthleteSchema = createInsertSchema(athletes).omit({ id: true, dataCadastro: true });
 export const insertOrderSchema = createInsertSchema(orders).omit({ id: true, dataPedido: true });
 export const insertRegistrationSchema = createInsertSchema(registrations).omit({ id: true, dataInscricao: true });
@@ -223,6 +233,9 @@ export type Price = typeof prices.$inferSelect;
 
 export type InsertAttachment = z.infer<typeof insertAttachmentSchema>;
 export type Attachment = typeof attachments.$inferSelect;
+
+export type InsertEventBanner = z.infer<typeof insertEventBannerSchema>;
+export type EventBanner = typeof eventBanners.$inferSelect;
 
 export type InsertAthlete = z.infer<typeof insertAthleteSchema>;
 export type Athlete = typeof athletes.$inferSelect;
