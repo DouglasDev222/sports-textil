@@ -3,8 +3,25 @@ import { z } from "zod";
 import { storage } from "../../storage";
 import { requireAuth, requireRole, checkEventOwnership } from "../../middleware/auth";
 import { slugify, generateUniqueSlug } from "../../utils/slugify";
+import { localToBrazilUTC, utcToBrazilLocal } from "../../utils/timezone";
 
 const router = Router();
+
+function formatEventForResponse(event: any) {
+  return {
+    ...event,
+    aberturaInscricoes: utcToBrazilLocal(event.aberturaInscricoes),
+    encerramentoInscricoes: utcToBrazilLocal(event.encerramentoInscricoes),
+  };
+}
+
+function formatBatchForResponse(batch: any) {
+  return {
+    ...batch,
+    dataInicio: utcToBrazilLocal(batch.dataInicio),
+    dataTermino: batch.dataTermino ? utcToBrazilLocal(batch.dataTermino) : null,
+  };
+}
 
 const eventSchema = z.object({
   organizerId: z.string().min(1, "Organizador e obrigatorio"),
@@ -41,7 +58,7 @@ router.get("/", requireAuth, async (req, res) => {
       events = await storage.getEvents();
     }
     
-    res.json({ success: true, data: events });
+    res.json({ success: true, data: events.map(formatEventForResponse) });
   } catch (error) {
     console.error("Get events error:", error);
     res.status(500).json({
@@ -69,7 +86,7 @@ router.get("/:id", requireAuth, async (req, res) => {
       });
     }
 
-    res.json({ success: true, data: event });
+    res.json({ success: true, data: formatEventForResponse(event) });
   } catch (error) {
     console.error("Get event error:", error);
     res.status(500).json({
@@ -109,9 +126,9 @@ router.get("/:id/full", requireAuth, async (req, res) => {
     res.json({ 
       success: true, 
       data: {
-        ...event,
+        ...formatEventForResponse(event),
         modalities,
-        batches,
+        batches: batches.map(formatBatchForResponse),
         prices,
         shirtSizes,
         attachments,
@@ -158,8 +175,8 @@ router.post("/", requireAuth, requireRole("superadmin", "admin"), async (req, re
       endereco: validation.data.endereco,
       cidade: validation.data.cidade,
       estado: validation.data.estado,
-      aberturaInscricoes: new Date(validation.data.aberturaInscricoes),
-      encerramentoInscricoes: new Date(validation.data.encerramentoInscricoes),
+      aberturaInscricoes: localToBrazilUTC(validation.data.aberturaInscricoes),
+      encerramentoInscricoes: localToBrazilUTC(validation.data.encerramentoInscricoes),
       limiteVagasTotal: validation.data.limiteVagasTotal,
       bannerUrl: validation.data.bannerUrl ?? null,
       status: validation.data.status ?? "rascunho",
@@ -168,7 +185,7 @@ router.post("/", requireAuth, requireRole("superadmin", "admin"), async (req, re
       informacoesRetiradaKit: validation.data.informacoesRetiradaKit ?? null
     });
 
-    res.status(201).json({ success: true, data: event });
+    res.status(201).json({ success: true, data: formatEventForResponse(event) });
   } catch (error) {
     console.error("Create event error:", error);
     res.status(500).json({
@@ -209,14 +226,14 @@ router.patch("/:id", requireAuth, requireRole("superadmin", "admin"), async (req
 
     const updateData: Record<string, unknown> = { ...validation.data };
     if (validation.data.aberturaInscricoes) {
-      updateData.aberturaInscricoes = new Date(validation.data.aberturaInscricoes);
+      updateData.aberturaInscricoes = localToBrazilUTC(validation.data.aberturaInscricoes);
     }
     if (validation.data.encerramentoInscricoes) {
-      updateData.encerramentoInscricoes = new Date(validation.data.encerramentoInscricoes);
+      updateData.encerramentoInscricoes = localToBrazilUTC(validation.data.encerramentoInscricoes);
     }
 
     const updated = await storage.updateEvent(req.params.id, updateData);
-    res.json({ success: true, data: updated });
+    res.json({ success: true, data: formatEventForResponse(updated) });
   } catch (error) {
     console.error("Update event error:", error);
     res.status(500).json({

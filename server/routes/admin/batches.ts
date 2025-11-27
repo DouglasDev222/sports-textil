@@ -2,8 +2,17 @@ import { Router } from "express";
 import { z } from "zod";
 import { storage } from "../../storage";
 import { requireAuth, requireRole, checkEventOwnership } from "../../middleware/auth";
+import { localToBrazilUTC, utcToBrazilLocal } from "../../utils/timezone";
 
 const router = Router({ mergeParams: true });
+
+function formatBatchForResponse(batch: any) {
+  return {
+    ...batch,
+    dataInicio: utcToBrazilLocal(batch.dataInicio),
+    dataTermino: batch.dataTermino ? utcToBrazilLocal(batch.dataTermino) : null,
+  };
+}
 
 const batchSchema = z.object({
   nome: z.string().min(2, "Nome deve ter pelo menos 2 caracteres"),
@@ -34,7 +43,7 @@ router.get("/", requireAuth, async (req, res) => {
     }
 
     const batches = await storage.getBatchesByEvent(eventId);
-    res.json({ success: true, data: batches });
+    res.json({ success: true, data: batches.map(formatBatchForResponse) });
   } catch (error) {
     console.error("Get batches error:", error);
     res.status(500).json({
@@ -71,13 +80,13 @@ router.post("/", requireAuth, requireRole("superadmin", "admin"), async (req, re
     const batch = await storage.createBatch({
       ...validation.data,
       eventId,
-      dataInicio: new Date(validation.data.dataInicio),
-      dataTermino: validation.data.dataTermino ? new Date(validation.data.dataTermino) : null,
+      dataInicio: localToBrazilUTC(validation.data.dataInicio),
+      dataTermino: validation.data.dataTermino ? localToBrazilUTC(validation.data.dataTermino) : null,
       ativo: validation.data.ativo ?? true,
       ordem: validation.data.ordem ?? nextOrder
     });
 
-    res.status(201).json({ success: true, data: batch });
+    res.status(201).json({ success: true, data: formatBatchForResponse(batch) });
   } catch (error) {
     console.error("Create batch error:", error);
     res.status(500).json({
@@ -117,14 +126,14 @@ router.patch("/:id", requireAuth, requireRole("superadmin", "admin"), async (req
 
     const updateData: Record<string, unknown> = { ...validation.data };
     if (validation.data.dataInicio) {
-      updateData.dataInicio = new Date(validation.data.dataInicio);
+      updateData.dataInicio = localToBrazilUTC(validation.data.dataInicio);
     }
     if (validation.data.dataTermino !== undefined) {
-      updateData.dataTermino = validation.data.dataTermino ? new Date(validation.data.dataTermino) : null;
+      updateData.dataTermino = validation.data.dataTermino ? localToBrazilUTC(validation.data.dataTermino) : null;
     }
 
     const updated = await storage.updateBatch(req.params.id, updateData);
-    res.json({ success: true, data: updated });
+    res.json({ success: true, data: formatBatchForResponse(updated) });
   } catch (error) {
     console.error("Update batch error:", error);
     res.status(500).json({

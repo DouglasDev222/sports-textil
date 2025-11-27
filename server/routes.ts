@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import express from "express";
 import path from "path";
 import { storage } from "./storage";
+import { utcToBrazilLocal } from "./utils/timezone";
 
 import authRoutes from "./routes/admin/auth";
 import usersRoutes from "./routes/admin/users";
@@ -29,11 +30,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/admin/events/:eventId/attachments", attachmentsRoutes);
   app.use("/api/admin/uploads", uploadsRoutes);
 
+  function formatEventForResponse(event: any) {
+    return {
+      ...event,
+      aberturaInscricoes: utcToBrazilLocal(event.aberturaInscricoes),
+      encerramentoInscricoes: utcToBrazilLocal(event.encerramentoInscricoes),
+    };
+  }
+
+  function formatBatchForResponse(batch: any) {
+    return {
+      ...batch,
+      dataInicio: utcToBrazilLocal(batch.dataInicio),
+      dataTermino: batch.dataTermino ? utcToBrazilLocal(batch.dataTermino) : null,
+    };
+  }
+
   app.get("/api/events", async (req, res) => {
     try {
       const events = await storage.getEvents();
       const publicEvents = events.filter(e => e.status === "publicado");
-      res.json({ success: true, data: publicEvents });
+      res.json({ success: true, data: publicEvents.map(formatEventForResponse) });
     } catch (error) {
       console.error("Get public events error:", error);
       res.status(500).json({
@@ -65,9 +82,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({
         success: true,
         data: {
-          ...event,
+          ...formatEventForResponse(event),
           modalities,
-          activeBatch,
+          activeBatch: activeBatch ? formatBatchForResponse(activeBatch) : null,
           prices: prices.filter(p => p.batchId === activeBatch?.id),
           attachments
         }
