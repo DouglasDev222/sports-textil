@@ -42,17 +42,19 @@ export default function EditEventPage() {
     );
   }
 
+  const { modalities, batches, prices, shirtSizes, attachments, ...event } = eventData;
+
   const initialData: EventFormData = {
-    event: eventData.event,
-    modalities: eventData.modalities || [],
-    batches: eventData.batches || [],
-    prices: (eventData.prices || []).map((p: any) => {
-      const modalityIndex = (eventData.modalities || []).findIndex((m: any) => m.id === p.modalityId);
-      const batchIndex = (eventData.batches || []).findIndex((b: any) => b.id === p.batchId);
+    event,
+    modalities: modalities || [],
+    batches: batches || [],
+    prices: (prices || []).map((p: any) => {
+      const modalityIndex = (modalities || []).findIndex((m: any) => m.id === p.modalityId);
+      const batchIndex = (batches || []).findIndex((b: any) => b.id === p.batchId);
       return { modalityIndex, batchIndex, valor: p.valor };
     }),
-    shirts: eventData.shirts || [],
-    attachments: eventData.attachments || [],
+    shirts: shirtSizes || [],
+    attachments: attachments || [],
   };
 
   return <EventWizard mode="edit" eventId={eventId} initialData={initialData} />;
