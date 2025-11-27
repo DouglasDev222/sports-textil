@@ -62,10 +62,12 @@ export default function AdminEventsPage() {
               Gerencie os eventos do sistema
             </p>
           </div>
-          <Button data-testid="button-create-event">
-            <Plus className="mr-2 h-4 w-4" />
-            Novo Evento
-          </Button>
+          <Link href="/admin/eventos/novo">
+            <Button data-testid="button-create-event">
+              <Plus className="mr-2 h-4 w-4" />
+              Novo Evento
+            </Button>
+          </Link>
         </div>
 
         <Card>

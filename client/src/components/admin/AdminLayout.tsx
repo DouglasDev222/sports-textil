@@ -36,16 +36,16 @@ export function AdminLayout({ children, title, breadcrumbs = [] }: AdminLayoutPr
                   <BreadcrumbLink href="/admin">Admin</BreadcrumbLink>
                 </BreadcrumbItem>
                 {breadcrumbs.map((crumb, index) => (
-                  <>
-                    <BreadcrumbSeparator key={`sep-${index}`} />
-                    <BreadcrumbItem key={`item-${index}`}>
+                  <span key={index} className="contents">
+                    <BreadcrumbSeparator />
+                    <BreadcrumbItem>
                       {crumb.href ? (
                         <BreadcrumbLink href={crumb.href}>{crumb.label}</BreadcrumbLink>
                       ) : (
                         <BreadcrumbPage>{crumb.label}</BreadcrumbPage>
                       )}
                     </BreadcrumbItem>
-                  </>
+                  </span>
                 ))}
                 {breadcrumbs.length === 0 && (
                   <>

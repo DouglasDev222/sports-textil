@@ -22,6 +22,8 @@ import AdminLoginPage from "@/pages/admin/AdminLoginPage";
 import AdminDashboardPage from "@/pages/admin/AdminDashboardPage";
 import AdminOrganizersPage from "@/pages/admin/AdminOrganizersPage";
 import AdminEventsPage from "@/pages/admin/AdminEventsPage";
+import CreateEventPage from "@/pages/admin/events/CreateEventPage";
+import EditEventPage from "@/pages/admin/events/EditEventPage";
 import AdminUsersPage from "@/pages/admin/AdminUsersPage";
 import AdminNotFound from "@/pages/admin/AdminNotFound";
 import ProtectedAdminRoute from "@/pages/admin/ProtectedAdminRoute";
@@ -62,6 +64,16 @@ function AdminRoutes() {
         <Route path="/admin/organizadores">
           <ProtectedAdminRoute>
             <AdminOrganizersPage />
+          </ProtectedAdminRoute>
+        </Route>
+        <Route path="/admin/eventos/novo">
+          <ProtectedAdminRoute>
+            <CreateEventPage />
+          </ProtectedAdminRoute>
+        </Route>
+        <Route path="/admin/eventos/:id">
+          <ProtectedAdminRoute>
+            <EditEventPage />
           </ProtectedAdminRoute>
         </Route>
         <Route path="/admin/eventos">
