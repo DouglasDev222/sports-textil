@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, MapPin, Users } from "lucide-react";
 import { Link } from "wouter";
+import { formatDateOnlyLong } from "@/lib/timezone";
 
 interface EventCardProps {
   id: string;
@@ -29,11 +30,7 @@ export default function EventCard({
   imagemUrl,
   valor,
 }: EventCardProps) {
-  const formattedDate = new Date(data).toLocaleDateString('pt-BR', {
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric'
-  });
+  const formattedDate = formatDateOnlyLong(data);
 
   return (
     <Card className="overflow-hidden hover-elevate transition-all" data-testid={`card-event-${id}`}>

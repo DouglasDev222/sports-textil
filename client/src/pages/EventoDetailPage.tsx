@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Calendar, MapPin, Clock, Award, Info, FileText, Download, Package, Map, AlertCircle } from "lucide-react";
 import heroImage from '@assets/generated_images/Marathon_runners_landscape_hero_b439e181.png';
+import { formatDateOnlyLong } from "@/lib/timezone";
 import type { Event, Modality, RegistrationBatch, Price, Attachment } from "@shared/schema";
 
 interface EventWithDetails extends Event {
@@ -72,11 +73,7 @@ export default function EventoDetailPage() {
     );
   }
 
-  const formattedDate = new Date(event.dataEvento).toLocaleDateString('pt-BR', {
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric'
-  });
+  const formattedDate = formatDateOnlyLong(event.dataEvento);
 
   const handleInscricao = () => {
     setLocation(`/evento/${event.slug}/inscricao/participante`);

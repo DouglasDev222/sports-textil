@@ -1,5 +1,5 @@
 import { formatInTimeZone, toZonedTime, fromZonedTime } from 'date-fns-tz';
-import { parseISO, isValid, format } from 'date-fns';
+import { parseISO, isValid, format, parse } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 export const BRAZIL_TIMEZONE = 'America/Sao_Paulo';
@@ -20,6 +20,34 @@ export function formatDateBrazil(dateString: string | Date | null | undefined): 
   if (!isValid(date)) return '';
   
   return format(date, 'dd/MM/yyyy', { locale: ptBR });
+}
+
+export function formatDateOnlyBrazil(dateString: string | null | undefined): string {
+  if (!dateString) return '';
+  
+  const dateOnly = dateString.split('T')[0];
+  const [year, month, day] = dateOnly.split('-').map(Number);
+  
+  if (!year || !month || !day) return '';
+  
+  const date = new Date(year, month - 1, day);
+  if (!isValid(date)) return '';
+  
+  return format(date, 'dd/MM/yyyy', { locale: ptBR });
+}
+
+export function formatDateOnlyLong(dateString: string | null | undefined): string {
+  if (!dateString) return '';
+  
+  const dateOnly = dateString.split('T')[0];
+  const [year, month, day] = dateOnly.split('-').map(Number);
+  
+  if (!year || !month || !day) return '';
+  
+  const date = new Date(year, month - 1, day);
+  if (!isValid(date)) return '';
+  
+  return format(date, "dd 'de' MMMM 'de' yyyy", { locale: ptBR });
 }
 
 export function formatTimeBrazil(dateString: string | Date | null | undefined): string {
