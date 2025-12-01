@@ -152,7 +152,13 @@ const mockPedidosConcluidos: Pedido[] = [
 ];
 
 function formatDate(dateString: string) {
-  return new Date(dateString).toLocaleDateString('pt-BR', {
+  const dateOnly = dateString.split('T')[0];
+  const [year, month, day] = dateOnly.split('-').map(Number);
+  
+  if (!year || !month || !day) return '';
+  
+  const date = new Date(year, month - 1, day);
+  return date.toLocaleDateString('pt-BR', {
     day: '2-digit',
     month: 'long',
     year: 'numeric'

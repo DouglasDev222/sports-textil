@@ -59,6 +59,15 @@ export function formatTimeBrazil(dateString: string | Date | null | undefined): 
   return formatInTimeZone(date, BRAZIL_TIMEZONE, 'HH:mm', { locale: ptBR });
 }
 
+export function formatTimestampAsDateBrazil(dateString: string | Date | null | undefined): string {
+  if (!dateString) return '';
+  
+  const date = typeof dateString === 'string' ? new Date(dateString) : dateString;
+  if (!isValid(date)) return '';
+  
+  return formatInTimeZone(date, BRAZIL_TIMEZONE, 'dd/MM/yyyy', { locale: ptBR });
+}
+
 export function formatForInput(dateString: string | Date | null | undefined): string {
   if (!dateString) return '';
   

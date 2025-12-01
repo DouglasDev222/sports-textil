@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Calendar, MapPin, Award } from "lucide-react";
 import { Link } from "wouter";
+import { formatDateOnlyLong } from "@/lib/timezone";
 
 interface InscricaoCardProps {
   id: string;
@@ -23,11 +24,7 @@ export default function InscricaoCard({
   status,
   eventoImagem,
 }: InscricaoCardProps) {
-  const formattedDate = new Date(eventoData).toLocaleDateString('pt-BR', {
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric'
-  });
+  const formattedDate = formatDateOnlyLong(eventoData);
 
   const statusVariant = status === 'confirmada' ? 'default' : 'secondary';
   const statusLabel = status === 'confirmada' ? 'Confirmada' : 'Pendente';

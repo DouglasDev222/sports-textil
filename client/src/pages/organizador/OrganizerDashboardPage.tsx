@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Skeleton } from "@/components/ui/skeleton";
 import { useOrganizerAuth } from "@/contexts/OrganizerAuthContext";
 import { Users, Calendar, TrendingUp, Shirt } from "lucide-react";
+import { formatDateOnlyBrazil } from "@/lib/timezone";
 
 interface DashboardStats {
   totalInscritos: number;
@@ -71,7 +72,7 @@ export default function OrganizerDashboardPage() {
               <CardHeader>
                 <CardTitle>{myEvent.nome}</CardTitle>
                 <CardDescription>
-                  {myEvent.cidade}, {myEvent.estado} - {new Date(myEvent.dataEvento).toLocaleDateString('pt-BR')}
+                  {myEvent.cidade}, {myEvent.estado} - {formatDateOnlyBrazil(myEvent.dataEvento)}
                 </CardDescription>
               </CardHeader>
             </Card>

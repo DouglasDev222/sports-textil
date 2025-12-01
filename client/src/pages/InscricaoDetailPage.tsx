@@ -22,6 +22,7 @@ import {
   Package
 } from "lucide-react";
 import cityImage from '@assets/generated_images/City_marathon_aerial_view_94ce50b6.png';
+import { formatDateOnlyLong } from "@/lib/timezone";
 
 const mockInscricao = {
   id: "1",
@@ -64,17 +65,8 @@ export default function InscricaoDetailPage() {
   const [, params] = useRoute("/inscricao/:id");
   const [, setLocation] = useLocation();
 
-  const formattedEventDate = new Date(mockInscricao.evento.data).toLocaleDateString('pt-BR', {
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric'
-  });
-
-  const formattedInscricaoDate = new Date(mockInscricao.dataInscricao).toLocaleDateString('pt-BR', {
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric'
-  });
+  const formattedEventDate = formatDateOnlyLong(mockInscricao.evento.data);
+  const formattedInscricaoDate = formatDateOnlyLong(mockInscricao.dataInscricao);
 
   const handleVoltar = () => {
     setLocation("/minhas-inscricoes");

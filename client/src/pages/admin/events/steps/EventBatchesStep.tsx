@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { formatTimestampAsDateBrazil } from "@/lib/timezone";
 import type { EventFormData } from "../EventWizard";
 import type { RegistrationBatch } from "@shared/schema";
 
@@ -229,8 +230,8 @@ export function EventBatchesStep({ formData, updateFormData }: EventBatchesStepP
                         {batch.ativo && <Badge variant="secondary">Ativo</Badge>}
                       </div>
                       <p className="text-sm text-muted-foreground">
-                        {batch.dataInicio ? new Date(batch.dataInicio).toLocaleDateString("pt-BR") : ""} 
-                        {batch.dataTermino ? ` - ${new Date(batch.dataTermino).toLocaleDateString("pt-BR")}` : ""}
+                        {batch.dataInicio ? formatTimestampAsDateBrazil(batch.dataInicio) : ""} 
+                        {batch.dataTermino ? ` - ${formatTimestampAsDateBrazil(batch.dataTermino)}` : ""}
                         {batch.quantidadeMaxima ? ` | Max: ${batch.quantidadeMaxima}` : ""}
                       </p>
                     </div>

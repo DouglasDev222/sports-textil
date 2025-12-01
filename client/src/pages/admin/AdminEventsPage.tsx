@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, Eye, Search } from "lucide-react";
+import { formatDateOnlyBrazil } from "@/lib/timezone";
 import type { Event } from "@shared/schema";
 
 const statusColors: Record<string, string> = {
@@ -128,7 +129,7 @@ export default function AdminEventsPage() {
                       <TableCell className="font-medium">{event.nome}</TableCell>
                       <TableCell>{event.cidade}, {event.estado}</TableCell>
                       <TableCell>
-                        {new Date(event.dataEvento).toLocaleDateString("pt-BR")}
+                        {formatDateOnlyBrazil(event.dataEvento)}
                       </TableCell>
                       <TableCell>{event.limiteVagasTotal}</TableCell>
                       <TableCell>
