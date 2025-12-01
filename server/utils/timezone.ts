@@ -1,5 +1,5 @@
 import { fromZonedTime, toZonedTime, format, formatInTimeZone } from 'date-fns-tz';
-import { parseISO, isValid } from 'date-fns';
+import { isValid } from 'date-fns';
 
 export const BRAZIL_TIMEZONE = 'America/Sao_Paulo';
 
@@ -14,17 +14,29 @@ export function localToBrazilUTC(localDateTimeString: string): Date {
     return new Date(trimmed);
   }
   
-  const parsed = parseISO(trimmed);
-  if (isValid(parsed)) {
-    return fromZonedTime(parsed, BRAZIL_TIMEZONE);
+  const dateTimeMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2})(?::(\d{2}))?)?$/);
+  if (!dateTimeMatch) {
+    throw new Error(`Formato de data invalido: ${localDateTimeString}. Use YYYY-MM-DD ou YYYY-MM-DDTHH:mm`);
   }
   
-  const directDate = new Date(trimmed);
-  if (isValid(directDate)) {
-    return fromZonedTime(directDate, BRAZIL_TIMEZONE);
+  const [, yearStr, monthStr, dayStr, hourStr = '00', minuteStr = '00', secondStr = '00'] = dateTimeMatch;
+  const year = parseInt(yearStr, 10);
+  const month = parseInt(monthStr, 10);
+  const day = parseInt(dayStr, 10);
+  const hour = parseInt(hourStr, 10);
+  const minute = parseInt(minuteStr, 10);
+  const second = parseInt(secondStr, 10);
+  
+  if (month < 1 || month > 12 || day < 1 || day > 31 || hour > 23 || minute > 59 || second > 59) {
+    throw new Error(`Data invalida: ${localDateTimeString}`);
   }
   
-  throw new Error(`Data invalida: ${localDateTimeString}`);
+  const localDate = new Date(year, month - 1, day, hour, minute, second);
+  if (!isValid(localDate)) {
+    throw new Error(`Data invalida: ${localDateTimeString}`);
+  }
+  
+  return fromZonedTime(localDate, BRAZIL_TIMEZONE);
 }
 
 export function localToBrazilUTCOptional(localDateTimeString: string | null | undefined): Date | null {

@@ -1,25 +1,55 @@
 import { formatInTimeZone, toZonedTime, fromZonedTime } from 'date-fns-tz';
-import { parseISO, isValid, format, parse } from 'date-fns';
+import { isValid, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 export const BRAZIL_TIMEZONE = 'America/Sao_Paulo';
 
+function parseLocalDateTimeString(dateString: string): Date | null {
+  const match = dateString.match(/^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2})(?::(\d{2}))?)?/);
+  if (!match) return null;
+  
+  const [, yearStr, monthStr, dayStr, hourStr = '00', minuteStr = '00', secondStr = '00'] = match;
+  const year = parseInt(yearStr, 10);
+  const month = parseInt(monthStr, 10);
+  const day = parseInt(dayStr, 10);
+  const hour = parseInt(hourStr, 10);
+  const minute = parseInt(minuteStr, 10);
+  const second = parseInt(secondStr, 10);
+  
+  const date = new Date(year, month - 1, day, hour, minute, second);
+  return isValid(date) ? date : null;
+}
+
+function localStringToUTC(localDateTimeString: string): Date | null {
+  const localDate = parseLocalDateTimeString(localDateTimeString);
+  if (!localDate) return null;
+  return fromZonedTime(localDate, BRAZIL_TIMEZONE);
+}
+
 export function formatDateTimeBrazil(dateString: string | Date | null | undefined): string {
   if (!dateString) return '';
   
-  const date = typeof dateString === 'string' ? new Date(dateString) : dateString;
-  if (!isValid(date)) return '';
+  if (typeof dateString === 'string') {
+    const localDate = parseLocalDateTimeString(dateString);
+    if (!localDate) return '';
+    return format(localDate, 'dd/MM/yyyy HH:mm', { locale: ptBR });
+  }
   
-  return formatInTimeZone(date, BRAZIL_TIMEZONE, 'dd/MM/yyyy HH:mm', { locale: ptBR });
+  if (!isValid(dateString)) return '';
+  return formatInTimeZone(dateString, BRAZIL_TIMEZONE, 'dd/MM/yyyy HH:mm', { locale: ptBR });
 }
 
 export function formatDateBrazil(dateString: string | Date | null | undefined): string {
   if (!dateString) return '';
   
-  const date = typeof dateString === 'string' ? new Date(dateString) : dateString;
-  if (!isValid(date)) return '';
+  if (typeof dateString === 'string') {
+    const localDate = parseLocalDateTimeString(dateString);
+    if (!localDate) return '';
+    return format(localDate, 'dd/MM/yyyy', { locale: ptBR });
+  }
   
-  return format(date, 'dd/MM/yyyy', { locale: ptBR });
+  if (!isValid(dateString)) return '';
+  return format(dateString, 'dd/MM/yyyy', { locale: ptBR });
 }
 
 export function formatDateOnlyBrazil(dateString: string | null | undefined): string {
@@ -53,28 +83,46 @@ export function formatDateOnlyLong(dateString: string | null | undefined): strin
 export function formatTimeBrazil(dateString: string | Date | null | undefined): string {
   if (!dateString) return '';
   
-  const date = typeof dateString === 'string' ? new Date(dateString) : dateString;
-  if (!isValid(date)) return '';
+  if (typeof dateString === 'string') {
+    const localDate = parseLocalDateTimeString(dateString);
+    if (!localDate) return '';
+    return format(localDate, 'HH:mm', { locale: ptBR });
+  }
   
-  return formatInTimeZone(date, BRAZIL_TIMEZONE, 'HH:mm', { locale: ptBR });
+  if (!isValid(dateString)) return '';
+  return formatInTimeZone(dateString, BRAZIL_TIMEZONE, 'HH:mm', { locale: ptBR });
 }
 
 export function formatTimestampAsDateBrazil(dateString: string | Date | null | undefined): string {
   if (!dateString) return '';
   
-  const date = typeof dateString === 'string' ? new Date(dateString) : dateString;
-  if (!isValid(date)) return '';
+  if (typeof dateString === 'string') {
+    const localDate = parseLocalDateTimeString(dateString);
+    if (!localDate) return '';
+    return format(localDate, 'dd/MM/yyyy', { locale: ptBR });
+  }
   
-  return formatInTimeZone(date, BRAZIL_TIMEZONE, 'dd/MM/yyyy', { locale: ptBR });
+  if (!isValid(dateString)) return '';
+  return formatInTimeZone(dateString, BRAZIL_TIMEZONE, 'dd/MM/yyyy', { locale: ptBR });
 }
 
 export function formatForInput(dateString: string | Date | null | undefined): string {
   if (!dateString) return '';
   
-  const date = typeof dateString === 'string' ? new Date(dateString) : dateString;
-  if (!isValid(date)) return '';
+  if (typeof dateString === 'string') {
+    const localDate = parseLocalDateTimeString(dateString);
+    if (!localDate) return '';
+    return format(localDate, "yyyy-MM-dd'T'HH:mm");
+  }
   
-  return formatInTimeZone(date, BRAZIL_TIMEZONE, "yyyy-MM-dd'T'HH:mm");
+  if (!isValid(dateString)) return '';
+  return formatInTimeZone(dateString, BRAZIL_TIMEZONE, "yyyy-MM-dd'T'HH:mm");
+}
+
+function localStringToUTCDate(dateString: string): Date | null {
+  const localDate = parseLocalDateTimeString(dateString);
+  if (!localDate) return null;
+  return fromZonedTime(localDate, BRAZIL_TIMEZONE);
 }
 
 export function isEventOpen(
@@ -84,10 +132,25 @@ export function isEventOpen(
   if (!aberturaInscricoes || !encerramentoInscricoes) return false;
   
   const now = new Date();
-  const abertura = typeof aberturaInscricoes === 'string' ? new Date(aberturaInscricoes) : aberturaInscricoes;
-  const encerramento = typeof encerramentoInscricoes === 'string' ? new Date(encerramentoInscricoes) : encerramentoInscricoes;
   
-  return now >= abertura && now <= encerramento;
+  let aberturaUTC: Date | null;
+  let encerramentoUTC: Date | null;
+  
+  if (typeof aberturaInscricoes === 'string') {
+    aberturaUTC = localStringToUTCDate(aberturaInscricoes);
+  } else {
+    aberturaUTC = aberturaInscricoes;
+  }
+  
+  if (typeof encerramentoInscricoes === 'string') {
+    encerramentoUTC = localStringToUTCDate(encerramentoInscricoes);
+  } else {
+    encerramentoUTC = encerramentoInscricoes;
+  }
+  
+  if (!aberturaUTC || !encerramentoUTC) return false;
+  
+  return now >= aberturaUTC && now <= encerramentoUTC;
 }
 
 export function getEventStatus(
@@ -97,11 +160,26 @@ export function getEventStatus(
   if (!aberturaInscricoes || !encerramentoInscricoes) return 'closed';
   
   const now = new Date();
-  const abertura = typeof aberturaInscricoes === 'string' ? new Date(aberturaInscricoes) : aberturaInscricoes;
-  const encerramento = typeof encerramentoInscricoes === 'string' ? new Date(encerramentoInscricoes) : encerramentoInscricoes;
   
-  if (now < abertura) return 'upcoming';
-  if (now > encerramento) return 'closed';
+  let aberturaUTC: Date | null;
+  let encerramentoUTC: Date | null;
+  
+  if (typeof aberturaInscricoes === 'string') {
+    aberturaUTC = localStringToUTCDate(aberturaInscricoes);
+  } else {
+    aberturaUTC = aberturaInscricoes;
+  }
+  
+  if (typeof encerramentoInscricoes === 'string') {
+    encerramentoUTC = localStringToUTCDate(encerramentoInscricoes);
+  } else {
+    encerramentoUTC = encerramentoInscricoes;
+  }
+  
+  if (!aberturaUTC || !encerramentoUTC) return 'closed';
+  
+  if (now < aberturaUTC) return 'upcoming';
+  if (now > encerramentoUTC) return 'closed';
   return 'open';
 }
 
@@ -116,11 +194,19 @@ export function getStatusLabel(status: 'upcoming' | 'open' | 'closed'): string {
 export function formatRelativeDate(dateString: string | Date | null | undefined): string {
   if (!dateString) return '';
   
-  const date = typeof dateString === 'string' ? new Date(dateString) : dateString;
-  if (!isValid(date)) return '';
+  let targetDate: Date | null;
+  
+  if (typeof dateString === 'string') {
+    const localDate = parseLocalDateTimeString(dateString);
+    if (!localDate) return '';
+    targetDate = fromZonedTime(localDate, BRAZIL_TIMEZONE);
+  } else {
+    if (!isValid(dateString)) return '';
+    targetDate = dateString;
+  }
   
   const now = new Date();
-  const diff = date.getTime() - now.getTime();
+  const diff = targetDate.getTime() - now.getTime();
   const days = Math.floor(diff / (1000 * 60 * 60 * 24));
   const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
   
