@@ -6,7 +6,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
-import { Plus, Pencil, Trash2, GripVertical, Upload, X, ImageIcon, Loader2 } from "lucide-react";
+import { Plus, Pencil, Trash2, GripVertical, Upload, X, ImageIcon, Loader2, DollarSign, Users, Clock } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import type { EventFormData } from "../EventWizard";
 import type { Modality } from "@shared/schema";
@@ -410,41 +411,76 @@ export function EventModalitiesStep({ formData, updateFormData }: EventModalitie
         </Card>
       ) : (
         <div className="space-y-3">
-          {formData.modalities.map((modality, index) => (
-            <Card key={index} data-testid={`card-modality-${index}`}>
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-3">
-                    <GripVertical className="h-5 w-5 text-muted-foreground" />
-                    <div>
-                      <CardTitle className="text-base">{modality.nome}</CardTitle>
-                      <p className="text-sm text-muted-foreground">
-                        {modality.distancia} {modality.unidadeDistancia} - Largada: {modality.horarioLargada}
-                      </p>
+          {formData.modalities.map((modality, index) => {
+            const tipoAcessoLabel = TIPOS_ACESSO.find(t => t.value === modality.tipoAcesso)?.label || modality.tipoAcesso;
+            const isGratuita = modality.tipoAcesso === "gratuita";
+            const taxa = typeof modality.taxaComodidade === 'number' 
+              ? modality.taxaComodidade 
+              : parseFloat(modality.taxaComodidade || "0") || 0;
+            
+            return (
+              <Card key={index} data-testid={`card-modality-${index}`}>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-3">
+                      <GripVertical className="h-5 w-5 text-muted-foreground" />
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <CardTitle className="text-base">{modality.nome}</CardTitle>
+                          <Badge 
+                            variant={isGratuita ? "secondary" : "default"}
+                            className="text-xs"
+                            data-testid={`badge-access-type-${index}`}
+                          >
+                            {tipoAcessoLabel}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-4 text-sm text-muted-foreground flex-wrap">
+                          <span className="flex items-center gap-1">
+                            {modality.distancia} {modality.unidadeDistancia}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Clock className="h-3.5 w-3.5" />
+                            {modality.horarioLargada}
+                          </span>
+                          {taxa > 0 && (
+                            <span className="flex items-center gap-1" data-testid={`text-fee-${index}`}>
+                              <DollarSign className="h-3.5 w-3.5" />
+                              Taxa: R$ {taxa.toFixed(2)}
+                            </span>
+                          )}
+                          {modality.limiteVagas && (
+                            <span className="flex items-center gap-1" data-testid={`text-capacity-${index}`}>
+                              <Users className="h-3.5 w-3.5" />
+                              {modality.limiteVagas} vagas
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => openEditDialog(index)}
+                        data-testid={`button-edit-modality-${index}`}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDelete(index)}
+                        data-testid={`button-delete-modality-${index}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </div>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => openEditDialog(index)}
-                      data-testid={`button-edit-modality-${index}`}
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleDelete(index)}
-                      data-testid={`button-delete-modality-${index}`}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-            </Card>
-          ))}
+                </CardHeader>
+              </Card>
+            );
+          })}
         </div>
       )}
     </div>
