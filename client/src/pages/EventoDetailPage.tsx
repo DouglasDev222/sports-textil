@@ -239,11 +239,14 @@ export default function EventoDetailPage() {
                             {mod.descricao && (
                               <p className="text-sm text-muted-foreground">{mod.descricao}</p>
                             )}
-                            {mod.limiteVagas && (
-                              <p className="text-xs text-muted-foreground">
-                                Limite: {mod.limiteVagas} vagas
-                              </p>
-                            )}
+                            <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                              {mod.limiteVagas && (
+                                <span>Limite: {mod.limiteVagas} vagas</span>
+                              )}
+                              {(mod.idadeMinima !== null && mod.idadeMinima !== undefined) || event.idadeMinimaEvento ? (
+                                <span>Idade minima: {mod.idadeMinima ?? event.idadeMinimaEvento} anos</span>
+                              ) : null}
+                            </div>
                           </div>
                         ))}
                       </div>

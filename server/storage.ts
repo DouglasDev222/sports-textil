@@ -526,11 +526,39 @@ export class DbStorage implements IStorage {
       throw new Error("Lote esgotado");
     }
 
+    const event = await this.getEvent(insertRegistration.eventId);
+    if (!event) {
+      throw new Error("Evento nao encontrado");
+    }
+
+    const modality = await this.getModality(insertRegistration.modalityId);
+    if (!modality) {
+      throw new Error("Modalidade nao encontrada");
+    }
+
+    const athlete = await this.getAthlete(insertRegistration.athleteId);
+    if (!athlete) {
+      throw new Error("Atleta nao encontrado");
+    }
+
+    const idadeMinima = modality.idadeMinima ?? event.idadeMinimaEvento ?? 18;
+    
+    const eventDate = new Date(event.dataEvento);
+    const birthDate = new Date(athlete.dataNascimento);
+    let age = eventDate.getFullYear() - birthDate.getFullYear();
+    const monthDiff = eventDate.getMonth() - birthDate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && eventDate.getDate() < birthDate.getDate())) {
+      age--;
+    }
+
+    if (age < idadeMinima) {
+      throw new Error(`Idade minima para esta modalidade e ${idadeMinima} anos. O participante tera ${age} anos na data do evento.`);
+    }
+
     if (insertRegistration.tamanhoCamisa) {
-      const event = await this.getEvent(insertRegistration.eventId);
       let shirtSize: ShirtSize | undefined;
       
-      if (event?.usarGradePorModalidade) {
+      if (event.usarGradePorModalidade) {
         const sizes = await this.getShirtSizesByModality(insertRegistration.modalityId);
         shirtSize = sizes.find(s => s.tamanho === insertRegistration.tamanhoCamisa);
       } else {
