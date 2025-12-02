@@ -223,7 +223,7 @@ export function EventModalitiesStep({ formData, updateFormData }: EventModalitie
                 </div>
               </div>
 
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-4 md:grid-cols-3">
                 <div className="space-y-2">
                   <Label htmlFor="mod-acesso">Tipo de Acesso *</Label>
                   <Select
@@ -255,6 +255,23 @@ export function EventModalitiesStep({ formData, updateFormData }: EventModalitie
                     placeholder="0.00"
                     data-testid="input-modality-fee"
                   />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="mod-idade-minima">Idade Minima</Label>
+                  <Input
+                    id="mod-idade-minima"
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={currentModality.idadeMinima ?? ""}
+                    onChange={(e) => updateCurrentModality("idadeMinima", e.target.value ? parseInt(e.target.value) : null)}
+                    placeholder="Usa padrao do evento"
+                    data-testid="input-modality-min-age"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Deixe vazio para usar a idade do evento
+                  </p>
                 </div>
               </div>
 
