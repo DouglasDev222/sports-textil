@@ -7,7 +7,10 @@ const router = Router({ mergeParams: true });
 
 const attachmentSchema = z.object({
   nome: z.string().min(2, "Nome deve ter pelo menos 2 caracteres"),
-  url: z.string().url("URL invalida"),
+  url: z.string().min(1, "URL ou caminho do arquivo e obrigatorio").refine(
+    (val) => val.startsWith("/uploads/") || val.startsWith("http://") || val.startsWith("https://"),
+    "URL ou caminho do arquivo invalido"
+  ),
   obrigatorioAceitar: z.boolean().optional(),
   ordem: z.number().int().optional()
 });
