@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -6,8 +6,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
-import { Plus, Trash2, Shirt, FileText, AlertCircle, Package, X } from "lucide-react";
+import { Plus, Trash2, Shirt, FileText, AlertCircle, Package, X, Upload, Loader2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useToast } from "@/hooks/use-toast";
 import type { EventFormData } from "../EventWizard";
 import type { ShirtSize, Attachment } from "@shared/schema";
 
@@ -31,11 +32,15 @@ const emptyAttachment: Partial<Attachment> = {
 };
 
 export function EventFinishStep({ formData, updateFormData }: EventFinishStepProps) {
+  const { toast } = useToast();
   const [shirtDialogOpen, setShirtDialogOpen] = useState(false);
   const [attachmentDialogOpen, setAttachmentDialogOpen] = useState(false);
   const [selectedSizes, setSelectedSizes] = useState<ShirtSelection[]>([]);
   const [customSizeInput, setCustomSizeInput] = useState("");
   const [currentAttachment, setCurrentAttachment] = useState<Partial<Attachment>>(emptyAttachment);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadedFileName, setUploadedFileName] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const usedSizes = formData.shirts.map(s => s.tamanho);
   const availablePredefinedSizes = TAMANHOS_CAMISA.filter(t => !usedSizes.includes(t));
@@ -99,6 +104,46 @@ export function EventFinishStep({ formData, updateFormData }: EventFinishStepPro
 
   const canAddShirts = selectedSizes.length > 0 && selectedSizes.every(s => s.quantidadeTotal > 0);
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    try {
+      const formDataUpload = new FormData();
+      formDataUpload.append("file", file);
+
+      const response = await fetch("/api/admin/uploads/document", {
+        method: "POST",
+        credentials: "include",
+        body: formDataUpload
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        setCurrentAttachment(prev => ({ ...prev, url: result.data.url }));
+        setUploadedFileName(result.data.originalName);
+        toast({
+          title: "Arquivo enviado",
+          description: "O documento foi carregado com sucesso."
+        });
+      } else {
+        throw new Error(result.message || "Erro ao enviar arquivo");
+      }
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Erro no upload",
+        description: error instanceof Error ? error.message : "Erro ao enviar o arquivo"
+      });
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
+
   const handleAddAttachment = () => {
     if (currentAttachment.nome && currentAttachment.url) {
       const newAttachments = [...formData.attachments, {
@@ -107,7 +152,16 @@ export function EventFinishStep({ formData, updateFormData }: EventFinishStepPro
       }];
       updateFormData({ attachments: newAttachments });
       setCurrentAttachment(emptyAttachment);
+      setUploadedFileName("");
       setAttachmentDialogOpen(false);
+    }
+  };
+
+  const handleAttachmentDialogOpenChange = (open: boolean) => {
+    setAttachmentDialogOpen(open);
+    if (!open) {
+      setCurrentAttachment(emptyAttachment);
+      setUploadedFileName("");
     }
   };
 
@@ -293,7 +347,7 @@ export function EventFinishStep({ formData, updateFormData }: EventFinishStepPro
               </p>
             </div>
           </div>
-          <Dialog open={attachmentDialogOpen} onOpenChange={setAttachmentDialogOpen}>
+          <Dialog open={attachmentDialogOpen} onOpenChange={handleAttachmentDialogOpenChange}>
             <DialogTrigger asChild>
               <Button size="sm" data-testid="button-add-attachment">
                 <Plus className="mr-2 h-4 w-4" />
@@ -318,15 +372,58 @@ export function EventFinishStep({ formData, updateFormData }: EventFinishStepPro
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="attachment-url">URL do Documento *</Label>
-                  <Input
-                    id="attachment-url"
-                    type="url"
-                    value={currentAttachment.url || ""}
-                    onChange={(e) => setCurrentAttachment(prev => ({ ...prev, url: e.target.value }))}
-                    placeholder="https://exemplo.com/regulamento.pdf"
-                    data-testid="input-attachment-url"
+                  <Label>Arquivo do Documento *</Label>
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileUpload}
+                    accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.webp,.txt"
+                    className="hidden"
+                    data-testid="input-attachment-file"
                   />
+                  
+                  {currentAttachment.url ? (
+                    <div className="flex items-center gap-2 p-3 rounded-lg border bg-muted/50">
+                      <FileText className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                      <span className="text-sm truncate flex-1">{uploadedFileName || currentAttachment.url}</span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => {
+                          setCurrentAttachment(prev => ({ ...prev, url: "" }));
+                          setUploadedFileName("");
+                        }}
+                        data-testid="button-remove-file"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isUploading}
+                      data-testid="button-upload-file"
+                    >
+                      {isUploading ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Enviando...
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="mr-2 h-4 w-4" />
+                          Selecionar Arquivo
+                        </>
+                      )}
+                    </Button>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    Formatos aceitos: PDF, DOC, DOCX, XLS, XLSX, JPG, PNG, WebP, TXT (max 20MB)
+                  </p>
                 </div>
 
                 <div className="flex items-center justify-between">
@@ -353,7 +450,7 @@ export function EventFinishStep({ formData, updateFormData }: EventFinishStepPro
                 </DialogClose>
                 <Button 
                   onClick={handleAddAttachment}
-                  disabled={!currentAttachment.nome || !currentAttachment.url}
+                  disabled={!currentAttachment.nome || !currentAttachment.url || isUploading}
                   data-testid="button-save-attachment"
                 >
                   Adicionar
@@ -373,34 +470,55 @@ export function EventFinishStep({ formData, updateFormData }: EventFinishStepPro
             </div>
           ) : (
             <div className="space-y-2">
-              {formData.attachments.map((attachment, index) => (
-                <div
-                  key={index}
-                  className="flex items-center justify-between p-3 rounded-lg border"
-                  data-testid={`card-attachment-${index}`}
-                >
-                  <div className="flex items-center gap-3">
-                    <FileText className="h-5 w-5 text-muted-foreground" />
-                    <div>
-                      <span className="font-medium">{attachment.nome}</span>
-                      {attachment.obrigatorioAceitar && (
-                        <span className="ml-2 text-xs text-destructive">(Aceite obrigatorio)</span>
-                      )}
-                      <p className="text-sm text-muted-foreground truncate max-w-xs">
-                        {attachment.url}
-                      </p>
-                    </div>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleDeleteAttachment(index)}
-                    data-testid={`button-delete-attachment-${index}`}
+              {formData.attachments.map((attachment, index) => {
+                const isLocalFile = attachment.url?.startsWith("/uploads/");
+                const fileName = isLocalFile 
+                  ? attachment.url?.split("/").pop() 
+                  : attachment.url;
+                
+                return (
+                  <div
+                    key={index}
+                    className="flex items-center justify-between p-3 rounded-lg border"
+                    data-testid={`card-attachment-${index}`}
                   >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <FileText className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-medium">{attachment.nome}</span>
+                          {attachment.obrigatorioAceitar && (
+                            <span className="text-xs text-destructive">(Aceite obrigatorio)</span>
+                          )}
+                        </div>
+                        {isLocalFile ? (
+                          <a 
+                            href={attachment.url} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-sm text-primary hover:underline truncate block"
+                          >
+                            {fileName}
+                          </a>
+                        ) : (
+                          <p className="text-sm text-muted-foreground truncate">
+                            {attachment.url}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleDeleteAttachment(index)}
+                      className="flex-shrink-0"
+                      data-testid={`button-delete-attachment-${index}`}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                );
+              })}
             </div>
           )}
         </CardContent>

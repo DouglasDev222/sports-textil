@@ -33,6 +33,25 @@ const imageFilter = (_req: Express.Request, file: Express.Multer.File, cb: multe
   }
 };
 
+const documentFilter = (_req: Express.Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+  const allowedTypes = [
+    "application/pdf",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.ms-excel",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+    "text/plain"
+  ];
+  if (allowedTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error("Tipo de arquivo nao permitido. Use PDF, DOC, DOCX, XLS, XLSX, JPG, PNG, WebP ou TXT."));
+  }
+};
+
 const uploadBanner = multer({
   storage: createStorage("banners"),
   fileFilter: imageFilter,
@@ -43,6 +62,12 @@ const uploadRoute = multer({
   storage: createStorage("routes"),
   fileFilter: imageFilter,
   limits: { fileSize: 10 * 1024 * 1024 }
+});
+
+const uploadDocument = multer({
+  storage: createStorage("documents"),
+  fileFilter: documentFilter,
+  limits: { fileSize: 20 * 1024 * 1024 }
 });
 
 router.post("/banner/:eventId", requireAuth, uploadBanner.single("image"), async (req, res) => {
@@ -226,6 +251,50 @@ router.delete("/route/:eventId", requireAuth, async (req, res) => {
   } catch (error) {
     console.error("Delete route error:", error);
     res.status(500).json({ success: false, message: "Erro ao remover imagem do percurso" });
+  }
+});
+
+router.post("/document", requireAuth, uploadDocument.single("file"), async (req, res) => {
+  try {
+    const file = req.file;
+
+    if (!file) {
+      return res.status(400).json({ success: false, message: "Nenhum arquivo enviado" });
+    }
+
+    const fileUrl = `/uploads/documents/${file.filename}`;
+    const originalName = file.originalname;
+
+    res.json({ 
+      success: true, 
+      data: { 
+        url: fileUrl, 
+        originalName,
+        filename: file.filename,
+        mimetype: file.mimetype,
+        size: file.size
+      } 
+    });
+  } catch (error) {
+    console.error("Upload document error:", error);
+    res.status(500).json({ success: false, message: "Erro ao fazer upload do documento" });
+  }
+});
+
+router.delete("/document/:filename", requireAuth, async (req, res) => {
+  try {
+    const { filename } = req.params;
+    const filePath = path.join(UPLOAD_DIR, "documents", filename);
+    
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+      res.json({ success: true, message: "Documento removido com sucesso" });
+    } else {
+      res.status(404).json({ success: false, message: "Documento nao encontrado" });
+    }
+  } catch (error) {
+    console.error("Delete document error:", error);
+    res.status(500).json({ success: false, message: "Erro ao remover documento" });
   }
 });
 
