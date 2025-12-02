@@ -358,15 +358,15 @@ confirmada -> no_show (atleta nao compareceu)
 ### Fase 1 - Inscricao Gratuita (MVP)
 - [x] Schema de dados (athletes, orders, registrations)
 - [x] Storage interface
-- [ ] API de cadastro de atleta
-- [ ] API de login de atleta
-- [ ] API de informacoes para inscricao
-- [ ] API de criar inscricao gratuita
-- [ ] Tela de login/cadastro do atleta
-- [ ] Tela de selecao de modalidade (dados reais)
-- [ ] Tela de resumo (dados reais)
-- [ ] Tela de confirmacao
-- [ ] Seed com dados de teste
+- [x] API de cadastro de atleta
+- [x] API de login de atleta
+- [x] API de informacoes para inscricao
+- [x] API de criar inscricao gratuita
+- [x] Tela de login/cadastro do atleta
+- [x] Tela de selecao de modalidade (dados reais)
+- [x] Tela de resumo (dados reais)
+- [x] Tela de confirmacao
+- [x] Seed com dados de teste
 
 ### Fase 2 - Inscricao Paga
 - [ ] Integracao com gateway de pagamento
@@ -381,7 +381,7 @@ confirmada -> no_show (atleta nao compareceu)
 - [ ] Sistema de vouchers
 - [ ] Fluxo PCD
 - [ ] Aprovacao manual
-- [ ] Minhas inscricoes
+- [x] Minhas inscricoes
 - [ ] Cancelamento de inscricao
 
 ---
