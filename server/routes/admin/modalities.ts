@@ -16,6 +16,7 @@ const modalitySchema = z.object({
   limiteVagas: z.number().int().positive().optional().nullable(),
   tipoAcesso: z.enum(["gratuita", "paga", "voucher", "pcd", "aprovacao_manual"]).optional(),
   taxaComodidade: z.string().optional(),
+  idadeMinima: z.number().int().min(0).max(100).optional().nullable(),
   ordem: z.number().int().optional()
 });
 

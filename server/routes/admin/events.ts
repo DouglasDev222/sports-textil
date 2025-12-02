@@ -38,6 +38,7 @@ const eventSchema = z.object({
   entregaCamisaNoKit: z.boolean().optional(),
   usarGradePorModalidade: z.boolean().optional(),
   informacoesRetiradaKit: z.string().optional().nullable(),
+  idadeMinimaEvento: z.number().int().min(0, "Idade minima deve ser positiva").max(100, "Idade minima invalida").optional(),
   status: z.enum(["rascunho", "publicado", "cancelado", "finalizado"]).optional()
 });
 
@@ -182,7 +183,8 @@ router.post("/", requireAuth, requireRole("superadmin", "admin"), async (req, re
       status: validation.data.status ?? "rascunho",
       entregaCamisaNoKit: validation.data.entregaCamisaNoKit ?? true,
       usarGradePorModalidade: validation.data.usarGradePorModalidade ?? false,
-      informacoesRetiradaKit: validation.data.informacoesRetiradaKit ?? null
+      informacoesRetiradaKit: validation.data.informacoesRetiradaKit ?? null,
+      idadeMinimaEvento: validation.data.idadeMinimaEvento ?? 18
     });
 
     res.status(201).json({ success: true, data: formatEventForResponse(event) });
