@@ -193,6 +193,38 @@ export function EventBasicInfoStep({ formData, updateFormData }: EventBasicInfoS
         </div>
       </div>
 
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="space-y-2">
+          <Label htmlFor="aberturaInscricoes">Abertura das Inscricoes *</Label>
+          <Input
+            id="aberturaInscricoes"
+            type="datetime-local"
+            value={typeof formData.event.aberturaInscricoes === 'string' 
+              ? formData.event.aberturaInscricoes 
+              : formData.event.aberturaInscricoes 
+                ? formData.event.aberturaInscricoes.toISOString().slice(0, 16)
+                : ""}
+            onChange={(e) => updateEvent("aberturaInscricoes", e.target.value)}
+            data-testid="input-registration-start"
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="encerramentoInscricoes">Encerramento das Inscricoes *</Label>
+          <Input
+            id="encerramentoInscricoes"
+            type="datetime-local"
+            value={typeof formData.event.encerramentoInscricoes === 'string' 
+              ? formData.event.encerramentoInscricoes 
+              : formData.event.encerramentoInscricoes 
+                ? formData.event.encerramentoInscricoes.toISOString().slice(0, 16)
+                : ""}
+            onChange={(e) => updateEvent("encerramentoInscricoes", e.target.value)}
+            data-testid="input-registration-end"
+          />
+        </div>
+      </div>
+
       <Card>
         <CardHeader className="flex flex-row items-center gap-2 space-y-0">
           <Image className="h-5 w-5" />
@@ -238,38 +270,6 @@ export function EventBasicInfoStep({ formData, updateFormData }: EventBasicInfoS
           />
         </CardContent>
       </Card>
-
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="space-y-2">
-          <Label htmlFor="aberturaInscricoes">Abertura das Inscricoes *</Label>
-          <Input
-            id="aberturaInscricoes"
-            type="datetime-local"
-            value={typeof formData.event.aberturaInscricoes === 'string' 
-              ? formData.event.aberturaInscricoes 
-              : formData.event.aberturaInscricoes 
-                ? formData.event.aberturaInscricoes.toISOString().slice(0, 16)
-                : ""}
-            onChange={(e) => updateEvent("aberturaInscricoes", e.target.value)}
-            data-testid="input-registration-start"
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="encerramentoInscricoes">Encerramento das Inscricoes *</Label>
-          <Input
-            id="encerramentoInscricoes"
-            type="datetime-local"
-            value={typeof formData.event.encerramentoInscricoes === 'string' 
-              ? formData.event.encerramentoInscricoes 
-              : formData.event.encerramentoInscricoes 
-                ? formData.event.encerramentoInscricoes.toISOString().slice(0, 16)
-                : ""}
-            onChange={(e) => updateEvent("encerramentoInscricoes", e.target.value)}
-            data-testid="input-registration-end"
-          />
-        </div>
-      </div>
 
     </div>
   );
