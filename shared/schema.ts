@@ -65,6 +65,7 @@ export const events = pgTable("events", {
   usarGradePorModalidade: boolean("usar_grade_por_modalidade").default(false).notNull(),
   informacoesRetiradaKit: text("informacoes_retirada_kit"),
   imagemPercursoUrl: text("imagem_percurso_url"),
+  idadeMinimaEvento: integer("idade_minima_evento").default(18).notNull(),
   dataCriacao: timestamp("data_criacao", { withTimezone: true }).defaultNow().notNull(),
 });
 
@@ -81,6 +82,7 @@ export const modalities = pgTable("modalities", {
   limiteVagas: integer("limite_vagas"),
   tipoAcesso: modalityAccessEnum("tipo_acesso").default("paga").notNull(),
   taxaComodidade: decimal("taxa_comodidade", { precision: 10, scale: 2 }).default("0").notNull(),
+  idadeMinima: integer("idade_minima"),
   ordem: integer("ordem").default(0).notNull(),
 });
 
