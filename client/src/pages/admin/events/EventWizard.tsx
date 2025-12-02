@@ -163,13 +163,30 @@ export default function EventWizard({ mode, eventId, initialData }: EventWizardP
             });
           }
         }
+      }
 
-        for (const shirt of formData.shirts) {
+      // Handle shirts (both create and edit mode)
+      for (const shirt of formData.shirts) {
+        if (shirt.id) {
+          // Update existing shirt
+          await apiRequest("PATCH", `/api/admin/events/${createdEventId}/shirts/${shirt.id}`, {
+            quantidadeTotal: shirt.quantidadeTotal,
+            quantidadeDisponivel: shirt.quantidadeDisponivel
+          });
+        } else {
+          // Create new shirt
           const shirtData = { ...shirt, eventId: createdEventId };
           await apiRequest("POST", `/api/admin/events/${createdEventId}/shirts`, shirtData);
         }
+      }
 
-        for (const attachment of formData.attachments) {
+      // Handle attachments (both create and edit mode)
+      for (const attachment of formData.attachments) {
+        if (attachment.id) {
+          // Update existing attachment
+          await apiRequest("PATCH", `/api/admin/events/${createdEventId}/attachments/${attachment.id}`, attachment);
+        } else {
+          // Create new attachment
           const attachmentData = { ...attachment, eventId: createdEventId };
           await apiRequest("POST", `/api/admin/events/${createdEventId}/attachments`, attachmentData);
         }
