@@ -271,37 +271,6 @@ export function EventBasicInfoStep({ formData, updateFormData }: EventBasicInfoS
         </div>
       </div>
 
-      <div className="space-y-4 rounded-lg border p-4">
-        <h3 className="font-medium">Configuracoes de Camisas</h3>
-
-        <div className="flex items-center justify-between">
-          <div className="space-y-0.5">
-            <Label>Entregar camisa no kit</Label>
-            <p className="text-sm text-muted-foreground">
-              Marque se a camisa sera entregue junto com o kit
-            </p>
-          </div>
-          <Switch
-            checked={formData.event.entregaCamisaNoKit ?? true}
-            onCheckedChange={(checked) => updateEvent("entregaCamisaNoKit", checked)}
-            data-testid="switch-shirt-in-kit"
-          />
-        </div>
-
-        <div className="flex items-center justify-between">
-          <div className="space-y-0.5">
-            <Label>Grade por modalidade</Label>
-            <p className="text-sm text-muted-foreground">
-              Configure tamanhos diferentes para cada modalidade
-            </p>
-          </div>
-          <Switch
-            checked={formData.event.usarGradePorModalidade ?? false}
-            onCheckedChange={(checked) => updateEvent("usarGradePorModalidade", checked)}
-            data-testid="switch-shirt-per-modality"
-          />
-        </div>
-      </div>
     </div>
   );
 }
