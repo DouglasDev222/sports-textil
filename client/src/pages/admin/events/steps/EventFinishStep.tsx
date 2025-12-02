@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
-import { Plus, Trash2, Shirt, FileText, AlertCircle, Package } from "lucide-react";
+import { Plus, Trash2, Shirt, FileText, AlertCircle, Package, X } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import type { EventFormData } from "../EventWizard";
 import type { ShirtSize, Attachment } from "@shared/schema";
@@ -18,11 +18,10 @@ interface EventFinishStepProps {
 
 const TAMANHOS_CAMISA = ["PP", "P", "M", "G", "GG", "XG", "XXG", "INFANTIL"];
 
-const emptyShirt: Partial<ShirtSize> = {
-  tamanho: "",
-  quantidadeTotal: 0,
-  quantidadeDisponivel: 0,
-};
+interface ShirtSelection {
+  tamanho: string;
+  quantidadeTotal: number;
+}
 
 const emptyAttachment: Partial<Attachment> = {
   nome: "",
@@ -34,17 +33,53 @@ const emptyAttachment: Partial<Attachment> = {
 export function EventFinishStep({ formData, updateFormData }: EventFinishStepProps) {
   const [shirtDialogOpen, setShirtDialogOpen] = useState(false);
   const [attachmentDialogOpen, setAttachmentDialogOpen] = useState(false);
-  const [currentShirt, setCurrentShirt] = useState<Partial<ShirtSize>>(emptyShirt);
+  const [selectedSizes, setSelectedSizes] = useState<ShirtSelection[]>([]);
+  const [customSizeInput, setCustomSizeInput] = useState("");
   const [currentAttachment, setCurrentAttachment] = useState<Partial<Attachment>>(emptyAttachment);
 
-  const handleAddShirt = () => {
-    if (currentShirt.tamanho && currentShirt.quantidadeTotal) {
-      const newShirts = [...formData.shirts, {
-        ...currentShirt,
-        quantidadeDisponivel: currentShirt.quantidadeTotal
-      }];
+  const usedSizes = formData.shirts.map(s => s.tamanho);
+  const availablePredefinedSizes = TAMANHOS_CAMISA.filter(t => !usedSizes.includes(t));
+
+  const toggleSize = (size: string) => {
+    const existingIndex = selectedSizes.findIndex(s => s.tamanho === size);
+    if (existingIndex >= 0) {
+      setSelectedSizes(prev => prev.filter((_, i) => i !== existingIndex));
+    } else {
+      setSelectedSizes(prev => [...prev, { tamanho: size, quantidadeTotal: 0 }]);
+    }
+  };
+
+  const updateSizeQuantity = (size: string, quantity: number) => {
+    setSelectedSizes(prev => prev.map(s => 
+      s.tamanho === size ? { ...s, quantidadeTotal: quantity } : s
+    ));
+  };
+
+  const addCustomSize = () => {
+    const trimmed = customSizeInput.trim().toUpperCase();
+    if (trimmed && !selectedSizes.find(s => s.tamanho === trimmed) && !usedSizes.includes(trimmed)) {
+      setSelectedSizes(prev => [...prev, { tamanho: trimmed, quantidadeTotal: 0 }]);
+      setCustomSizeInput("");
+    }
+  };
+
+  const removeSelectedSize = (size: string) => {
+    setSelectedSizes(prev => prev.filter(s => s.tamanho !== size));
+  };
+
+  const handleAddShirts = () => {
+    const validShirts = selectedSizes.filter(s => s.quantidadeTotal > 0);
+    if (validShirts.length > 0) {
+      const newShirts = [
+        ...formData.shirts,
+        ...validShirts.map(s => ({
+          tamanho: s.tamanho,
+          quantidadeTotal: s.quantidadeTotal,
+          quantidadeDisponivel: s.quantidadeTotal
+        }))
+      ];
       updateFormData({ shirts: newShirts });
-      setCurrentShirt(emptyShirt);
+      setSelectedSizes([]);
       setShirtDialogOpen(false);
     }
   };
@@ -53,6 +88,16 @@ export function EventFinishStep({ formData, updateFormData }: EventFinishStepPro
     const newShirts = formData.shirts.filter((_, i) => i !== index);
     updateFormData({ shirts: newShirts });
   };
+
+  const handleDialogOpenChange = (open: boolean) => {
+    setShirtDialogOpen(open);
+    if (!open) {
+      setSelectedSizes([]);
+      setCustomSizeInput("");
+    }
+  };
+
+  const canAddShirts = selectedSizes.length > 0 && selectedSizes.every(s => s.quantidadeTotal > 0);
 
   const handleAddAttachment = () => {
     if (currentAttachment.nome && currentAttachment.url) {
@@ -70,9 +115,6 @@ export function EventFinishStep({ formData, updateFormData }: EventFinishStepPro
     const newAttachments = formData.attachments.filter((_, i) => i !== index);
     updateFormData({ attachments: newAttachments });
   };
-
-  const usedSizes = formData.shirts.map(s => s.tamanho);
-  const availableSizes = TAMANHOS_CAMISA.filter(t => !usedSizes.includes(t));
 
   return (
     <div className="space-y-6">
@@ -95,52 +137,96 @@ export function EventFinishStep({ formData, updateFormData }: EventFinishStepPro
               </p>
             </div>
           </div>
-          <Dialog open={shirtDialogOpen} onOpenChange={setShirtDialogOpen}>
+          <Dialog open={shirtDialogOpen} onOpenChange={handleDialogOpenChange}>
             <DialogTrigger asChild>
-              <Button size="sm" disabled={availableSizes.length === 0} data-testid="button-add-shirt">
+              <Button size="sm" data-testid="button-add-shirt">
                 <Plus className="mr-2 h-4 w-4" />
-                Adicionar Tamanho
+                Adicionar Tamanhos
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-w-lg">
               <DialogHeader>
-                <DialogTitle>Adicionar Tamanho de Camisa</DialogTitle>
+                <DialogTitle>Adicionar Tamanhos de Camisa</DialogTitle>
               </DialogHeader>
 
               <div className="space-y-4 py-4">
                 <div className="space-y-2">
-                  <Label htmlFor="shirt-size">Tamanho</Label>
+                  <Label>Selecione os tamanhos</Label>
                   <div className="flex flex-wrap gap-2">
-                    {availableSizes.map((size) => (
-                      <Button
-                        key={size}
-                        type="button"
-                        variant={currentShirt.tamanho === size ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setCurrentShirt(prev => ({ ...prev, tamanho: size }))}
-                        data-testid={`button-size-${size}`}
-                      >
-                        {size}
-                      </Button>
-                    ))}
+                    {availablePredefinedSizes.map((size) => {
+                      const isSelected = selectedSizes.some(s => s.tamanho === size);
+                      return (
+                        <Button
+                          key={size}
+                          type="button"
+                          variant={isSelected ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => toggleSize(size)}
+                          data-testid={`button-size-${size}`}
+                        >
+                          {size}
+                        </Button>
+                      );
+                    })}
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="shirt-quantity">Quantidade Total</Label>
-                  <Input
-                    id="shirt-quantity"
-                    type="number"
-                    min="1"
-                    value={currentShirt.quantidadeTotal || ""}
-                    onChange={(e) => setCurrentShirt(prev => ({
-                      ...prev,
-                      quantidadeTotal: parseInt(e.target.value) || 0
-                    }))}
-                    placeholder="Ex: 500"
-                    data-testid="input-shirt-quantity"
-                  />
+                  <Label>Adicionar tamanho personalizado</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      value={customSizeInput}
+                      onChange={(e) => setCustomSizeInput(e.target.value)}
+                      placeholder="Ex: 3XG, KIDS-M..."
+                      onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addCustomSize())}
+                      data-testid="input-custom-size"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={addCustomSize}
+                      disabled={!customSizeInput.trim()}
+                      data-testid="button-add-custom-size"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
+
+                {selectedSizes.length > 0 && (
+                  <div className="space-y-3 pt-2 border-t">
+                    <Label>Quantidades</Label>
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                      {selectedSizes.map((selection) => (
+                        <div 
+                          key={selection.tamanho} 
+                          className="flex items-center gap-3 p-2 rounded-md bg-muted/50"
+                        >
+                          <span className="font-medium min-w-16">{selection.tamanho}</span>
+                          <Input
+                            type="number"
+                            min="1"
+                            value={selection.quantidadeTotal || ""}
+                            onChange={(e) => updateSizeQuantity(selection.tamanho, parseInt(e.target.value) || 0)}
+                            placeholder="Quantidade"
+                            className="flex-1"
+                            data-testid={`input-quantity-${selection.tamanho}`}
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => removeSelectedSize(selection.tamanho)}
+                            data-testid={`button-remove-${selection.tamanho}`}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <DialogFooter>
@@ -148,11 +234,11 @@ export function EventFinishStep({ formData, updateFormData }: EventFinishStepPro
                   <Button variant="outline">Cancelar</Button>
                 </DialogClose>
                 <Button 
-                  onClick={handleAddShirt}
-                  disabled={!currentShirt.tamanho || !currentShirt.quantidadeTotal}
-                  data-testid="button-save-shirt"
+                  onClick={handleAddShirts}
+                  disabled={!canAddShirts}
+                  data-testid="button-save-shirts"
                 >
-                  Adicionar
+                  Adicionar {selectedSizes.length > 0 ? `(${selectedSizes.length})` : ""}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -164,7 +250,7 @@ export function EventFinishStep({ formData, updateFormData }: EventFinishStepPro
               <p className="text-muted-foreground mb-4">Nenhum tamanho cadastrado</p>
               <Button variant="outline" onClick={() => setShirtDialogOpen(true)}>
                 <Plus className="mr-2 h-4 w-4" />
-                Adicionar tamanho
+                Adicionar tamanhos
               </Button>
             </div>
           ) : (
