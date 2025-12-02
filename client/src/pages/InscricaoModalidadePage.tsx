@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRoute, useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -7,76 +8,188 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { ChevronLeft, ShieldCheck, AlertCircle } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { ChevronLeft, ShieldCheck, AlertCircle, Loader2, CheckCircle } from "lucide-react";
 import Header from "@/components/Header";
+import { useAthleteAuth } from "@/contexts/AthleteAuthContext";
 
-const mockCategorias = [
-  { nome: "5km", valor: "R$ 80,00", valorNumerico: 80, taxaComodidade: 5 },
-  { nome: "10km", valor: "R$ 100,00", valorNumerico: 100, taxaComodidade: 7.50 },
-  { 
-    nome: "5km - Servidores Públicos", 
-    valor: "R$ 50,00",
-    valorNumerico: 50,
-    taxaComodidade: 3,
-    requerComprovacao: true,
-    tipoComprovacao: "codigo",
-    mensagemComprovacao: "Esta modalidade é exclusiva para servidores públicos. Insira o código de confirmação fornecido pelo seu órgão."
-  },
-  { nome: "21km", valor: "R$ 150,00", valorNumerico: 150, taxaComodidade: 10 },
-  { nome: "42km", valor: "R$ 200,00", valorNumerico: 200, taxaComodidade: 15 },
-  { 
-    nome: "PCD (Pessoa com Deficiência)", 
-    valor: "R$ 40,00",
-    valorNumerico: 40,
-    taxaComodidade: 0,
-    requerComprovacao: true,
-    tipoComprovacao: "pre_aprovacao",
-    mensagemComprovacao: "Sua inscrição passará por análise prévia. Você receberá a confirmação por email em até 48 horas."
-  },
-];
+interface ModalityInfo {
+  id: string;
+  nome: string;
+  distancia: string;
+  unidadeDistancia: string;
+  horarioLargada: string;
+  descricao: string | null;
+  tipoAcesso: string;
+  preco: number;
+  taxaComodidade: number;
+  limiteVagas: number | null;
+  vagasDisponiveis: number | null;
+  idadeMinima: number | null;
+  ordem: number;
+}
 
-const tamanhosCamisa = ["PP", "P", "M", "G", "GG", "XGG"];
+interface ShirtSize {
+  id: string;
+  tamanho: string;
+  disponivel: number;
+}
+
+interface RegistrationInfo {
+  event: {
+    id: string;
+    nome: string;
+    slug: string;
+    entregaCamisaNoKit: boolean;
+  };
+  modalities: ModalityInfo[];
+  activeBatch: {
+    id: string;
+    nome: string;
+  } | null;
+  shirtSizes: {
+    byModality: boolean;
+    data: ShirtSize[] | { modalityId: string; sizes: ShirtSize[] }[];
+  };
+}
 
 export default function InscricaoModalidadePage() {
   const [, params] = useRoute("/evento/:slug/inscricao/modalidade");
   const [, setLocation] = useLocation();
+  const { athlete, isLoading: authLoading } = useAthleteAuth();
+  const slug = params?.slug;
+  
   const [modalidadeSelecionada, setModalidadeSelecionada] = useState("");
   const [tamanhoSelecionado, setTamanhoSelecionado] = useState("");
   const [codigoComprovacao, setCodigoComprovacao] = useState("");
 
+  useEffect(() => {
+    if (!authLoading && !athlete) {
+      const redirectUrl = `/evento/${slug}/inscricao/modalidade`;
+      setLocation(`/login?redirect=${encodeURIComponent(redirectUrl)}`);
+    }
+  }, [authLoading, athlete, slug, setLocation]);
+
+  const { data, isLoading, error } = useQuery<{ success: boolean; data: RegistrationInfo }>({
+    queryKey: ["/api/registrations/events", slug, "registration-info"],
+    queryFn: async () => {
+      const response = await fetch(`/api/registrations/events/${slug}/registration-info`);
+      return response.json();
+    },
+    enabled: !!slug && !!athlete,
+  });
+
   const handleVoltar = () => {
-    setLocation(`/evento/${params?.slug}/inscricao/participante`);
+    setLocation(`/evento/${slug}/inscricao/participante`);
   };
 
   const handleContinuar = () => {
     if (modalidadeSelecionada && tamanhoSelecionado) {
-      const categoriaAtual = mockCategorias.find(c => c.nome === modalidadeSelecionada);
+      const modality = data?.data?.modalities.find(m => m.id === modalidadeSelecionada);
       
-      if (categoriaAtual?.requerComprovacao && categoriaAtual.tipoComprovacao === "codigo" && !codigoComprovacao) {
+      if (!modality) return;
+      
+      if (modality.tipoAcesso === "voucher" && !codigoComprovacao) {
         return;
       }
       
-      const taxaComodidade = categoriaAtual?.taxaComodidade ?? 0;
-      const valorModalidade = categoriaAtual?.valorNumerico ?? 0;
-      
-      let url = `/evento/${params?.slug}/inscricao/resumo?modalidade=${encodeURIComponent(modalidadeSelecionada)}&tamanho=${tamanhoSelecionado}&valor=${valorModalidade}&taxaComodidade=${taxaComodidade}`;
-      if (codigoComprovacao) {
-        url += `&codigo=${encodeURIComponent(codigoComprovacao)}`;
-      }
+      const url = `/evento/${slug}/inscricao/resumo?modalidade=${encodeURIComponent(modalidadeSelecionada)}&tamanho=${encodeURIComponent(tamanhoSelecionado)}${codigoComprovacao ? `&codigo=${encodeURIComponent(codigoComprovacao)}` : ''}`;
       
       setLocation(url);
     }
   };
 
-  const categoriaAtual = mockCategorias.find(c => c.nome === modalidadeSelecionada);
-  const modalidadeValor = categoriaAtual?.valor;
-  const taxaComodidadeValor = categoriaAtual?.taxaComodidade ?? 0;
-  const valorTotal = (categoriaAtual?.valorNumerico ?? 0) + taxaComodidadeValor;
+  if (authLoading || isLoading) {
+    return (
+      <div className="min-h-screen bg-background pb-24 md:pb-8">
+        <Header />
+        <div className="max-w-2xl mx-auto px-4 py-8 md:py-12">
+          <Skeleton className="h-8 w-24 mb-6" />
+          <div className="mb-8">
+            <Skeleton className="h-8 w-64 mb-2" />
+            <Skeleton className="h-4 w-48" />
+          </div>
+          <div className="space-y-6">
+            <Skeleton className="h-64 w-full" />
+            <Skeleton className="h-48 w-full" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!athlete) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (error || !data?.success) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <div className="max-w-2xl mx-auto px-4 py-8 md:py-12 text-center">
+          <AlertCircle className="h-16 w-16 mx-auto text-destructive mb-4" />
+          <h1 className="text-2xl font-bold mb-2">Erro ao carregar dados</h1>
+          <p className="text-muted-foreground mb-6">
+            Nao foi possivel carregar as informacoes do evento.
+          </p>
+          <Button onClick={() => setLocation(`/evento/${slug}`)}>
+            Voltar para o evento
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  const { modalities, shirtSizes, activeBatch } = data.data;
+  const selectedModality = modalities.find(m => m.id === modalidadeSelecionada);
   
-  const podeAvancar = modalidadeSelecionada && tamanhoSelecionado && 
-    (!categoriaAtual?.requerComprovacao || 
-     categoriaAtual.tipoComprovacao === "pre_aprovacao" || 
-     codigoComprovacao.trim() !== "");
+  let availableSizes: ShirtSize[] = [];
+  if (shirtSizes.byModality && modalidadeSelecionada) {
+    const modalitySizes = (shirtSizes.data as { modalityId: string; sizes: ShirtSize[] }[])
+      .find(s => s.modalityId === modalidadeSelecionada);
+    availableSizes = modalitySizes?.sizes || [];
+  } else if (!shirtSizes.byModality) {
+    availableSizes = shirtSizes.data as ShirtSize[];
+  }
+
+  const taxaComodidadeValor = selectedModality?.taxaComodidade ?? 0;
+  const valorModalidade = selectedModality?.preco ?? 0;
+  const valorTotal = valorModalidade + taxaComodidadeValor;
+
+  const requiresCode = selectedModality?.tipoAcesso === "voucher";
+  const requiresApproval = selectedModality?.tipoAcesso === "aprovacao_manual" || selectedModality?.tipoAcesso === "pcd";
+  
+  const requiresShirtSize = availableSizes.length > 0;
+  
+  const podeAvancar = modalidadeSelecionada && 
+    (!requiresShirtSize || tamanhoSelecionado) && 
+    (!requiresCode || codigoComprovacao.trim() !== "");
+
+  const getTipoAcessoBadge = (tipoAcesso: string) => {
+    switch (tipoAcesso) {
+      case "gratuita":
+        return <Badge variant="secondary">Gratuita</Badge>;
+      case "paga":
+        return null;
+      case "voucher":
+        return <Badge>Codigo</Badge>;
+      case "pcd":
+        return <Badge>PCD</Badge>;
+      case "aprovacao_manual":
+        return <Badge>Aprovacao</Badge>;
+      default:
+        return null;
+    }
+  };
+
+  const formatPrice = (value: number) => {
+    if (value === 0) return "Gratuito";
+    return `R$ ${value.toFixed(2).replace('.', ',')}`;
+  };
 
   return (
     <div className="min-h-screen bg-background pb-24 md:pb-8">
@@ -97,8 +210,13 @@ export default function InscricaoModalidadePage() {
             Escolha a Modalidade
           </h1>
           <p className="text-muted-foreground">
-            Selecione a distância e o tamanho da sua camisa
+            Selecione a distancia e o tamanho da sua camisa
           </p>
+          {activeBatch && (
+            <p className="text-sm text-primary mt-1">
+              Lote atual: {activeBatch.nome}
+            </p>
+          )}
         </div>
 
         <div className="space-y-6">
@@ -109,90 +227,124 @@ export default function InscricaoModalidadePage() {
             <CardContent>
               <RadioGroup value={modalidadeSelecionada} onValueChange={setModalidadeSelecionada}>
                 <div className="space-y-2">
-                  {mockCategorias.map((categoria, idx) => (
-                    <div
-                      key={idx}
-                      className={`flex items-center justify-between p-4 border rounded-md transition-all ${
-                        modalidadeSelecionada === categoria.nome 
-                          ? 'border-primary bg-primary/5' 
-                          : 'hover-elevate'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3 flex-1">
-                        <RadioGroupItem 
-                          value={categoria.nome} 
-                          id={`modalidade-${idx}`}
-                          data-testid={`radio-modalidade-${idx}`}
-                        />
-                        <Label htmlFor={`modalidade-${idx}`} className="flex-1 cursor-pointer">
-                          <div className="flex items-center justify-between gap-4">
-                            <span className="font-medium text-foreground">{categoria.nome}</span>
-                            <Badge variant="secondary" className="font-semibold">
-                              {categoria.valor}
-                            </Badge>
-                          </div>
-                        </Label>
+                  {modalities.map((modality, idx) => {
+                    const isUnavailable = modality.vagasDisponiveis !== null && modality.vagasDisponiveis <= 0;
+                    
+                    return (
+                      <div
+                        key={modality.id}
+                        className={`flex items-center justify-between p-4 border rounded-md transition-all ${
+                          modalidadeSelecionada === modality.id 
+                            ? 'border-primary bg-primary/5' 
+                            : isUnavailable 
+                              ? 'opacity-50 cursor-not-allowed' 
+                              : 'hover-elevate'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3 flex-1">
+                          <RadioGroupItem 
+                            value={modality.id} 
+                            id={`modalidade-${idx}`}
+                            disabled={isUnavailable}
+                            data-testid={`radio-modalidade-${idx}`}
+                          />
+                          <Label htmlFor={`modalidade-${idx}`} className="flex-1 cursor-pointer">
+                            <div className="flex items-center justify-between gap-4 flex-wrap">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-medium text-foreground">{modality.nome}</span>
+                                {getTipoAcessoBadge(modality.tipoAcesso)}
+                                {isUnavailable && (
+                                  <Badge variant="destructive">Esgotado</Badge>
+                                )}
+                              </div>
+                              <Badge variant="secondary" className="font-semibold">
+                                {formatPrice(modality.preco)}
+                              </Badge>
+                            </div>
+                            <div className="flex flex-wrap gap-2 text-xs text-muted-foreground mt-1">
+                              <span>{modality.distancia} {modality.unidadeDistancia}</span>
+                              <span>Largada: {modality.horarioLargada}</span>
+                              {modality.vagasDisponiveis !== null && !isUnavailable && (
+                                <span>{modality.vagasDisponiveis} vagas</span>
+                              )}
+                            </div>
+                          </Label>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </RadioGroup>
             </CardContent>
           </Card>
 
-          {categoriaAtual?.requerComprovacao && (
+          {requiresCode && (
             <Alert className="border-primary/50 bg-primary/5">
               <div className="flex gap-2">
-                {categoriaAtual.tipoComprovacao === "codigo" ? (
-                  <ShieldCheck className="h-5 w-5 text-primary" />
-                ) : (
-                  <AlertCircle className="h-5 w-5 text-primary" />
-                )}
+                <ShieldCheck className="h-5 w-5 text-primary" />
                 <div className="flex-1">
                   <AlertDescription className="text-sm">
-                    {categoriaAtual.mensagemComprovacao}
+                    Esta modalidade requer um codigo de acesso. Insira o codigo fornecido para continuar.
                   </AlertDescription>
                   
-                  {categoriaAtual.tipoComprovacao === "codigo" && (
-                    <div className="mt-3">
-                      <Label htmlFor="codigo-comprovacao" className="text-sm font-medium mb-2 block">
-                        Código de Confirmação
-                      </Label>
-                      <Input
-                        id="codigo-comprovacao"
-                        placeholder="Ex: SERV2025-ABC123"
-                        value={codigoComprovacao}
-                        onChange={(e) => setCodigoComprovacao(e.target.value)}
-                        className="max-w-xs"
-                        data-testid="input-codigo-comprovacao"
-                      />
-                    </div>
-                  )}
+                  <div className="mt-3">
+                    <Label htmlFor="codigo-comprovacao" className="text-sm font-medium mb-2 block">
+                      Codigo de Acesso
+                    </Label>
+                    <Input
+                      id="codigo-comprovacao"
+                      placeholder="Ex: VOUCHER2025-ABC123"
+                      value={codigoComprovacao}
+                      onChange={(e) => setCodigoComprovacao(e.target.value)}
+                      className="max-w-xs"
+                      data-testid="input-codigo-comprovacao"
+                    />
+                  </div>
                 </div>
               </div>
             </Alert>
           )}
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Tamanho da Camisa</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-3 gap-2">
-                {tamanhosCamisa.map((tamanho, idx) => (
-                  <Button
-                    key={idx}
-                    variant={tamanhoSelecionado === tamanho ? "default" : "outline"}
-                    onClick={() => setTamanhoSelecionado(tamanho)}
-                    className="font-semibold"
-                    data-testid={`button-tamanho-${tamanho}`}
-                  >
-                    {tamanho}
-                  </Button>
-                ))}
+          {requiresApproval && (
+            <Alert className="border-primary/50 bg-primary/5">
+              <div className="flex gap-2">
+                <AlertCircle className="h-5 w-5 text-primary" />
+                <div className="flex-1">
+                  <AlertDescription className="text-sm">
+                    Esta modalidade requer aprovacao. Sua inscricao sera analisada e voce recebera a confirmacao por email em ate 48 horas.
+                  </AlertDescription>
+                </div>
               </div>
-            </CardContent>
-          </Card>
+            </Alert>
+          )}
+
+          {availableSizes.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Tamanho da Camisa</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-3 gap-2">
+                  {availableSizes.map((size, idx) => {
+                    const isUnavailable = size.disponivel <= 0;
+                    return (
+                      <Button
+                        key={size.id}
+                        variant={tamanhoSelecionado === size.tamanho ? "default" : "outline"}
+                        onClick={() => !isUnavailable && setTamanhoSelecionado(size.tamanho)}
+                        className={`font-semibold ${isUnavailable ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        disabled={isUnavailable}
+                        data-testid={`button-tamanho-${size.tamanho}`}
+                      >
+                        {size.tamanho}
+                        {isUnavailable && " (Esgotado)"}
+                      </Button>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
 
@@ -200,14 +352,23 @@ export default function InscricaoModalidadePage() {
         <div className="max-w-2xl mx-auto px-4 py-3">
           <div className="flex items-center justify-between gap-4 mb-3">
             <div>
-              {modalidadeSelecionada ? (
+              {selectedModality ? (
                 <>
-                  <p className="text-xs text-muted-foreground">
-                    {modalidadeValor} + Taxa R$ {taxaComodidadeValor.toFixed(2)}
-                  </p>
-                  <p className="text-lg md:text-xl font-bold text-foreground">
-                    Total: R$ {valorTotal.toFixed(2)}
-                  </p>
+                  {valorTotal > 0 ? (
+                    <>
+                      <p className="text-xs text-muted-foreground">
+                        {formatPrice(valorModalidade)} + Taxa R$ {taxaComodidadeValor.toFixed(2).replace('.', ',')}
+                      </p>
+                      <p className="text-lg md:text-xl font-bold text-foreground">
+                        Total: R$ {valorTotal.toFixed(2).replace('.', ',')}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-lg md:text-xl font-bold text-green-600 dark:text-green-400 flex items-center gap-2">
+                      <CheckCircle className="h-5 w-5" />
+                      Inscricao Gratuita
+                    </p>
+                  )}
                 </>
               ) : (
                 <>

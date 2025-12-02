@@ -29,6 +29,7 @@ import AdminNotFound from "@/pages/admin/AdminNotFound";
 import ProtectedAdminRoute from "@/pages/admin/ProtectedAdminRoute";
 
 import { OrganizerAuthProvider } from "@/contexts/OrganizerAuthContext";
+import { AthleteAuthProvider } from "@/contexts/AthleteAuthContext";
 import OrganizerLoginPage from "@/pages/organizador/OrganizerLoginPage";
 import OrganizerDashboardPage from "@/pages/organizador/OrganizerDashboardPage";
 import OrganizerInscritosPage from "@/pages/organizador/OrganizerInscritosPage";
@@ -142,7 +143,11 @@ function AppRouter() {
     return <OrganizerRoutes />;
   }
   
-  return <PublicRouter />;
+  return (
+    <AthleteAuthProvider>
+      <PublicRouter />
+    </AthleteAuthProvider>
+  );
 }
 
 function App() {

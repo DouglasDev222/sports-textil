@@ -7,7 +7,6 @@ const router = Router();
 const createRegistrationSchema = z.object({
   eventId: z.string().uuid(),
   modalityId: z.string().uuid(),
-  athleteId: z.string().uuid(),
   tamanhoCamisa: z.string().optional(),
   equipe: z.string().optional()
 });
@@ -147,8 +146,8 @@ router.get("/events/:slug/registration-info", async (req, res) => {
 
 router.post("/", async (req, res) => {
   try {
-    const athleteId = (req.session as any)?.athleteId;
-    if (!athleteId) {
+    const sessionAthleteId = (req.session as any)?.athleteId;
+    if (!sessionAthleteId) {
       return res.status(401).json({ success: false, error: "Nao autenticado" });
     }
 
@@ -162,6 +161,7 @@ router.post("/", async (req, res) => {
     }
 
     const { eventId, modalityId, tamanhoCamisa, equipe } = parsed.data;
+    const athleteId = sessionAthleteId;
 
     const event = await storage.getEvent(eventId);
     if (!event) {

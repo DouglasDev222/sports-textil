@@ -1,28 +1,63 @@
 import { useRoute, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { User, Users, ArrowLeft } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { User, Users, ArrowLeft, Loader2 } from "lucide-react";
 import Header from "@/components/Header";
+import { useAthleteAuth } from "@/contexts/AthleteAuthContext";
+import { useEffect } from "react";
 
 export default function InscricaoParticipantePage() {
   const [, params] = useRoute("/evento/:slug/inscricao/participante");
   const [, setLocation] = useLocation();
+  const { athlete, isLoading } = useAthleteAuth();
+  const slug = params?.slug;
 
-  const mockUsuario = {
-    nome: "João Silva"
-  };
+  useEffect(() => {
+    if (!isLoading && !athlete) {
+      const redirectUrl = `/evento/${slug}/inscricao/participante`;
+      setLocation(`/login?redirect=${encodeURIComponent(redirectUrl)}`);
+    }
+  }, [isLoading, athlete, slug, setLocation]);
 
   const handleParaMim = () => {
-    setLocation(`/evento/${params?.slug}/inscricao/modalidade`);
+    setLocation(`/evento/${slug}/inscricao/modalidade`);
   };
 
   const handleParaOutro = () => {
-    console.log("Inscrição para outra pessoa - em desenvolvimento");
+    console.log("Inscricao para outra pessoa - em desenvolvimento");
   };
 
   const handleVoltar = () => {
-    setLocation(`/evento/${params?.slug}`);
+    setLocation(`/evento/${slug}`);
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <div className="max-w-2xl mx-auto px-4 py-8 md:py-12">
+          <div className="mb-8">
+            <Skeleton className="h-8 w-32 mb-4" />
+            <Skeleton className="h-8 w-48 mb-2" />
+            <Skeleton className="h-4 w-64" />
+          </div>
+          <div className="grid gap-4">
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-24 w-full" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!athlete) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -39,10 +74,10 @@ export default function InscricaoParticipantePage() {
             Voltar
           </Button>
           <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-2">
-            Nova Inscrição
+            Nova Inscricao
           </h1>
           <p className="text-muted-foreground">
-            Para quem você está fazendo esta inscrição?
+            Para quem voce esta fazendo esta inscricao?
           </p>
         </div>
 
@@ -61,7 +96,7 @@ export default function InscricaoParticipantePage() {
                   <div className="flex-1">
                     <CardTitle className="text-lg">Para mim</CardTitle>
                     <CardDescription>
-                      Inscrição para {mockUsuario.nome}
+                      Inscricao para {athlete.nome}
                     </CardDescription>
                   </div>
                 </div>
@@ -72,9 +107,10 @@ export default function InscricaoParticipantePage() {
           <button 
             className="text-left opacity-50"
             onClick={handleParaOutro}
+            disabled
             data-testid="button-inscricao-para-outro"
           >
-            <Card className="hover-elevate cursor-pointer transition-all">
+            <Card className="cursor-not-allowed transition-all">
               <CardHeader>
                 <div className="flex items-center gap-4">
                   <div className="flex h-12 w-12 items-center justify-center rounded-md bg-muted">

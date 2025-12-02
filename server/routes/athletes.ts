@@ -15,6 +15,10 @@ const registerSchema = insertAthleteSchema.extend({
   dataNascimento: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data deve estar no formato YYYY-MM-DD")
 });
 
+function normalizeCpf(cpf: string): string {
+  return cpf.replace(/\D/g, '');
+}
+
 router.post("/login", async (req, res) => {
   try {
     const parsed = loginSchema.safeParse(req.body);
@@ -27,8 +31,12 @@ router.post("/login", async (req, res) => {
     }
 
     const { cpf, dataNascimento } = parsed.data;
+    const normalizedCpf = normalizeCpf(cpf);
     
-    const athlete = await storage.getAthleteByCpf(cpf);
+    let athlete = await storage.getAthleteByCpf(normalizedCpf);
+    if (!athlete) {
+      athlete = await storage.getAthleteByCpf(cpf);
+    }
     
     if (!athlete) {
       return res.status(404).json({ 

@@ -1,41 +1,209 @@
-import { useState } from "react";
-import { useRoute, useLocation } from "wouter";
+import { useState, useEffect } from "react";
+import { useRoute, useLocation, useSearch } from "wouter";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ChevronLeft, User, Shirt, Award } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { ChevronLeft, User, Shirt, Award, Loader2, AlertCircle, CheckCircle } from "lucide-react";
 import Header from "@/components/Header";
+import { useAthleteAuth } from "@/contexts/AthleteAuthContext";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
+interface ModalityInfo {
+  id: string;
+  nome: string;
+  distancia: string;
+  unidadeDistancia: string;
+  tipoAcesso: string;
+  preco: number;
+  taxaComodidade: number;
+}
+
+interface RegistrationInfo {
+  event: {
+    id: string;
+    nome: string;
+    slug: string;
+    dataEvento: string;
+    cidade: string;
+    estado: string;
+  };
+  modalities: ModalityInfo[];
+}
 
 export default function InscricaoResumoPage() {
   const [, params] = useRoute("/evento/:slug/inscricao/resumo");
   const [, setLocation] = useLocation();
+  const searchString = useSearch();
+  const { athlete, isLoading: authLoading } = useAthleteAuth();
+  const { toast } = useToast();
   const [equipe, setEquipe] = useState("");
+  const slug = params?.slug;
 
-  const searchParams = new URLSearchParams(window.location.search);
-  const modalidade = searchParams.get("modalidade") || "";
+  const searchParams = new URLSearchParams(searchString);
+  const modalidadeId = searchParams.get("modalidade") || "";
   const tamanho = searchParams.get("tamanho") || "";
-  const valorModalidade = parseFloat(searchParams.get("valor") || "0");
-  const taxaComodidade = parseFloat(searchParams.get("taxaComodidade") || "0");
-  const valorTotal = valorModalidade + taxaComodidade;
 
-  const mockUsuario = {
-    nome: "João Silva",
-    cpf: "123.456.789-00",
-    dataNascimento: "15/03/1990"
-  };
+  useEffect(() => {
+    if (!authLoading && !athlete) {
+      const redirectUrl = `/evento/${slug}/inscricao/resumo?${searchString}`;
+      setLocation(`/login?redirect=${encodeURIComponent(redirectUrl)}`);
+    }
+  }, [authLoading, athlete, slug, searchString, setLocation]);
 
-  const mockEvento = {
-    nome: "Maratona de São Paulo 2025"
-  };
+  const { data, isLoading, error } = useQuery<{ success: boolean; data: RegistrationInfo }>({
+    queryKey: ["/api/registrations/events", slug, "registration-info"],
+    queryFn: async () => {
+      const response = await fetch(`/api/registrations/events/${slug}/registration-info`);
+      return response.json();
+    },
+    enabled: !!slug && !!athlete,
+  });
+
+  const createRegistrationMutation = useMutation({
+    mutationFn: async (registrationData: {
+      eventId: string;
+      modalityId: string;
+      tamanhoCamisa?: string;
+      equipe?: string;
+    }) => {
+      const response = await apiRequest("POST", "/api/registrations", registrationData);
+      return response.json();
+    },
+    onSuccess: (result) => {
+      if (result.success) {
+        queryClient.invalidateQueries({ queryKey: ["/api/registrations"] });
+        
+        const isGratuita = result.data.order.valorTotal === 0;
+        
+        if (isGratuita) {
+          toast({
+            title: "Inscricao confirmada!",
+            description: `Sua inscricao #${result.data.registration.numeroInscricao} foi realizada com sucesso.`,
+          });
+          setLocation(`/inscricao/${result.data.registration.id}?sucesso=1`);
+        } else {
+          setLocation(`/evento/${slug}/inscricao/pagamento?orderId=${result.data.order.id}`);
+        }
+      } else {
+        toast({
+          title: "Erro na inscricao",
+          description: result.error || "Nao foi possivel realizar a inscricao.",
+          variant: "destructive"
+        });
+      }
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro na inscricao",
+        description: error.message || "Nao foi possivel realizar a inscricao.",
+        variant: "destructive"
+      });
+    }
+  });
 
   const handleVoltar = () => {
-    setLocation(`/evento/${params?.slug}/inscricao/modalidade`);
+    setLocation(`/evento/${slug}/inscricao/modalidade`);
   };
 
-  const handleContinuar = () => {
-    setLocation(`/evento/${params?.slug}/inscricao/pagamento?modalidade=${encodeURIComponent(modalidade)}&tamanho=${tamanho}&valor=${valorModalidade}&taxaComodidade=${taxaComodidade}&equipe=${encodeURIComponent(equipe)}`);
+  const handleConfirmar = () => {
+    if (!athlete || !data?.data) return;
+
+    createRegistrationMutation.mutate({
+      eventId: data.data.event.id,
+      modalityId: modalidadeId,
+      tamanhoCamisa: tamanho || undefined,
+      equipe: equipe || undefined
+    });
+  };
+
+  if (authLoading || isLoading) {
+    return (
+      <div className="min-h-screen bg-background pb-24 md:pb-8">
+        <Header />
+        <div className="max-w-2xl mx-auto px-4 py-8 md:py-12">
+          <Skeleton className="h-8 w-24 mb-6" />
+          <div className="mb-8">
+            <Skeleton className="h-8 w-64 mb-2" />
+            <Skeleton className="h-4 w-48" />
+          </div>
+          <div className="space-y-4">
+            <Skeleton className="h-32 w-full" />
+            <Skeleton className="h-48 w-full" />
+            <Skeleton className="h-32 w-full" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!athlete) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (error || !data?.success) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <div className="max-w-2xl mx-auto px-4 py-8 md:py-12 text-center">
+          <AlertCircle className="h-16 w-16 mx-auto text-destructive mb-4" />
+          <h1 className="text-2xl font-bold mb-2">Erro ao carregar dados</h1>
+          <p className="text-muted-foreground mb-6">
+            Nao foi possivel carregar as informacoes do evento.
+          </p>
+          <Button onClick={() => setLocation(`/evento/${slug}`)}>
+            Voltar para o evento
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  const { event, modalities } = data.data;
+  const selectedModality = modalities.find(m => m.id === modalidadeId);
+  
+  if (!selectedModality) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <div className="max-w-2xl mx-auto px-4 py-8 md:py-12 text-center">
+          <AlertCircle className="h-16 w-16 mx-auto text-destructive mb-4" />
+          <h1 className="text-2xl font-bold mb-2">Modalidade nao encontrada</h1>
+          <p className="text-muted-foreground mb-6">
+            Selecione uma modalidade para continuar.
+          </p>
+          <Button onClick={() => setLocation(`/evento/${slug}/inscricao/modalidade`)}>
+            Escolher modalidade
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  const valorModalidade = selectedModality.preco;
+  const taxaComodidade = selectedModality.taxaComodidade;
+  const valorTotal = valorModalidade + taxaComodidade;
+  const isGratuita = selectedModality.tipoAcesso === "gratuita" || valorTotal === 0;
+
+  const formatCpf = (cpf: string) => {
+    return cpf;
+  };
+
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('pt-BR');
+  };
+
+  const formatPrice = (value: number) => {
+    if (value === 0) return "Gratuito";
+    return `R$ ${value.toFixed(2).replace('.', ',')}`;
   };
 
   return (
@@ -46,6 +214,7 @@ export default function InscricaoResumoPage() {
           variant="ghost"
           onClick={handleVoltar}
           className="mb-6"
+          disabled={createRegistrationMutation.isPending}
           data-testid="button-voltar"
         >
           <ChevronLeft className="h-4 w-4 mr-2" />
@@ -54,10 +223,10 @@ export default function InscricaoResumoPage() {
 
         <div className="mb-8">
           <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-2">
-            Resumo da Inscrição
+            Resumo da Inscricao
           </h1>
           <p className="text-muted-foreground">
-            Confira os dados da sua inscrição
+            Confira os dados da sua inscricao
           </p>
         </div>
 
@@ -67,7 +236,10 @@ export default function InscricaoResumoPage() {
               <CardTitle className="text-lg">Evento</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="font-semibold text-foreground">{mockEvento.nome}</p>
+              <p className="font-semibold text-foreground">{event.nome}</p>
+              <p className="text-sm text-muted-foreground">
+                {event.cidade}, {event.estado}
+              </p>
             </CardContent>
           </Card>
 
@@ -81,9 +253,11 @@ export default function InscricaoResumoPage() {
             <CardContent className="space-y-4">
               <div>
                 <p className="text-sm text-muted-foreground mb-1">Participante</p>
-                <p className="font-semibold text-foreground">{mockUsuario.nome}</p>
-                <p className="text-sm text-muted-foreground">CPF: {mockUsuario.cpf}</p>
-                <p className="text-sm text-muted-foreground">Data de Nascimento: {mockUsuario.dataNascimento}</p>
+                <p className="font-semibold text-foreground">{athlete.nome}</p>
+                <p className="text-sm text-muted-foreground">CPF: {formatCpf(athlete.cpf)}</p>
+                <p className="text-sm text-muted-foreground">
+                  Data de Nascimento: {formatDate(athlete.dataNascimento)}
+                </p>
               </div>
 
               <div className="border-t pt-4">
@@ -92,28 +266,36 @@ export default function InscricaoResumoPage() {
                   <div className="flex-1">
                     <p className="text-sm text-muted-foreground mb-1">Modalidade</p>
                     <div className="flex items-center justify-between">
-                      <p className="font-semibold text-foreground">{modalidade}</p>
-                      <p className="text-lg font-bold text-foreground">R$ {valorModalidade.toFixed(2)}</p>
+                      <p className="font-semibold text-foreground">
+                        {selectedModality.nome} ({selectedModality.distancia} {selectedModality.unidadeDistancia})
+                      </p>
+                      <p className="text-lg font-bold text-foreground">
+                        {formatPrice(valorModalidade)}
+                      </p>
                     </div>
                     {taxaComodidade > 0 && (
                       <div className="flex items-center justify-between mt-1">
                         <p className="text-sm text-muted-foreground">Taxa de comodidade</p>
-                        <p className="text-sm text-muted-foreground">R$ {taxaComodidade.toFixed(2)}</p>
+                        <p className="text-sm text-muted-foreground">
+                          R$ {taxaComodidade.toFixed(2).replace('.', ',')}
+                        </p>
                       </div>
                     )}
                   </div>
                 </div>
               </div>
 
-              <div className="border-t pt-4">
-                <div className="flex items-start gap-2">
-                  <Shirt className="h-4 w-4 text-muted-foreground mt-0.5" />
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-1">Tamanho da Camisa</p>
-                    <p className="font-semibold text-foreground">{tamanho}</p>
+              {tamanho && (
+                <div className="border-t pt-4">
+                  <div className="flex items-start gap-2">
+                    <Shirt className="h-4 w-4 text-muted-foreground mt-0.5" />
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-1">Tamanho da Camisa</p>
+                      <p className="font-semibold text-foreground">{tamanho}</p>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
             </CardContent>
           </Card>
 
@@ -131,6 +313,7 @@ export default function InscricaoResumoPage() {
                   placeholder="Ex: Assessoria RunFast"
                   value={equipe}
                   onChange={(e) => setEquipe(e.target.value)}
+                  disabled={createRegistrationMutation.isPending}
                   data-testid="input-equipe"
                 />
               </div>
@@ -143,20 +326,39 @@ export default function InscricaoResumoPage() {
         <div className="max-w-2xl mx-auto px-4 py-3">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <p className="text-xs text-muted-foreground">
-                R$ {valorModalidade.toFixed(2)} + Taxa R$ {taxaComodidade.toFixed(2)}
-              </p>
-              <p className="text-lg md:text-xl font-bold text-foreground">
-                Total: R$ {valorTotal.toFixed(2)}
-              </p>
+              {isGratuita ? (
+                <p className="text-lg md:text-xl font-bold text-green-600 dark:text-green-400 flex items-center gap-2">
+                  <CheckCircle className="h-5 w-5" />
+                  Inscricao Gratuita
+                </p>
+              ) : (
+                <>
+                  <p className="text-xs text-muted-foreground">
+                    R$ {valorModalidade.toFixed(2).replace('.', ',')} + Taxa R$ {taxaComodidade.toFixed(2).replace('.', ',')}
+                  </p>
+                  <p className="text-lg md:text-xl font-bold text-foreground">
+                    Total: R$ {valorTotal.toFixed(2).replace('.', ',')}
+                  </p>
+                </>
+              )}
             </div>
             <Button
               size="lg"
-              onClick={handleContinuar}
+              onClick={handleConfirmar}
+              disabled={createRegistrationMutation.isPending}
               className="font-semibold"
-              data-testid="button-continuar"
+              data-testid="button-confirmar"
             >
-              Ir para Pagamento
+              {createRegistrationMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Processando...
+                </>
+              ) : isGratuita ? (
+                "Confirmar Inscricao"
+              ) : (
+                "Ir para Pagamento"
+              )}
             </Button>
           </div>
         </div>

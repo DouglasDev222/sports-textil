@@ -1,102 +1,163 @@
-import { useRoute, useLocation } from "wouter";
+import { useRoute, useLocation, useSearch } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import Header from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
 import { 
   ArrowLeft, 
   Calendar, 
   MapPin, 
   Award, 
   User, 
-  Shirt, 
-  FileText,
-  Download,
+  Shirt,
   CheckCircle2,
-  QrCode,
   Clock,
-  Tag,
   Users,
   Hash,
-  Package
+  Package,
+  AlertCircle,
+  PartyPopper
 } from "lucide-react";
-import cityImage from '@assets/generated_images/City_marathon_aerial_view_94ce50b6.png';
+import heroImage from '@assets/generated_images/Marathon_runners_landscape_hero_b439e181.png';
 import { formatDateOnlyLong } from "@/lib/timezone";
+import { useAthleteAuth } from "@/contexts/AthleteAuthContext";
+import { useEffect } from "react";
 
-const mockInscricao = {
-  id: "1",
-  numeroInscricao: 12345,
-  codigoComprovacao: "MAR2025-A1B2C3",
-  status: "confirmada",
-  dataInscricao: "2025-03-15",
-  valorPago: "150.00",
-  valorOriginal: "150.00",
-  cupomDesconto: null,
-  pedido: {
-    id: "p1",
-    numeroPedido: 98765,
-    totalInscricoes: 2,
-  },
-  participante: {
-    nome: "João Silva",
-    cpf: "123.456.789-00",
-    email: "joao.silva@email.com",
-    telefone: "(11) 98765-4321",
-    dataNascimento: "15/03/1990"
-  },
+interface RegistrationDetail {
+  id: string;
+  numeroInscricao: number;
+  status: string;
+  tamanhoCamisa: string | null;
+  equipe: string | null;
+  dataInscricao: string;
+  valorPago: number;
   evento: {
-    nome: "Maratona de São Paulo 2025",
-    slug: "maratona-sao-paulo-2025",
-    data: "2025-05-15",
-    horarioLargada: "06:15",
-    local: "Parque Ibirapuera",
-    cidade: "São Paulo",
-    estado: "SP",
-    imagemUrl: cityImage,
-    retiradaKit: "14 e 15 de maio de 2025, das 10h às 20h no Shopping Ibirapuera"
-  },
-  modalidade: "21km",
-  tamanhoCamisa: "M",
-  equipe: "Assessoria RunFast",
-};
+    id: string;
+    nome: string;
+    slug: string;
+    dataEvento: string;
+    cidade: string;
+    estado: string;
+  } | null;
+  modalidade: {
+    id: string;
+    nome: string;
+    distancia: string;
+    unidadeDistancia: string;
+  } | null;
+  pedido: {
+    numeroPedido: number;
+    status: string;
+  } | null;
+}
 
 export default function InscricaoDetailPage() {
   const [, params] = useRoute("/inscricao/:id");
   const [, setLocation] = useLocation();
+  const searchString = useSearch();
+  const searchParams = new URLSearchParams(searchString);
+  const isSuccess = searchParams.get("sucesso") === "1";
+  const { athlete, isLoading: authLoading } = useAthleteAuth();
+  const registrationId = params?.id;
 
-  const formattedEventDate = formatDateOnlyLong(mockInscricao.evento.data);
-  const formattedInscricaoDate = formatDateOnlyLong(mockInscricao.dataInscricao);
+  useEffect(() => {
+    if (!authLoading && !athlete) {
+      setLocation(`/login?redirect=${encodeURIComponent(`/inscricao/${registrationId}`)}`);
+    }
+  }, [authLoading, athlete, registrationId, setLocation]);
+
+  const { data, isLoading, error } = useQuery<{ success: boolean; data: RegistrationDetail[] }>({
+    queryKey: ["/api/registrations/my-registrations"],
+    enabled: !!athlete,
+  });
 
   const handleVoltar = () => {
     setLocation("/minhas-inscricoes");
   };
 
-  const handleDownloadComprovante = () => {
-    console.log("Download comprovante:", mockInscricao.id);
+  const handleVerEvento = (slug: string) => {
+    setLocation(`/evento/${slug}`);
   };
 
-  const handleVerEvento = () => {
-    setLocation(`/evento/${mockInscricao.evento.slug}`);
-  };
+  if (authLoading || isLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <Skeleton className="w-full h-[200px] md:h-[300px]" />
+        <div className="max-w-5xl mx-auto px-4 md:px-6 py-8 md:py-12">
+          <div className="grid gap-6 md:grid-cols-3">
+            <div className="md:col-span-2 space-y-6">
+              <Skeleton className="h-32 w-full" />
+              <Skeleton className="h-48 w-full" />
+              <Skeleton className="h-48 w-full" />
+            </div>
+            <div>
+              <Skeleton className="h-64 w-full" />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!athlete) {
+    return null;
+  }
+
+  const registration = data?.data?.find(r => r.id === registrationId);
+
+  if (error || !data?.success || !registration) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <div className="max-w-5xl mx-auto px-4 md:px-6 py-16 text-center">
+          <AlertCircle className="h-16 w-16 mx-auto text-destructive mb-4" />
+          <h1 className="text-2xl font-bold mb-2">Inscricao nao encontrada</h1>
+          <p className="text-muted-foreground mb-6">
+            A inscricao que voce esta procurando nao existe ou nao esta disponivel.
+          </p>
+          <Button onClick={() => setLocation("/minhas-inscricoes")}>
+            Ver minhas inscricoes
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  const formattedEventDate = registration.evento ? formatDateOnlyLong(registration.evento.dataEvento) : "";
+  const formattedInscricaoDate = formatDateOnlyLong(registration.dataInscricao);
 
   const statusConfig = {
     confirmada: {
       variant: "default" as const,
       label: "Confirmada",
       icon: CheckCircle2,
-      description: "Sua inscrição está confirmada! Você receberá um e-mail com mais informações sobre a retirada do kit."
+      description: "Sua inscricao esta confirmada! Voce recebera um e-mail com mais informacoes sobre a retirada do kit."
     },
     pendente: {
       variant: "secondary" as const,
       label: "Aguardando Pagamento",
       icon: Clock,
-      description: "Estamos aguardando a confirmação do pagamento. Isso pode levar até 48 horas."
+      description: "Estamos aguardando a confirmacao do pagamento. Isso pode levar ate 48 horas."
+    },
+    cancelada: {
+      variant: "destructive" as const,
+      label: "Cancelada",
+      icon: AlertCircle,
+      description: "Esta inscricao foi cancelada."
     }
   };
 
-  const currentStatus = statusConfig[mockInscricao.status as keyof typeof statusConfig];
+  const currentStatus = statusConfig[registration.status as keyof typeof statusConfig] || statusConfig.pendente;
   const StatusIcon = currentStatus.icon;
+
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('pt-BR');
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -105,8 +166,8 @@ export default function InscricaoDetailPage() {
       <div className="relative">
         <div className="absolute inset-0 bg-gradient-to-r from-primary/95 to-primary/75 z-10"></div>
         <img
-          src={mockInscricao.evento.imagemUrl}
-          alt={mockInscricao.evento.nome}
+          src={heroImage}
+          alt={registration.evento?.nome || "Evento"}
           className="w-full h-[200px] md:h-[300px] object-cover"
         />
         <div className="absolute inset-0 z-20 flex items-end">
@@ -122,23 +183,29 @@ export default function InscricaoDetailPage() {
                 Voltar
               </Button>
               <div className="flex items-center gap-3 mb-2 text-white/80 flex-wrap">
-                <div className="flex items-center gap-1">
-                  <Package className="h-4 w-4" />
-                  <span className="text-sm font-medium">Pedido #{mockInscricao.pedido.numeroPedido}</span>
-                </div>
-                <span className="text-white/50">|</span>
+                {registration.pedido && (
+                  <>
+                    <div className="flex items-center gap-1">
+                      <Package className="h-4 w-4" />
+                      <span className="text-sm font-medium">Pedido #{registration.pedido.numeroPedido}</span>
+                    </div>
+                    <span className="text-white/50">|</span>
+                  </>
+                )}
                 <div className="flex items-center gap-1">
                   <Hash className="h-4 w-4" />
-                  <span className="text-sm font-medium">Inscrição #{mockInscricao.numeroInscricao}</span>
+                  <span className="text-sm font-medium">Inscricao #{registration.numeroInscricao}</span>
                 </div>
               </div>
               <h1 className="text-2xl md:text-4xl font-bold text-white mb-2">
-                {mockInscricao.evento.nome}
+                {registration.evento?.nome || "Evento"}
               </h1>
               <div className="flex items-center gap-2 flex-wrap">
-                <Badge variant="secondary" className="text-sm">
-                  {mockInscricao.modalidade}
-                </Badge>
+                {registration.modalidade && (
+                  <Badge variant="secondary" className="text-sm">
+                    {registration.modalidade.distancia} {registration.modalidade.unidadeDistancia}
+                  </Badge>
+                )}
                 <Badge variant={currentStatus.variant} className="text-sm">
                   {currentStatus.label}
                 </Badge>
@@ -149,6 +216,24 @@ export default function InscricaoDetailPage() {
       </div>
 
       <div className="max-w-5xl mx-auto px-4 md:px-6 py-8 md:py-12">
+        {isSuccess && (
+          <Card className="mb-6 border-green-500 bg-green-50 dark:bg-green-950/20">
+            <CardContent className="py-4">
+              <div className="flex items-center gap-3">
+                <PartyPopper className="h-8 w-8 text-green-600" />
+                <div>
+                  <p className="font-semibold text-green-800 dark:text-green-400">
+                    Inscricao realizada com sucesso!
+                  </p>
+                  <p className="text-sm text-green-700 dark:text-green-500">
+                    Sua inscricao foi confirmada. Guarde o numero da inscricao para referencia.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         <div className="grid gap-6 md:grid-cols-3">
           <div className="md:col-span-2 space-y-6">
             <Card>
@@ -158,7 +243,7 @@ export default function InscricaoDetailPage() {
                     <StatusIcon className="h-5 w-5 text-primary" />
                   </div>
                   <div>
-                    <CardTitle>Status da Inscrição</CardTitle>
+                    <CardTitle>Status da Inscricao</CardTitle>
                   </div>
                 </div>
               </CardHeader>
@@ -169,51 +254,38 @@ export default function InscricaoDetailPage() {
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Calendar className="h-5 w-5" />
-                  Informações do Evento
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <p className="text-sm text-muted-foreground mb-1">Data</p>
-                  <p className="font-semibold text-foreground">{formattedEventDate}</p>
-                </div>
-                <Separator />
-                <div>
-                  <p className="text-sm text-muted-foreground mb-1">Horário da Largada</p>
-                  <p className="font-semibold text-foreground">{mockInscricao.evento.horarioLargada}</p>
-                </div>
-                <Separator />
-                <div>
-                  <p className="text-sm text-muted-foreground mb-1">Local</p>
-                  <p className="font-semibold text-foreground">{mockInscricao.evento.local}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {mockInscricao.evento.cidade}, {mockInscricao.evento.estado}
-                  </p>
-                </div>
-                {mockInscricao.evento.retiradaKit && (
-                  <>
-                    <Separator />
-                    <div>
-                      <p className="text-sm text-muted-foreground mb-1">Retirada do Kit</p>
-                      <p className="text-sm text-foreground">{mockInscricao.evento.retiradaKit}</p>
-                    </div>
-                  </>
-                )}
-                <Separator />
-                <Button 
-                  variant="outline" 
-                  className="w-full"
-                  onClick={handleVerEvento}
-                  data-testid="button-ver-evento"
-                >
-                  Ver Página do Evento
-                </Button>
-              </CardContent>
-            </Card>
+            {registration.evento && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Calendar className="h-5 w-5" />
+                    Informacoes do Evento
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-1">Data</p>
+                    <p className="font-semibold text-foreground">{formattedEventDate}</p>
+                  </div>
+                  <Separator />
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-1">Local</p>
+                    <p className="font-semibold text-foreground">
+                      {registration.evento.cidade}, {registration.evento.estado}
+                    </p>
+                  </div>
+                  <Separator />
+                  <Button 
+                    variant="outline" 
+                    className="w-full"
+                    onClick={() => handleVerEvento(registration.evento!.slug)}
+                    data-testid="button-ver-evento"
+                  >
+                    Ver Pagina do Evento
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
 
             <Card>
               <CardHeader>
@@ -225,75 +297,29 @@ export default function InscricaoDetailPage() {
               <CardContent className="space-y-4">
                 <div>
                   <p className="text-sm text-muted-foreground mb-1">Nome</p>
-                  <p className="font-semibold text-foreground">{mockInscricao.participante.nome}</p>
+                  <p className="font-semibold text-foreground">{athlete.nome}</p>
                 </div>
                 <Separator />
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm text-muted-foreground mb-1">CPF</p>
-                    <p className="text-sm text-foreground">{mockInscricao.participante.cpf}</p>
+                    <p className="text-sm text-foreground">{athlete.cpf}</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground mb-1">Data de Nascimento</p>
-                    <p className="text-sm text-foreground">{mockInscricao.participante.dataNascimento}</p>
+                    <p className="text-sm text-foreground">{formatDate(athlete.dataNascimento)}</p>
                   </div>
                 </div>
                 <Separator />
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm text-muted-foreground mb-1">E-mail</p>
-                    <p className="text-sm text-foreground">{mockInscricao.participante.email}</p>
+                    <p className="text-sm text-foreground">{athlete.email}</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground mb-1">Telefone</p>
-                    <p className="text-sm text-foreground">{mockInscricao.participante.telefone}</p>
+                    <p className="text-sm text-foreground">{athlete.telefone}</p>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Award className="h-5 w-5" />
-                  Detalhes da Inscrição
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <p className="text-sm text-muted-foreground mb-1">Número da Inscrição</p>
-                  <p className="font-mono text-2xl font-bold text-primary flex items-center gap-2">
-                    <Hash className="h-5 w-5" />
-                    {mockInscricao.numeroInscricao}
-                  </p>
-                </div>
-                <Separator />
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-1">Modalidade</p>
-                    <p className="font-semibold text-foreground">{mockInscricao.modalidade}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-1">Tamanho da Camisa</p>
-                    <p className="font-semibold text-foreground">{mockInscricao.tamanhoCamisa}</p>
-                  </div>
-                </div>
-                {mockInscricao.equipe && (
-                  <>
-                    <Separator />
-                    <div>
-                      <p className="text-sm text-muted-foreground mb-1">Equipe</p>
-                      <p className="font-semibold text-foreground flex items-center gap-2">
-                        <Users className="h-4 w-4" />
-                        {mockInscricao.equipe}
-                      </p>
-                    </div>
-                  </>
-                )}
-                <Separator />
-                <div>
-                  <p className="text-sm text-muted-foreground mb-1">Data da Inscrição</p>
-                  <p className="text-sm text-foreground">{formattedInscricaoDate}</p>
                 </div>
               </CardContent>
             </Card>
@@ -303,66 +329,68 @@ export default function InscricaoDetailPage() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <QrCode className="h-5 w-5" />
-                  Código de Confirmação
+                  <Award className="h-5 w-5" />
+                  Detalhes da Inscricao
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex items-center justify-center p-6 bg-muted rounded-md">
-                  <div className="text-center">
-                    <QrCode className="h-24 w-24 mx-auto mb-4 text-muted-foreground" />
-                    <p className="text-xs text-muted-foreground">
-                      QR Code para retirada do kit
-                    </p>
-                  </div>
-                </div>
-                <div className="text-center">
-                  <p className="text-xs text-muted-foreground mb-1">Código</p>
-                  <p className="font-mono font-bold text-lg text-foreground">
-                    {mockInscricao.codigoComprovacao}
+                <div>
+                  <p className="text-sm text-muted-foreground mb-1">Numero da Inscricao</p>
+                  <p className="font-mono text-2xl font-bold text-primary flex items-center gap-2">
+                    <Hash className="h-5 w-5" />
+                    {registration.numeroInscricao}
                   </p>
                 </div>
-                <Button 
-                  variant="outline" 
-                  className="w-full"
-                  onClick={handleDownloadComprovante}
-                  data-testid="button-download-comprovante"
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  Baixar Comprovante
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <FileText className="h-5 w-5" />
-                  Pagamento
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-center justify-between py-2 border-b">
-                  <span className="text-sm text-muted-foreground">Valor da Inscrição</span>
-                  <span className="font-medium text-foreground">
-                    R$ {parseFloat(mockInscricao.valorOriginal).toFixed(2)}
-                  </span>
-                </div>
-                {mockInscricao.cupomDesconto && (
-                  <div className="flex items-center justify-between py-2 border-b">
-                    <span className="text-sm text-primary flex items-center gap-1">
-                      <Tag className="h-3 w-3" />
-                      Desconto
-                    </span>
-                    <span className="font-medium text-primary">
-                      - R$ {(parseFloat(mockInscricao.valorOriginal) - parseFloat(mockInscricao.valorPago)).toFixed(2)}
-                    </span>
+                <Separator />
+                {registration.modalidade && (
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-1">Modalidade</p>
+                    <p className="font-semibold text-foreground">
+                      {registration.modalidade.nome}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {registration.modalidade.distancia} {registration.modalidade.unidadeDistancia}
+                    </p>
                   </div>
                 )}
+                {registration.tamanhoCamisa && (
+                  <>
+                    <Separator />
+                    <div className="flex items-center gap-2">
+                      <Shirt className="h-4 w-4 text-muted-foreground" />
+                      <div>
+                        <p className="text-sm text-muted-foreground mb-1">Tamanho da Camisa</p>
+                        <p className="font-semibold text-foreground">{registration.tamanhoCamisa}</p>
+                      </div>
+                    </div>
+                  </>
+                )}
+                {registration.equipe && (
+                  <>
+                    <Separator />
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-1">Equipe</p>
+                      <p className="font-semibold text-foreground flex items-center gap-2">
+                        <Users className="h-4 w-4" />
+                        {registration.equipe}
+                      </p>
+                    </div>
+                  </>
+                )}
+                <Separator />
+                <div>
+                  <p className="text-sm text-muted-foreground mb-1">Data da Inscricao</p>
+                  <p className="text-sm text-foreground">{formattedInscricaoDate}</p>
+                </div>
+                <Separator />
                 <div className="flex items-center justify-between pt-2">
-                  <span className="font-semibold text-foreground">Total Pago</span>
+                  <span className="font-semibold text-foreground">Valor</span>
                   <span className="text-xl font-bold text-primary">
-                    R$ {parseFloat(mockInscricao.valorPago).toFixed(2)}
+                    {registration.valorPago === 0 ? (
+                      <span className="text-green-600 dark:text-green-400">Gratuito</span>
+                    ) : (
+                      `R$ ${registration.valorPago.toFixed(2).replace('.', ',')}`
+                    )}
                   </span>
                 </div>
               </CardContent>
