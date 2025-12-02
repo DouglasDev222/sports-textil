@@ -225,6 +225,25 @@ export function EventBasicInfoStep({ formData, updateFormData }: EventBasicInfoS
         </div>
       </div>
 
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="space-y-2">
+          <Label htmlFor="idadeMinimaEvento">Idade Minima para Inscricao</Label>
+          <Input
+            id="idadeMinimaEvento"
+            type="number"
+            min="0"
+            max="100"
+            value={formData.event.idadeMinimaEvento ?? 18}
+            onChange={(e) => updateEvent("idadeMinimaEvento", parseInt(e.target.value) || 0)}
+            placeholder="18"
+            data-testid="input-minimum-age"
+          />
+          <p className="text-xs text-muted-foreground">
+            Idade minima padrao para todas as modalidades. Pode ser personalizado por modalidade.
+          </p>
+        </div>
+      </div>
+
       <Card>
         <CardHeader className="flex flex-row items-center gap-2 space-y-0">
           <Image className="h-5 w-5" />
