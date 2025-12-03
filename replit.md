@@ -182,7 +182,13 @@ Preferred communication style: Simple, everyday language.
 - `/evento/:slug/inscricao/participante` - Select registration type (self/other)
 - `/evento/:slug/inscricao/modalidade` - Choose race distance, shirt size, and handle special category verification
 - `/evento/:slug/inscricao/resumo` - Review registration details and add team
-- `/evento/:slug/inscricao/pagamento` - Payment with discount code support
+- `/evento/:slug/inscricao/pagamento` - Payment with discount code support (fetches order data from API)
+
+**Registration API Routes**
+- `GET /api/registrations/events/:slug/registration-info` - Get event info with modalities, prices, and shirt sizes for registration
+- `POST /api/registrations` - Create new registration (returns order and registration data)
+- `GET /api/registrations/orders/:orderId` - Get order details with registrations for payment page
+- `GET /api/registrations/my-registrations` - Get authenticated athlete's registrations
 
 **Special Category Verification System**
 - Support for race categories requiring verification (e.g., public servants, PCD)
