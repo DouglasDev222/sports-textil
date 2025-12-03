@@ -6,7 +6,7 @@ import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Info } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { formatTimestampAsDateBrazil } from "@/lib/timezone";
 import type { EventFormData } from "../EventWizard";
@@ -118,6 +118,23 @@ export function EventBatchesStep({ formData, updateFormData }: EventBatchesStepP
                   {editingBatchIndex !== null ? "Editar Lote" : "Novo Lote"}
                 </DialogTitle>
               </DialogHeader>
+
+              {(formData.event.aberturaInscricoes || formData.event.encerramentoInscricoes) && (
+                <div className="flex items-start gap-2 p-3 bg-muted/50 rounded-md text-sm">
+                  <Info className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+                  <div className="text-muted-foreground">
+                    <span className="font-medium text-foreground">Periodo de inscricoes do evento:</span>
+                    <br />
+                    {formData.event.aberturaInscricoes && (
+                      <span>Inicio: {formatTimestampAsDateBrazil(formData.event.aberturaInscricoes)}</span>
+                    )}
+                    {formData.event.aberturaInscricoes && formData.event.encerramentoInscricoes && " | "}
+                    {formData.event.encerramentoInscricoes && (
+                      <span>Termino: {formatTimestampAsDateBrazil(formData.event.encerramentoInscricoes)}</span>
+                    )}
+                  </div>
+                </div>
+              )}
 
               <div className="space-y-4 py-4">
                 <div className="space-y-2">
@@ -283,33 +300,42 @@ export function EventBatchesStep({ formData, updateFormData }: EventBatchesStepP
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {formData.modalities.map((modality, modalityIndex) => (
-                    <TableRow key={modalityIndex}>
-                      <TableCell className="font-medium">
-                        {modality.nome}
-                        <span className="text-muted-foreground text-sm block">
-                          {modality.distancia} {modality.unidadeDistancia}
-                        </span>
-                      </TableCell>
-                      {formData.batches.map((_, batchIndex) => (
-                        <TableCell key={batchIndex}>
-                          <div className="flex items-center gap-1">
-                            <span className="text-muted-foreground">R$</span>
-                            <Input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              value={getPrice(modalityIndex, batchIndex)}
-                              onChange={(e) => setPrice(modalityIndex, batchIndex, e.target.value)}
-                              className="w-24"
-                              placeholder="0.00"
-                              data-testid={`input-price-${modalityIndex}-${batchIndex}`}
-                            />
-                          </div>
+                  {formData.modalities.map((modality, modalityIndex) => {
+                    const isGratuita = modality.tipoAcesso === "gratuita";
+                    return (
+                      <TableRow key={modalityIndex}>
+                        <TableCell className="font-medium">
+                          {modality.nome}
+                          <span className="text-muted-foreground text-sm block">
+                            {modality.distancia} {modality.unidadeDistancia}
+                          </span>
                         </TableCell>
-                      ))}
-                    </TableRow>
-                  ))}
+                        {formData.batches.map((_, batchIndex) => (
+                          <TableCell key={batchIndex}>
+                            {isGratuita ? (
+                              <Badge variant="secondary" className="text-xs">
+                                Gratuita
+                              </Badge>
+                            ) : (
+                              <div className="flex items-center gap-1">
+                                <span className="text-muted-foreground">R$</span>
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  value={getPrice(modalityIndex, batchIndex)}
+                                  onChange={(e) => setPrice(modalityIndex, batchIndex, e.target.value)}
+                                  className="w-24"
+                                  placeholder="0.00"
+                                  data-testid={`input-price-${modalityIndex}-${batchIndex}`}
+                                />
+                              </div>
+                            )}
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>

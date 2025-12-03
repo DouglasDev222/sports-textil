@@ -72,19 +72,31 @@ export function EventModalitiesStep({ formData, updateFormData }: EventModalitie
 
   const handleSave = () => {
     const newModalities = [...formData.modalities];
+    let newPrices = [...formData.prices];
+    
     if (editingIndex !== null) {
       newModalities[editingIndex] = currentModality;
+      if (currentModality.tipoAcesso === "gratuita") {
+        newPrices = newPrices.filter(p => p.modalityIndex !== editingIndex);
+      }
     } else {
       newModalities.push(currentModality);
     }
-    updateFormData({ modalities: newModalities });
+    
+    updateFormData({ modalities: newModalities, prices: newPrices });
     resetDialogState();
     setDialogOpen(false);
   };
 
   const handleDelete = (index: number) => {
     const newModalities = formData.modalities.filter((_, i) => i !== index);
-    updateFormData({ modalities: newModalities });
+    const newPrices = formData.prices
+      .filter(p => p.modalityIndex !== index)
+      .map(p => ({
+        ...p,
+        modalityIndex: p.modalityIndex > index ? p.modalityIndex - 1 : p.modalityIndex
+      }));
+    updateFormData({ modalities: newModalities, prices: newPrices });
   };
 
   const updateCurrentModality = (field: string, value: any) => {

@@ -88,7 +88,21 @@ export default function EventWizard({ mode, eventId, initialData }: EventWizardP
       case 2:
         return formData.modalities.length > 0;
       case 3:
-        return formData.batches.length > 0 && formData.prices.length > 0;
+        if (formData.batches.length === 0) return false;
+        
+        const paidModalities = formData.modalities
+          .map((m, i) => ({ modality: m, index: i }))
+          .filter(({ modality }) => modality.tipoAcesso !== "gratuita");
+        
+        if (paidModalities.length === 0) return true;
+        
+        const allPaidModalitiesHavePrices = paidModalities.every(({ index: modalityIndex }) => 
+          formData.batches.every((_, batchIndex) => 
+            formData.prices.some(p => p.modalityIndex === modalityIndex && p.batchIndex === batchIndex)
+          )
+        );
+        
+        return allPaidModalitiesHavePrices;
       case 4:
         return true;
       default:
@@ -143,26 +157,56 @@ export default function EventWizard({ mode, eventId, initialData }: EventWizardP
         }
       }
 
-      if (mode === "create") {
-        const modalitiesResponse = await fetch(`/api/admin/events/${createdEventId}/modalities`, { credentials: "include" });
-        const modalitiesResult = await modalitiesResponse.json();
-        const savedModalities = modalitiesResult.data || [];
+      const modalitiesResponse = await fetch(`/api/admin/events/${createdEventId}/modalities`, { credentials: "include" });
+      const modalitiesResult = await modalitiesResponse.json();
+      const savedModalities = modalitiesResult.data || [];
 
-        const batchesResponse = await fetch(`/api/admin/events/${createdEventId}/batches`, { credentials: "include" });
-        const batchesResult = await batchesResponse.json();
-        const savedBatches = batchesResult.data || [];
+      const batchesResponse = await fetch(`/api/admin/events/${createdEventId}/batches`, { credentials: "include" });
+      const batchesResult = await batchesResponse.json();
+      const savedBatches = batchesResult.data || [];
 
-        for (const priceEntry of formData.prices) {
-          const modalityId = savedModalities[priceEntry.modalityIndex]?.id;
-          const batchId = savedBatches[priceEntry.batchIndex]?.id;
-          if (modalityId && batchId) {
-            await apiRequest("POST", `/api/admin/events/${createdEventId}/prices`, {
-              modalityId,
-              batchId,
-              valor: priceEntry.valor,
+      const pricesForBulk: Array<{ modalityId: string; batchId: string; valor: string }> = [];
+
+      for (let modalityIndex = 0; modalityIndex < formData.modalities.length; modalityIndex++) {
+        const modality = formData.modalities[modalityIndex];
+        const savedModality = savedModalities.find((m: any) => 
+          modality.id ? m.id === modality.id : savedModalities.indexOf(m) === modalityIndex
+        );
+        
+        if (!savedModality?.id) continue;
+        
+        for (let batchIndex = 0; batchIndex < formData.batches.length; batchIndex++) {
+          const batch = formData.batches[batchIndex];
+          const savedBatch = savedBatches.find((b: any) => 
+            batch.id ? b.id === batch.id : savedBatches.indexOf(b) === batchIndex
+          );
+          if (!savedBatch?.id) continue;
+          
+          if (modality.tipoAcesso === "gratuita") {
+            pricesForBulk.push({
+              modalityId: savedModality.id,
+              batchId: savedBatch.id,
+              valor: "0",
             });
+          } else {
+            const priceEntry = formData.prices.find(
+              p => p.modalityIndex === modalityIndex && p.batchIndex === batchIndex
+            );
+            if (priceEntry) {
+              pricesForBulk.push({
+                modalityId: savedModality.id,
+                batchId: savedBatch.id,
+                valor: priceEntry.valor,
+              });
+            }
           }
         }
+      }
+
+      if (pricesForBulk.length > 0) {
+        await apiRequest("PUT", `/api/admin/events/${createdEventId}/prices/bulk`, {
+          prices: pricesForBulk,
+        });
       }
 
       // Handle shirts (both create and edit mode)

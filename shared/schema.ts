@@ -112,6 +112,7 @@ export const prices = pgTable("prices", {
   modalityId: varchar("modality_id").notNull().references(() => modalities.id),
   batchId: varchar("batch_id").notNull().references(() => registrationBatches.id),
   valor: decimal("valor", { precision: 10, scale: 2 }).notNull(),
+  dataCriacao: timestamp("data_criacao", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export const attachments = pgTable("attachments", {
@@ -195,7 +196,7 @@ export const insertEventSchema = createInsertSchema(events).omit({ id: true, dat
 export const insertModalitySchema = createInsertSchema(modalities).omit({ id: true });
 export const insertShirtSizeSchema = createInsertSchema(shirtSizes).omit({ id: true });
 export const insertRegistrationBatchSchema = createInsertSchema(registrationBatches).omit({ id: true });
-export const insertPriceSchema = createInsertSchema(prices).omit({ id: true });
+export const insertPriceSchema = createInsertSchema(prices).omit({ id: true, dataCriacao: true });
 export const insertAttachmentSchema = createInsertSchema(attachments).omit({ id: true });
 export const insertEventBannerSchema = createInsertSchema(eventBanners).omit({ id: true, dataCriacao: true });
 export const insertAthleteSchema = createInsertSchema(athletes).omit({ id: true, dataCadastro: true });

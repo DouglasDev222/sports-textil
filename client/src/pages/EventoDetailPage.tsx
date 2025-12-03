@@ -84,9 +84,16 @@ export default function EventoDetailPage() {
   };
 
   const getPrice = (modalityId: string): string => {
+    const modality = modalities.find(m => m.id === modalityId);
+    if (modality?.tipoAcesso === "gratuita") return "Gratuito";
+    
     const price = event.prices?.find(p => p.modalityId === modalityId);
     if (!price) return "Consulte";
-    return `R$ ${parseFloat(price.valor).toFixed(2).replace('.', ',')}`;
+    
+    const valor = parseFloat(price.valor);
+    if (valor === 0) return "Gratuito";
+    
+    return `R$ ${valor.toFixed(2).replace('.', ',')}`;
   };
 
   const modalities = event.modalities || [];
