@@ -205,7 +205,7 @@ router.post("/", async (req, res) => {
 
     const isGratuita = modality.tipoAcesso === "gratuita" || valorTotal === 0;
 
-    const orderNumber = await storage.getNextOrderNumber(eventId);
+    const orderNumber = await storage.getNextOrderNumber();
     const order = await storage.createOrder({
       numeroPedido: orderNumber,
       eventId,
@@ -217,7 +217,7 @@ router.post("/", async (req, res) => {
       ipComprador: req.ip || null
     });
 
-    const registrationNumber = await storage.getNextRegistrationNumber(eventId);
+    const registrationNumber = await storage.getNextRegistrationNumber();
     const registration = await storage.createRegistration({
       numeroInscricao: registrationNumber,
       orderId: order.id,

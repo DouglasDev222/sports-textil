@@ -97,7 +97,7 @@ export interface IStorage {
   getOrdersByBuyer(buyerId: string): Promise<Order[]>;
   createOrder(order: InsertOrder): Promise<Order>;
   updateOrder(id: string, order: Partial<InsertOrder>): Promise<Order | undefined>;
-  getNextOrderNumber(eventId: string): Promise<number>;
+  getNextOrderNumber(): Promise<number>;
 
   getRegistration(id: string): Promise<Registration | undefined>;
   getRegistrationsByEvent(eventId: string): Promise<Registration[]>;
@@ -105,7 +105,7 @@ export interface IStorage {
   getRegistrationsByOrder(orderId: string): Promise<Registration[]>;
   createRegistration(registration: InsertRegistration): Promise<Registration>;
   updateRegistration(id: string, registration: Partial<InsertRegistration>): Promise<Registration | undefined>;
-  getNextRegistrationNumber(eventId: string): Promise<number>;
+  getNextRegistrationNumber(): Promise<number>;
 
   getDocumentAcceptancesByRegistration(registrationId: string): Promise<DocumentAcceptance[]>;
   createDocumentAcceptance(acceptance: InsertDocumentAcceptance): Promise<DocumentAcceptance>;
@@ -496,10 +496,9 @@ export class DbStorage implements IStorage {
     return order;
   }
 
-  async getNextOrderNumber(eventId: string): Promise<number> {
+  async getNextOrderNumber(): Promise<number> {
     const result = await db.select({ maxNum: max(orders.numeroPedido) })
-      .from(orders)
-      .where(eq(orders.eventId, eventId));
+      .from(orders);
     return (result[0]?.maxNum ?? 0) + 1;
   }
 
@@ -595,10 +594,9 @@ export class DbStorage implements IStorage {
     return registration;
   }
 
-  async getNextRegistrationNumber(eventId: string): Promise<number> {
+  async getNextRegistrationNumber(): Promise<number> {
     const result = await db.select({ maxNum: max(registrations.numeroInscricao) })
-      .from(registrations)
-      .where(eq(registrations.eventId, eventId));
+      .from(registrations);
     return (result[0]?.maxNum ?? 0) + 1;
   }
 
