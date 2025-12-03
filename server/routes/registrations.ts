@@ -275,6 +275,77 @@ router.post("/", async (req, res) => {
   }
 });
 
+router.get("/orders/:orderId", async (req, res) => {
+  try {
+    const athleteId = (req.session as any)?.athleteId;
+    if (!athleteId) {
+      return res.status(401).json({ success: false, error: "Nao autenticado" });
+    }
+
+    const { orderId } = req.params;
+    const order = await storage.getOrder(orderId);
+    
+    if (!order) {
+      return res.status(404).json({ success: false, error: "Pedido nao encontrado" });
+    }
+
+    if (order.compradorId !== athleteId) {
+      return res.status(403).json({ success: false, error: "Acesso nao autorizado" });
+    }
+
+    const event = await storage.getEvent(order.eventId);
+    const registrations = await storage.getRegistrationsByOrder(orderId);
+    
+    const registrationsWithDetails = await Promise.all(
+      registrations.map(async (reg) => {
+        const modality = await storage.getModality(reg.modalityId);
+        return {
+          id: reg.id,
+          numeroInscricao: reg.numeroInscricao,
+          tamanhoCamisa: reg.tamanhoCamisa,
+          equipe: reg.equipe,
+          valorUnitario: parseFloat(reg.valorUnitario),
+          taxaComodidade: parseFloat(reg.taxaComodidade),
+          modalidade: modality ? {
+            id: modality.id,
+            nome: modality.nome,
+            distancia: modality.distancia,
+            unidadeDistancia: modality.unidadeDistancia,
+            tipoAcesso: modality.tipoAcesso
+          } : null
+        };
+      })
+    );
+
+    res.json({
+      success: true,
+      data: {
+        order: {
+          id: order.id,
+          numeroPedido: order.numeroPedido,
+          valorTotal: parseFloat(order.valorTotal),
+          valorDesconto: parseFloat(order.valorDesconto),
+          status: order.status,
+          metodoPagamento: order.metodoPagamento,
+          codigoVoucher: order.codigoVoucher
+        },
+        evento: event ? {
+          id: event.id,
+          nome: event.nome,
+          slug: event.slug,
+          dataEvento: event.dataEvento,
+          cidade: event.cidade,
+          estado: event.estado
+        } : null,
+        registrations: registrationsWithDetails
+      }
+    });
+  } catch (error) {
+    console.error("Erro ao buscar pedido:", error);
+    res.status(500).json({ success: false, error: "Erro interno do servidor" });
+  }
+});
+
 router.get("/my-registrations", async (req, res) => {
   try {
     const athleteId = (req.session as any)?.athleteId;

@@ -1,16 +1,54 @@
-import { useState } from "react";
-import { useRoute, useLocation } from "wouter";
+import { useState, useEffect } from "react";
+import { useRoute, useLocation, useSearch } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { ChevronLeft, Tag, CreditCard, CheckCircle2 } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Separator } from "@/components/ui/separator";
+import { ChevronLeft, Tag, CreditCard, CheckCircle2, AlertCircle, Loader2, Hash, Shirt, Users } from "lucide-react";
 import Header from "@/components/Header";
 import { useToast } from "@/hooks/use-toast";
+import { useAthleteAuth } from "@/contexts/AthleteAuthContext";
 
+interface OrderData {
+  order: {
+    id: string;
+    numeroPedido: number;
+    valorTotal: number;
+    valorDesconto: number;
+    status: string;
+    metodoPagamento: string | null;
+    codigoVoucher: string | null;
+  };
+  evento: {
+    id: string;
+    nome: string;
+    slug: string;
+    dataEvento: string;
+    cidade: string;
+    estado: string;
+  } | null;
+  registrations: Array<{
+    id: string;
+    numeroInscricao: number;
+    tamanhoCamisa: string | null;
+    equipe: string | null;
+    valorUnitario: number;
+    taxaComodidade: number;
+    modalidade: {
+      id: string;
+      nome: string;
+      distancia: string;
+      unidadeDistancia: string;
+      tipoAcesso: string;
+    } | null;
+  }>;
+}
 
-const cuponsValidos = {
+const cuponsValidos: Record<string, { desconto: number; tipo: "percentual" | "fixo" }> = {
   "DESCONTO10": { desconto: 10, tipo: "percentual" },
   "CORRIDA50": { desconto: 50, tipo: "fixo" },
 };
@@ -18,40 +56,58 @@ const cuponsValidos = {
 export default function InscricaoPagamentoPage() {
   const [, params] = useRoute("/evento/:slug/inscricao/pagamento");
   const [, setLocation] = useLocation();
+  const searchString = useSearch();
   const { toast } = useToast();
+  const { athlete, isLoading: authLoading } = useAthleteAuth();
   
   const [cupom, setCupom] = useState("");
   const [cupomAplicado, setCupomAplicado] = useState<string | null>(null);
   const [processandoPagamento, setProcessandoPagamento] = useState(false);
 
-  const searchParams = new URLSearchParams(window.location.search);
-  const modalidade = searchParams.get("modalidade") || "";
-  const tamanho = searchParams.get("tamanho") || "";
-  const equipe = searchParams.get("equipe") || "";
-  const valorModalidade = parseFloat(searchParams.get("valor") || "0");
-  const taxaComodidade = parseFloat(searchParams.get("taxaComodidade") || "0");
+  const searchParams = new URLSearchParams(searchString);
+  const orderId = searchParams.get("orderId");
+  const slug = params?.slug;
 
-  const valorOriginal = valorModalidade + taxaComodidade;
+  useEffect(() => {
+    if (!authLoading && !athlete) {
+      const redirectUrl = `/evento/${slug}/inscricao/pagamento?orderId=${orderId}`;
+      setLocation(`/login?redirect=${encodeURIComponent(redirectUrl)}`);
+    }
+  }, [authLoading, athlete, slug, orderId, setLocation]);
+
+  const { data, isLoading, error } = useQuery<{ success: boolean; data: OrderData }>({
+    queryKey: ["/api/registrations/orders", orderId],
+    queryFn: async () => {
+      const response = await fetch(`/api/registrations/orders/${orderId}`, {
+        credentials: "include"
+      });
+      return response.json();
+    },
+    enabled: !!orderId && !!athlete,
+  });
+
+  const orderData = data?.data;
+  const valorOriginal = orderData?.order.valorTotal || 0;
   
   let valorDesconto = 0;
-  if (cupomAplicado && cuponsValidos[cupomAplicado as keyof typeof cuponsValidos]) {
-    const cupomInfo = cuponsValidos[cupomAplicado as keyof typeof cuponsValidos];
+  if (cupomAplicado && cuponsValidos[cupomAplicado]) {
+    const cupomInfo = cuponsValidos[cupomAplicado];
     if (cupomInfo.tipo === "percentual") {
       valorDesconto = valorOriginal * (cupomInfo.desconto / 100);
     } else {
-      valorDesconto = cupomInfo.desconto;
+      valorDesconto = Math.min(cupomInfo.desconto, valorOriginal);
     }
   }
 
-  const valorFinal = valorOriginal - valorDesconto;
+  const valorFinal = Math.max(0, valorOriginal - valorDesconto);
 
   const handleVoltar = () => {
-    setLocation(`/evento/${params?.slug}/inscricao/resumo?modalidade=${encodeURIComponent(modalidade)}&tamanho=${tamanho}&valor=${valorModalidade}&taxaComodidade=${taxaComodidade}`);
+    setLocation(`/evento/${slug}`);
   };
 
   const handleAplicarCupom = () => {
     const cupomUpper = cupom.toUpperCase();
-    if (cuponsValidos[cupomUpper as keyof typeof cuponsValidos]) {
+    if (cuponsValidos[cupomUpper]) {
       setCupomAplicado(cupomUpper);
       toast({
         title: "Cupom aplicado!",
@@ -59,8 +115,8 @@ export default function InscricaoPagamentoPage() {
       });
     } else {
       toast({
-        title: "Cupom inválido",
-        description: "O cupom informado não existe ou expirou.",
+        title: "Cupom invalido",
+        description: "O cupom informado nao existe ou expirou.",
         variant: "destructive",
       });
     }
@@ -77,12 +133,100 @@ export default function InscricaoPagamentoPage() {
     setTimeout(() => {
       toast({
         title: "Pagamento realizado!",
-        description: "Sua inscrição foi confirmada com sucesso.",
+        description: "Sua inscricao foi confirmada com sucesso.",
       });
       setProcessandoPagamento(false);
-      setLocation("/minhas-inscricoes");
+      if (orderData?.registrations[0]?.id) {
+        setLocation(`/inscricao/${orderData.registrations[0].id}?sucesso=1`);
+      } else {
+        setLocation("/minhas-inscricoes");
+      }
     }, 2000);
   };
+
+  if (authLoading || isLoading) {
+    return (
+      <div className="min-h-screen bg-background pb-24 md:pb-8">
+        <Header />
+        <div className="max-w-2xl mx-auto px-4 py-8 md:py-12">
+          <Skeleton className="h-8 w-24 mb-6" />
+          <div className="mb-8">
+            <Skeleton className="h-8 w-64 mb-2" />
+            <Skeleton className="h-4 w-48" />
+          </div>
+          <div className="space-y-4">
+            <Skeleton className="h-32 w-full" />
+            <Skeleton className="h-48 w-full" />
+            <Skeleton className="h-32 w-full" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!athlete) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!orderId) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <div className="max-w-2xl mx-auto px-4 py-8 md:py-12 text-center">
+          <AlertCircle className="h-16 w-16 mx-auto text-destructive mb-4" />
+          <h1 className="text-2xl font-bold mb-2">Pedido nao encontrado</h1>
+          <p className="text-muted-foreground mb-6">
+            Nao foi possivel identificar o pedido para pagamento.
+          </p>
+          <Button onClick={() => setLocation(`/evento/${slug}`)}>
+            Voltar para o evento
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !data?.success || !orderData) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <div className="max-w-2xl mx-auto px-4 py-8 md:py-12 text-center">
+          <AlertCircle className="h-16 w-16 mx-auto text-destructive mb-4" />
+          <h1 className="text-2xl font-bold mb-2">Erro ao carregar pedido</h1>
+          <p className="text-muted-foreground mb-6">
+            Nao foi possivel carregar os dados do pedido.
+          </p>
+          <Button onClick={() => setLocation(`/evento/${slug}`)}>
+            Voltar para o evento
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (orderData.order.status === "pago") {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <div className="max-w-2xl mx-auto px-4 py-8 md:py-12 text-center">
+          <CheckCircle2 className="h-16 w-16 mx-auto text-green-600 mb-4" />
+          <h1 className="text-2xl font-bold mb-2">Pedido ja pago</h1>
+          <p className="text-muted-foreground mb-6">
+            Este pedido ja foi pago e sua inscricao esta confirmada.
+          </p>
+          <Button onClick={() => setLocation("/minhas-inscricoes")}>
+            Ver minhas inscricoes
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  const registration = orderData.registrations[0];
 
   return (
     <div className="min-h-screen bg-background pb-24 md:pb-8">
@@ -99,11 +243,15 @@ export default function InscricaoPagamentoPage() {
         </Button>
 
         <div className="mb-8">
+          <div className="flex items-center gap-2 text-muted-foreground mb-2">
+            <Hash className="h-4 w-4" />
+            <span className="text-sm">Pedido #{orderData.order.numeroPedido}</span>
+          </div>
           <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-2">
             Pagamento
           </h1>
           <p className="text-muted-foreground">
-            Finalize sua inscrição
+            Finalize sua inscricao para {orderData.evento?.nome}
           </p>
         </div>
 
@@ -140,13 +288,13 @@ export default function InscricaoPagamentoPage() {
                   </div>
                 </div>
               ) : (
-                <div className="flex items-center justify-between p-3 bg-primary/10 rounded-md">
+                <div className="flex items-center justify-between gap-2 p-3 bg-primary/10 rounded-md flex-wrap">
                   <div className="flex items-center gap-2">
                     <CheckCircle2 className="h-5 w-5 text-primary" />
                     <div>
                       <p className="font-semibold text-foreground">{cupomAplicado}</p>
                       <p className="text-sm text-muted-foreground">
-                        Desconto aplicado: R$ {valorDesconto.toFixed(2)}
+                        Desconto aplicado: R$ {valorDesconto.toFixed(2).replace('.', ',')}
                       </p>
                     </div>
                   </div>
@@ -169,44 +317,61 @@ export default function InscricaoPagamentoPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                <div className="flex items-center justify-between py-2 border-b">
-                  <span className="text-sm text-muted-foreground">Modalidade</span>
-                  <span className="font-medium text-foreground">{modalidade}</span>
-                </div>
-                <div className="flex items-center justify-between py-2 border-b">
-                  <span className="text-sm text-muted-foreground">Tamanho da Camisa</span>
-                  <span className="font-medium text-foreground">{tamanho}</span>
-                </div>
-                {equipe && (
-                  <div className="flex items-center justify-between py-2 border-b">
-                    <span className="text-sm text-muted-foreground">Equipe</span>
-                    <span className="font-medium text-foreground">{equipe}</span>
-                  </div>
+                {registration && (
+                  <>
+                    <div className="flex items-center justify-between gap-2 py-2 border-b flex-wrap">
+                      <span className="text-sm text-muted-foreground">Modalidade</span>
+                      <span className="font-medium text-foreground">
+                        {registration.modalidade?.nome} ({registration.modalidade?.distancia} {registration.modalidade?.unidadeDistancia})
+                      </span>
+                    </div>
+                    {registration.tamanhoCamisa && (
+                      <div className="flex items-center justify-between gap-2 py-2 border-b flex-wrap">
+                        <span className="text-sm text-muted-foreground flex items-center gap-1">
+                          <Shirt className="h-4 w-4" />
+                          Tamanho da Camisa
+                        </span>
+                        <span className="font-medium text-foreground">{registration.tamanhoCamisa}</span>
+                      </div>
+                    )}
+                    {registration.equipe && (
+                      <div className="flex items-center justify-between gap-2 py-2 border-b flex-wrap">
+                        <span className="text-sm text-muted-foreground flex items-center gap-1">
+                          <Users className="h-4 w-4" />
+                          Equipe
+                        </span>
+                        <span className="font-medium text-foreground">{registration.equipe}</span>
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between gap-2 py-2 border-b flex-wrap">
+                      <span className="text-sm text-muted-foreground">Valor da Inscricao</span>
+                      <span className="font-medium text-foreground">
+                        R$ {registration.valorUnitario.toFixed(2).replace('.', ',')}
+                      </span>
+                    </div>
+                    {registration.taxaComodidade > 0 && (
+                      <div className="flex items-center justify-between gap-2 py-2 border-b flex-wrap">
+                        <span className="text-sm text-muted-foreground">Taxa de Comodidade</span>
+                        <span className="font-medium text-foreground">
+                          R$ {registration.taxaComodidade.toFixed(2).replace('.', ',')}
+                        </span>
+                      </div>
+                    )}
+                  </>
                 )}
-                <div className="flex items-center justify-between py-2 border-b">
-                  <span className="text-sm text-muted-foreground">Valor da Inscrição</span>
-                  <span className="font-medium text-foreground">
-                    R$ {valorModalidade.toFixed(2)}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between py-2 border-b">
-                  <span className="text-sm text-muted-foreground">Taxa de Comodidade</span>
-                  <span className="font-medium text-foreground">
-                    R$ {taxaComodidade.toFixed(2)}
-                  </span>
-                </div>
-                {cupomAplicado && (
-                  <div className="flex items-center justify-between py-2 border-b">
-                    <span className="text-sm text-primary">Desconto</span>
-                    <span className="font-medium text-primary">
-                      - R$ {valorDesconto.toFixed(2)}
+                {cupomAplicado && valorDesconto > 0 && (
+                  <div className="flex items-center justify-between gap-2 py-2 border-b flex-wrap">
+                    <span className="text-sm text-green-600 dark:text-green-400">Desconto</span>
+                    <span className="font-medium text-green-600 dark:text-green-400">
+                      - R$ {valorDesconto.toFixed(2).replace('.', ',')}
                     </span>
                   </div>
                 )}
-                <div className="flex items-center justify-between pt-2">
-                  <span className="text-lg font-semibold text-foreground">Total</span>
+                <Separator />
+                <div className="flex items-center justify-between gap-2 pt-2 flex-wrap">
+                  <span className="text-lg font-semibold text-foreground">Total a Pagar</span>
                   <span className="text-2xl font-bold text-primary">
-                    R$ {valorFinal.toFixed(2)}
+                    R$ {valorFinal.toFixed(2).replace('.', ',')}
                   </span>
                 </div>
               </div>
@@ -223,10 +388,10 @@ export default function InscricaoPagamentoPage() {
             <CardContent>
               <div className="space-y-3">
                 <Badge variant="secondary" className="text-sm">
-                  Pagamento via PIX ou Cartão de Crédito
+                  Pagamento via PIX ou Cartao de Credito
                 </Badge>
                 <p className="text-sm text-muted-foreground">
-                  Você será redirecionado para finalizar o pagamento de forma segura.
+                  Voce sera redirecionado para finalizar o pagamento de forma segura.
                 </p>
               </div>
             </CardContent>
@@ -243,7 +408,14 @@ export default function InscricaoPagamentoPage() {
             className="w-full font-semibold"
             data-testid="button-finalizar-pagamento"
           >
-            {processandoPagamento ? "Processando..." : `Finalizar Pagamento - R$ ${valorFinal.toFixed(2)}`}
+            {processandoPagamento ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Processando...
+              </>
+            ) : (
+              `Finalizar Pagamento - R$ ${valorFinal.toFixed(2).replace('.', ',')}`
+            )}
           </Button>
         </div>
       </div>
