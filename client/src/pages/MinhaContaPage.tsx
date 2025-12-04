@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import Header from "@/components/Header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,7 +13,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { FileText, Users, Edit, ChevronDown, ChevronUp } from "lucide-react";
+import { FileText, Users, Edit, Loader2 } from "lucide-react";
+import { useAthleteAuth } from "@/contexts/AthleteAuthContext";
 
 const estadosBrasil = [
   "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG",
@@ -29,34 +30,104 @@ const escolaridades = [
   "Doutorado"
 ];
 
-//todo: remove mock functionality
-const mockUserData = {
-  cpf: "123.456.789-00",
-  nome: "João Silva",
-  dataNascimento: "1990-05-15",
-  sexo: "masculino",
-  email: "joao.silva@email.com",
-  telefone: "(11) 98765-4321",
-  estado: "SP",
-  cidade: "São Paulo",
-  escolaridade: "Ensino Superior",
-  profissao: "Engenheiro"
-};
+interface FormData {
+  cpf: string;
+  nome: string;
+  dataNascimento: string;
+  sexo: string;
+  email: string;
+  telefone: string;
+  estado: string;
+  cidade: string;
+  escolaridade: string;
+  profissao: string;
+}
 
 export default function MinhaContaPage() {
   const [, setLocation] = useLocation();
-  const [formData, setFormData] = useState(mockUserData);
+  const { athlete, isLoading, updateAthlete } = useAthleteAuth();
+  const [formData, setFormData] = useState<FormData>({
+    cpf: "",
+    nome: "",
+    dataNascimento: "",
+    sexo: "",
+    email: "",
+    telefone: "",
+    estado: "",
+    cidade: "",
+    escolaridade: "",
+    profissao: ""
+  });
+  const [originalData, setOriginalData] = useState<FormData | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  useEffect(() => {
+    if (athlete) {
+      const athleteData: FormData = {
+        cpf: athlete.cpf || "",
+        nome: athlete.nome || "",
+        dataNascimento: athlete.dataNascimento?.split("T")[0] || "",
+        sexo: athlete.sexo || "",
+        email: athlete.email || "",
+        telefone: athlete.telefone || "",
+        estado: athlete.estado || "",
+        cidade: athlete.cidade || "",
+        escolaridade: athlete.escolaridade || "",
+        profissao: athlete.profissao || ""
+      };
+      setFormData(athleteData);
+      setOriginalData(athleteData);
+    }
+  }, [athlete]);
+
+  useEffect(() => {
+    if (!isLoading && !athlete) {
+      setLocation("/login");
+    }
+  }, [isLoading, athlete, setLocation]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Dados atualizados:', formData);
-    toast({
-      title: "Dados atualizados!",
-      description: "Suas informações foram salvas com sucesso.",
-    });
-    setIsEditing(false);
+    setIsSaving(true);
+    
+    try {
+      const result = await updateAthlete({
+        nome: formData.nome,
+        email: formData.email,
+        telefone: formData.telefone,
+        estado: formData.estado,
+        cidade: formData.cidade,
+        escolaridade: formData.escolaridade || undefined,
+        profissao: formData.profissao || undefined,
+        dataNascimento: formData.dataNascimento,
+        sexo: formData.sexo
+      });
+      
+      if (result.success) {
+        toast({
+          title: "Dados atualizados!",
+          description: "Suas informações foram salvas com sucesso.",
+        });
+        setIsEditing(false);
+        setOriginalData(formData);
+      } else {
+        toast({
+          title: "Erro ao atualizar",
+          description: result.error || "Não foi possível salvar suas informações.",
+          variant: "destructive"
+        });
+      }
+    } catch {
+      toast({
+        title: "Erro ao atualizar",
+        description: "Não foi possível salvar suas informações.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleChange = (field: string, value: string) => {
@@ -64,9 +135,26 @@ export default function MinhaContaPage() {
   };
 
   const handleCancel = () => {
-    setFormData(mockUserData);
+    if (originalData) {
+      setFormData(originalData);
+    }
     setIsEditing(false);
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!athlete) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -82,7 +170,6 @@ export default function MinhaContaPage() {
           </p>
         </div>
 
-        {/* Botões de navegação */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
           <Button
             variant="outline"
@@ -141,7 +228,6 @@ export default function MinhaContaPage() {
           </CardHeader>
           <CardContent>
             {!isEditing ? (
-              // Resumo dos dados
               <div className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
@@ -183,13 +269,12 @@ export default function MinhaContaPage() {
                   <div>
                     <Label className="text-muted-foreground text-sm">Profissão</Label>
                     <p className="text-foreground font-medium" data-testid="text-profissao">
-                      {formData.profissao}
+                      {formData.profissao || "-"}
                     </p>
                   </div>
                 </div>
               </div>
             ) : (
-              // Formulário de edição
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold text-foreground border-b pb-2">
@@ -336,7 +421,7 @@ export default function MinhaContaPage() {
                       onValueChange={(value) => handleChange("escolaridade", value)}
                     >
                       <SelectTrigger id="escolaridade" data-testid="select-escolaridade">
-                        <SelectValue />
+                        <SelectValue placeholder="Selecione..." />
                       </SelectTrigger>
                       <SelectContent>
                         {escolaridades.map((esc) => (
@@ -355,7 +440,6 @@ export default function MinhaContaPage() {
                       type="text"
                       value={formData.profissao}
                       onChange={(e) => handleChange("profissao", e.target.value)}
-                      required
                       data-testid="input-profissao"
                     />
                   </div>
@@ -365,14 +449,23 @@ export default function MinhaContaPage() {
                   <Button
                     type="submit"
                     className="flex-1"
+                    disabled={isSaving}
                     data-testid="button-save"
                   >
-                    Salvar Alterações
+                    {isSaving ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Salvando...
+                      </>
+                    ) : (
+                      "Salvar Alterações"
+                    )}
                   </Button>
                   <Button
                     type="button"
                     variant="outline"
                     onClick={handleCancel}
+                    disabled={isSaving}
                     data-testid="button-cancel"
                   >
                     Cancelar

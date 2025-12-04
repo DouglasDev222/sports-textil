@@ -1,5 +1,6 @@
-import { useState } from "react";
-import { Link } from "wouter";
+import { useState, useEffect } from "react";
+import { Link, useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import Header from "@/components/Header";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -15,24 +16,39 @@ import {
   Package,
   CheckCircle2,
   Clock,
-  Shirt
+  Shirt,
+  Loader2,
+  XCircle
 } from "lucide-react";
-import cityImage from '@assets/generated_images/City_marathon_aerial_view_94ce50b6.png';
-import trailImage from '@assets/generated_images/Trail_running_mountain_event_08f65871.png';
-import beachImage from '@assets/generated_images/Beach_running_race_event_8d36858c.png';
+import { useAthleteAuth } from "@/contexts/AthleteAuthContext";
+
+interface Modalidade {
+  id: string;
+  nome: string;
+  distancia: string;
+  unidadeDistancia: string;
+}
 
 interface Inscricao {
   id: string;
   numeroInscricao: number;
   participanteNome: string;
-  eventoNome: string;
-  eventoSlug: string;
-  eventoData: string;
-  eventoLocal: string;
-  eventoImagem: string;
-  modalidade: string;
-  tamanhoCamisa: string;
   status: string;
+  tamanhoCamisa: string | null;
+  equipe: string | null;
+  valorUnitario: number;
+  taxaComodidade: number;
+  modalidade: Modalidade | null;
+}
+
+interface Evento {
+  id: string;
+  nome: string;
+  slug: string;
+  dataEvento: string;
+  cidade: string;
+  estado: string;
+  bannerUrl: string | null;
 }
 
 interface Pedido {
@@ -40,118 +56,15 @@ interface Pedido {
   numeroPedido: number;
   dataPedido: string;
   status: string;
-  valorTotal: string;
+  valorTotal: number;
+  valorDesconto: number;
+  metodoPagamento: string | null;
+  evento: Evento | null;
   inscricoes: Inscricao[];
 }
 
-const mockPedidos: Pedido[] = [
-  {
-    id: "p1",
-    numeroPedido: 98765,
-    dataPedido: "2025-03-15",
-    status: "confirmado",
-    valorTotal: "350.00",
-    inscricoes: [
-      {
-        id: "1",
-        numeroInscricao: 12345,
-        participanteNome: "João Silva",
-        eventoNome: "Maratona de São Paulo 2025",
-        eventoSlug: "maratona-sao-paulo-2025",
-        eventoData: "2025-05-15",
-        eventoLocal: "Parque Ibirapuera, São Paulo - SP",
-        eventoImagem: cityImage,
-        modalidade: "21km",
-        tamanhoCamisa: "M",
-        status: "confirmada",
-      },
-      {
-        id: "5",
-        numeroInscricao: 12346,
-        participanteNome: "Maria Silva",
-        eventoNome: "Maratona de São Paulo 2025",
-        eventoSlug: "maratona-sao-paulo-2025",
-        eventoData: "2025-05-15",
-        eventoLocal: "Parque Ibirapuera, São Paulo - SP",
-        eventoImagem: cityImage,
-        modalidade: "10km",
-        tamanhoCamisa: "P",
-        status: "confirmada",
-      },
-    ],
-  },
-  {
-    id: "p2",
-    numeroPedido: 98766,
-    dataPedido: "2025-03-20",
-    status: "confirmado",
-    valorTotal: "180.00",
-    inscricoes: [
-      {
-        id: "2",
-        numeroInscricao: 12347,
-        participanteNome: "João Silva",
-        eventoNome: "Corrida Trail Serra do Mar",
-        eventoSlug: "trail-serra-mar-2025",
-        eventoData: "2025-06-20",
-        eventoLocal: "Parque Estadual da Serra do Mar, Cunha - SP",
-        eventoImagem: trailImage,
-        modalidade: "15km",
-        tamanhoCamisa: "M",
-        status: "confirmada",
-      },
-    ],
-  },
-  {
-    id: "p3",
-    numeroPedido: 98767,
-    dataPedido: "2025-04-01",
-    status: "pendente",
-    valorTotal: "120.00",
-    inscricoes: [
-      {
-        id: "3",
-        numeroInscricao: 12348,
-        participanteNome: "João Silva",
-        eventoNome: "Corrida de Praia Florianópolis",
-        eventoSlug: "corrida-praia-floripa-2025",
-        eventoData: "2025-08-05",
-        eventoLocal: "Praia da Joaquina, Florianópolis - SC",
-        eventoImagem: beachImage,
-        modalidade: "10km",
-        tamanhoCamisa: "M",
-        status: "pendente",
-      },
-    ],
-  },
-];
-
-const mockPedidosConcluidos: Pedido[] = [
-  {
-    id: "p4",
-    numeroPedido: 85432,
-    dataPedido: "2024-10-15",
-    status: "concluido",
-    valorTotal: "200.00",
-    inscricoes: [
-      {
-        id: "4",
-        numeroInscricao: 11234,
-        participanteNome: "João Silva",
-        eventoNome: "Meia Maratona do Rio 2024",
-        eventoSlug: "meia-maratona-rio-2024",
-        eventoData: "2024-11-10",
-        eventoLocal: "Copacabana, Rio de Janeiro - RJ",
-        eventoImagem: cityImage,
-        modalidade: "21km",
-        tamanhoCamisa: "M",
-        status: "concluida",
-      },
-    ],
-  },
-];
-
 function formatDate(dateString: string) {
+  if (!dateString) return '';
   const dateOnly = dateString.split('T')[0];
   const [year, month, day] = dateOnly.split('-').map(Number);
   
@@ -167,27 +80,33 @@ function formatDate(dateString: string) {
 
 function getStatusConfig(status: string) {
   const configs: Record<string, { variant: "default" | "secondary" | "destructive" | "outline"; label: string; icon: typeof CheckCircle2 }> = {
+    pago: { variant: "default", label: "Pago", icon: CheckCircle2 },
     confirmado: { variant: "default", label: "Confirmado", icon: CheckCircle2 },
     confirmada: { variant: "default", label: "Confirmada", icon: CheckCircle2 },
     pendente: { variant: "secondary", label: "Pendente", icon: Clock },
+    cancelado: { variant: "destructive", label: "Cancelado", icon: XCircle },
+    cancelada: { variant: "destructive", label: "Cancelada", icon: XCircle },
     concluido: { variant: "outline", label: "Concluído", icon: CheckCircle2 },
     concluida: { variant: "outline", label: "Concluída", icon: CheckCircle2 },
+    expirado: { variant: "destructive", label: "Expirado", icon: XCircle },
   };
   return configs[status] || { variant: "secondary" as const, label: status, icon: Clock };
 }
 
-function InscricaoItem({ inscricao }: { inscricao: Inscricao }) {
+function InscricaoItem({ inscricao, evento }: { inscricao: Inscricao; evento: Evento | null }) {
   const statusConfig = getStatusConfig(inscricao.status);
   
   return (
     <div className="flex flex-col md:flex-row gap-4 p-4 bg-muted/30 rounded-md" data-testid={`inscricao-item-${inscricao.id}`}>
-      <div className="w-full md:w-24 h-20 md:h-16 rounded-md overflow-hidden flex-shrink-0">
-        <img
-          src={inscricao.eventoImagem}
-          alt={inscricao.eventoNome}
-          className="w-full h-full object-cover"
-        />
-      </div>
+      {evento?.bannerUrl && (
+        <div className="w-full md:w-24 h-20 md:h-16 rounded-md overflow-hidden flex-shrink-0">
+          <img
+            src={evento.bannerUrl}
+            alt={evento.nome}
+            className="w-full h-full object-cover"
+          />
+        </div>
+      )}
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-2 flex-wrap mb-2">
           <div>
@@ -195,7 +114,7 @@ function InscricaoItem({ inscricao }: { inscricao: Inscricao }) {
               Inscrição #{inscricao.numeroInscricao}
             </p>
             <h4 className="font-semibold text-foreground text-sm">
-              {inscricao.eventoNome}
+              {evento?.nome || "Evento"}
             </h4>
           </div>
           <Badge variant={statusConfig.variant} className="text-xs">
@@ -209,16 +128,18 @@ function InscricaoItem({ inscricao }: { inscricao: Inscricao }) {
           </div>
           <div className="flex items-center gap-1">
             <Award className="h-3 w-3" />
-            <span>{inscricao.modalidade}</span>
+            <span>{inscricao.modalidade?.nome || "-"}</span>
           </div>
           <div className="flex items-center gap-1">
             <Calendar className="h-3 w-3" />
-            <span>{formatDate(inscricao.eventoData)}</span>
+            <span>{evento?.dataEvento ? formatDate(evento.dataEvento) : "-"}</span>
           </div>
-          <div className="flex items-center gap-1">
-            <Shirt className="h-3 w-3" />
-            <span>Camisa {inscricao.tamanhoCamisa}</span>
-          </div>
+          {inscricao.tamanhoCamisa && (
+            <div className="flex items-center gap-1">
+              <Shirt className="h-3 w-3" />
+              <span>Camisa {inscricao.tamanhoCamisa}</span>
+            </div>
+          )}
         </div>
       </div>
       <div className="flex items-center">
@@ -256,14 +177,14 @@ function PedidoCard({ pedido }: { pedido: Pedido }) {
                 </Badge>
               </div>
               <p className="text-sm text-muted-foreground">
-                {formatDate(pedido.dataPedido)} • {qtdInscricoes} {qtdInscricoes === 1 ? 'inscrição' : 'inscrições'}
+                {formatDate(pedido.dataPedido)} {qtdInscricoes} {qtdInscricoes === 1 ? 'inscrição' : 'inscrições'}
               </p>
             </div>
           </div>
           <div className="text-right">
             <p className="text-xs text-muted-foreground">Valor total</p>
             <p className="font-bold text-lg text-foreground">
-              R$ {parseFloat(pedido.valorTotal).toFixed(2)}
+              R$ {pedido.valorTotal.toFixed(2)}
             </p>
           </div>
         </div>
@@ -271,7 +192,7 @@ function PedidoCard({ pedido }: { pedido: Pedido }) {
       <CardContent className="pt-4 space-y-3">
         {pedido.inscricoes.map((inscricao, index) => (
           <div key={inscricao.id}>
-            <InscricaoItem inscricao={inscricao} />
+            <InscricaoItem inscricao={inscricao} evento={pedido.evento} />
             {index < pedido.inscricoes.length - 1 && (
               <Separator className="my-3" />
             )}
@@ -284,9 +205,53 @@ function PedidoCard({ pedido }: { pedido: Pedido }) {
 
 export default function MinhasInscricoesPage() {
   const [activeTab, setActiveTab] = useState("proximas");
+  const [, setLocation] = useLocation();
+  const { athlete, isLoading: isAuthLoading } = useAthleteAuth();
 
-  const totalInscricoesProximas = mockPedidos.reduce((acc, p) => acc + p.inscricoes.length, 0);
-  const totalInscricoesConcluidas = mockPedidosConcluidos.reduce((acc, p) => acc + p.inscricoes.length, 0);
+  const { data: ordersData, isLoading: isOrdersLoading } = useQuery<{ success: boolean; data: Pedido[] }>({
+    queryKey: ['/api/registrations/my-orders'],
+    enabled: !!athlete
+  });
+
+  useEffect(() => {
+    if (!isAuthLoading && !athlete) {
+      setLocation("/login");
+    }
+  }, [isAuthLoading, athlete, setLocation]);
+
+  const isLoading = isAuthLoading || isOrdersLoading;
+  const pedidos = ordersData?.data || [];
+  
+  const now = new Date();
+  const pedidosProximos = pedidos.filter(p => {
+    if (!p.evento?.dataEvento) return true;
+    const eventDate = new Date(p.evento.dataEvento);
+    return eventDate >= now;
+  });
+  
+  const pedidosConcluidos = pedidos.filter(p => {
+    if (!p.evento?.dataEvento) return false;
+    const eventDate = new Date(p.evento.dataEvento);
+    return eventDate < now;
+  });
+
+  const totalInscricoesProximas = pedidosProximos.reduce((acc, p) => acc + p.inscricoes.length, 0);
+  const totalInscricoesConcluidas = pedidosConcluidos.reduce((acc, p) => acc + p.inscricoes.length, 0);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!athlete) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -313,10 +278,10 @@ export default function MinhasInscricoesPage() {
           </TabsList>
 
           <TabsContent value="proximas" className="space-y-6">
-            {mockPedidos.map((pedido) => (
+            {pedidosProximos.map((pedido) => (
               <PedidoCard key={pedido.id} pedido={pedido} />
             ))}
-            {mockPedidos.length === 0 && (
+            {pedidosProximos.length === 0 && (
               <div className="text-center py-12">
                 <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                 <p className="text-muted-foreground">
@@ -332,10 +297,10 @@ export default function MinhasInscricoesPage() {
           </TabsContent>
 
           <TabsContent value="concluidas" className="space-y-6">
-            {mockPedidosConcluidos.map((pedido) => (
+            {pedidosConcluidos.map((pedido) => (
               <PedidoCard key={pedido.id} pedido={pedido} />
             ))}
-            {mockPedidosConcluidos.length === 0 && (
+            {pedidosConcluidos.length === 0 && (
               <div className="text-center py-12">
                 <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                 <p className="text-muted-foreground">

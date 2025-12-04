@@ -149,11 +149,76 @@ router.get("/me", async (req, res) => {
         cidade: athlete.cidade,
         estado: athlete.estado,
         dataNascimento: athlete.dataNascimento,
-        sexo: athlete.sexo
+        sexo: athlete.sexo,
+        escolaridade: athlete.escolaridade,
+        profissao: athlete.profissao
       }
     });
   } catch (error) {
     console.error("Erro ao buscar dados do atleta:", error);
+    res.status(500).json({ success: false, error: "Erro interno do servidor" });
+  }
+});
+
+router.put("/me", async (req, res) => {
+  try {
+    const athleteId = (req.session as any)?.athleteId;
+    
+    if (!athleteId) {
+      return res.status(401).json({ 
+        success: false, 
+        error: "Nao autenticado" 
+      });
+    }
+
+    const updateSchema = z.object({
+      nome: z.string().min(2).optional(),
+      email: z.string().email().optional(),
+      telefone: z.string().min(10).optional(),
+      estado: z.string().length(2).optional(),
+      cidade: z.string().min(2).optional(),
+      escolaridade: z.string().optional(),
+      profissao: z.string().optional(),
+      dataNascimento: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data deve estar no formato YYYY-MM-DD").optional(),
+      sexo: z.string().optional()
+    });
+
+    const parsed = updateSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "Dados invalidos",
+        details: parsed.error.flatten() 
+      });
+    }
+
+    const updatedAthlete = await storage.updateAthlete(athleteId, parsed.data);
+    
+    if (!updatedAthlete) {
+      return res.status(404).json({ 
+        success: false, 
+        error: "Atleta nao encontrado" 
+      });
+    }
+
+    res.json({ 
+      success: true, 
+      data: {
+        id: updatedAthlete.id,
+        nome: updatedAthlete.nome,
+        cpf: updatedAthlete.cpf,
+        email: updatedAthlete.email,
+        telefone: updatedAthlete.telefone,
+        cidade: updatedAthlete.cidade,
+        estado: updatedAthlete.estado,
+        dataNascimento: updatedAthlete.dataNascimento,
+        sexo: updatedAthlete.sexo,
+        escolaridade: updatedAthlete.escolaridade,
+        profissao: updatedAthlete.profissao
+      }
+    });
+  } catch (error) {
+    console.error("Erro ao atualizar dados do atleta:", error);
     res.status(500).json({ success: false, error: "Erro interno do servidor" });
   }
 });

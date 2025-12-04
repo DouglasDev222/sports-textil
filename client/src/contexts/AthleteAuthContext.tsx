@@ -11,6 +11,20 @@ interface Athlete {
   estado: string;
   dataNascimento: string;
   sexo: string;
+  escolaridade?: string | null;
+  profissao?: string | null;
+}
+
+interface UpdateAthleteData {
+  nome?: string;
+  email?: string;
+  telefone?: string;
+  estado?: string;
+  cidade?: string;
+  escolaridade?: string;
+  profissao?: string;
+  dataNascimento?: string;
+  sexo?: string;
 }
 
 interface AthleteAuthContextType {
@@ -18,6 +32,7 @@ interface AthleteAuthContextType {
   isLoading: boolean;
   login: (cpf: string, dataNascimento: string) => Promise<{ success: boolean; error?: string }>;
   register: (data: RegisterData) => Promise<{ success: boolean; error?: string }>;
+  updateAthlete: (data: UpdateAthleteData) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   refreshSession: () => Promise<void>;
 }
@@ -93,6 +108,21 @@ export function AthleteAuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const updateAthlete = async (updateData: UpdateAthleteData) => {
+    try {
+      const response = await apiRequest("PUT", "/api/athletes/me", updateData);
+      const data = await response.json();
+      
+      if (data.success) {
+        setAthlete(data.data);
+        return { success: true };
+      }
+      return { success: false, error: data.error || "Erro ao atualizar dados" };
+    } catch (error: any) {
+      return { success: false, error: error.message || "Erro ao atualizar dados" };
+    }
+  };
+
   const logout = async () => {
     try {
       await apiRequest("POST", "/api/athletes/logout", {});
@@ -102,7 +132,7 @@ export function AthleteAuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AthleteAuthContext.Provider value={{ athlete, isLoading, login, register, logout, refreshSession }}>
+    <AthleteAuthContext.Provider value={{ athlete, isLoading, login, register, updateAthlete, logout, refreshSession }}>
       {children}
     </AthleteAuthContext.Provider>
   );

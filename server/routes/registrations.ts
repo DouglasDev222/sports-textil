@@ -375,7 +375,8 @@ router.get("/my-registrations", async (req, res) => {
             slug: event.slug,
             dataEvento: event.dataEvento,
             cidade: event.cidade,
-            estado: event.estado
+            estado: event.estado,
+            bannerUrl: event.bannerUrl
           } : null,
           modalidade: modality ? {
             id: modality.id,
@@ -394,6 +395,73 @@ router.get("/my-registrations", async (req, res) => {
     res.json({ success: true, data: registrationsWithDetails });
   } catch (error) {
     console.error("Erro ao buscar inscricoes:", error);
+    res.status(500).json({ success: false, error: "Erro interno do servidor" });
+  }
+});
+
+router.get("/my-orders", async (req, res) => {
+  try {
+    const athleteId = (req.session as any)?.athleteId;
+    if (!athleteId) {
+      return res.status(401).json({ success: false, error: "Nao autenticado" });
+    }
+
+    const orders = await storage.getOrdersByBuyer(athleteId);
+    
+    const ordersWithDetails = await Promise.all(
+      orders.map(async (order) => {
+        const event = await storage.getEvent(order.eventId);
+        const registrations = await storage.getRegistrationsByOrder(order.id);
+        
+        const registrationsWithDetails = await Promise.all(
+          registrations.map(async (reg) => {
+            const modality = await storage.getModality(reg.modalityId);
+            const athlete = await storage.getAthlete(reg.athleteId);
+            
+            return {
+              id: reg.id,
+              numeroInscricao: reg.numeroInscricao,
+              status: reg.status,
+              tamanhoCamisa: reg.tamanhoCamisa,
+              equipe: reg.equipe,
+              participanteNome: athlete?.nome || "Participante",
+              valorUnitario: parseFloat(reg.valorUnitario),
+              taxaComodidade: parseFloat(reg.taxaComodidade),
+              modalidade: modality ? {
+                id: modality.id,
+                nome: modality.nome,
+                distancia: modality.distancia,
+                unidadeDistancia: modality.unidadeDistancia
+              } : null
+            };
+          })
+        );
+
+        return {
+          id: order.id,
+          numeroPedido: order.numeroPedido,
+          dataPedido: order.dataPedido,
+          status: order.status,
+          valorTotal: parseFloat(order.valorTotal),
+          valorDesconto: parseFloat(order.valorDesconto),
+          metodoPagamento: order.metodoPagamento,
+          evento: event ? {
+            id: event.id,
+            nome: event.nome,
+            slug: event.slug,
+            dataEvento: event.dataEvento,
+            cidade: event.cidade,
+            estado: event.estado,
+            bannerUrl: event.bannerUrl
+          } : null,
+          inscricoes: registrationsWithDetails
+        };
+      })
+    );
+
+    res.json({ success: true, data: ordersWithDetails });
+  } catch (error) {
+    console.error("Erro ao buscar pedidos:", error);
     res.status(500).json({ success: false, error: "Erro interno do servidor" });
   }
 });
