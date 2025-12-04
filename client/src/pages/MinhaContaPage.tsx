@@ -12,8 +12,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { FileText, Users, Edit, Loader2 } from "lucide-react";
+import { FileText, Users, Edit, Loader2, LogOut, Headphones, Mail, Phone } from "lucide-react";
 import { useAthleteAuth } from "@/contexts/AthleteAuthContext";
 
 const estadosBrasil = [
@@ -45,7 +52,7 @@ interface FormData {
 
 export default function MinhaContaPage() {
   const [, setLocation] = useLocation();
-  const { athlete, isLoading, updateAthlete } = useAthleteAuth();
+  const { athlete, isLoading, updateAthlete, logout } = useAthleteAuth();
   const [formData, setFormData] = useState<FormData>({
     cpf: "",
     nome: "",
@@ -61,7 +68,19 @@ export default function MinhaContaPage() {
   const [originalData, setOriginalData] = useState<FormData | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const { toast } = useToast();
+
+  const handleLogout = async () => {
+    setIsLoggingOut(true);
+    try {
+      await logout();
+      setLocation("/");
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
 
   useEffect(() => {
     if (athlete) {
@@ -197,6 +216,41 @@ export default function MinhaContaPage() {
               <div className="font-semibold">Participantes</div>
               <div className="text-xs text-muted-foreground">
                 Gerencie os participantes da sua conta
+              </div>
+            </div>
+          </Button>
+
+          <Button
+            variant="outline"
+            className="justify-start gap-2 h-auto py-4"
+            onClick={() => setIsSupportModalOpen(true)}
+            data-testid="button-suporte"
+          >
+            <Headphones className="w-5 h-5" />
+            <div className="text-left">
+              <div className="font-semibold">Suporte</div>
+              <div className="text-xs text-muted-foreground">
+                Entre em contato com nossa equipe
+              </div>
+            </div>
+          </Button>
+
+          <Button
+            variant="outline"
+            className="justify-start gap-2 h-auto py-4 text-destructive hover:text-destructive"
+            onClick={handleLogout}
+            disabled={isLoggingOut}
+            data-testid="button-sair"
+          >
+            {isLoggingOut ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              <LogOut className="w-5 h-5" />
+            )}
+            <div className="text-left">
+              <div className="font-semibold">Sair</div>
+              <div className="text-xs text-muted-foreground">
+                Encerrar sua sessão
               </div>
             </div>
           </Button>
@@ -476,6 +530,47 @@ export default function MinhaContaPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={isSupportModalOpen} onOpenChange={setIsSupportModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Headphones className="w-5 h-5" />
+              Suporte
+            </DialogTitle>
+            <DialogDescription>
+              Entre em contato com nossa equipe de suporte
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="flex items-center gap-3 p-4 bg-muted/50 rounded-md">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
+                <Mail className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">E-mail</p>
+                <p className="font-medium text-foreground" data-testid="text-suporte-email">
+                  suporte@steventos.com.br
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 p-4 bg-muted/50 rounded-md">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
+                <Phone className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Telefone</p>
+                <p className="font-medium text-foreground" data-testid="text-suporte-telefone">
+                  (11) 99999-9999
+                </p>
+              </div>
+            </div>
+            <p className="text-sm text-muted-foreground text-center pt-2">
+              Atendimento de segunda a sexta, das 9h às 18h
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
