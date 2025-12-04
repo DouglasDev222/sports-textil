@@ -46,6 +46,10 @@ interface FormData {
   telefone: string;
   estado: string;
   cidade: string;
+  cep: string;
+  rua: string;
+  numero: string;
+  complemento: string;
   escolaridade: string;
   profissao: string;
 }
@@ -62,6 +66,10 @@ export default function MinhaContaPage() {
     telefone: "",
     estado: "",
     cidade: "",
+    cep: "",
+    rua: "",
+    numero: "",
+    complemento: "",
     escolaridade: "",
     profissao: ""
   });
@@ -93,6 +101,10 @@ export default function MinhaContaPage() {
         telefone: athlete.telefone || "",
         estado: athlete.estado || "",
         cidade: athlete.cidade || "",
+        cep: athlete.cep || "",
+        rua: athlete.rua || "",
+        numero: athlete.numero || "",
+        complemento: athlete.complemento || "",
         escolaridade: athlete.escolaridade || "",
         profissao: athlete.profissao || ""
       };
@@ -118,6 +130,10 @@ export default function MinhaContaPage() {
         telefone: formData.telefone,
         estado: formData.estado,
         cidade: formData.cidade,
+        cep: formData.cep || undefined,
+        rua: formData.rua || undefined,
+        numero: formData.numero || undefined,
+        complemento: formData.complemento || undefined,
         escolaridade: formData.escolaridade || undefined,
         profissao: formData.profissao || undefined,
         dataNascimento: formData.dataNascimento,
@@ -280,15 +296,15 @@ export default function MinhaContaPage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Label className="text-muted-foreground text-sm">Cidade/Estado</Label>
-                    <p className="text-foreground font-medium" data-testid="text-localizacao">
-                      {formData.cidade} - {formData.estado}
-                    </p>
-                  </div>
-                  <div>
                     <Label className="text-muted-foreground text-sm">Profissão</Label>
                     <p className="text-foreground font-medium" data-testid="text-profissao">
                       {formData.profissao || "-"}
+                    </p>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground text-sm">Escolaridade</Label>
+                    <p className="text-foreground font-medium" data-testid="text-escolaridade">
+                      {formData.escolaridade || "-"}
                     </p>
                   </div>
                 </div>
@@ -396,6 +412,18 @@ export default function MinhaContaPage() {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
+                      <Label htmlFor="cep">CEP</Label>
+                      <Input
+                        id="cep"
+                        type="text"
+                        value={formData.cep}
+                        onChange={(e) => handleChange("cep", e.target.value)}
+                        placeholder="00000-000"
+                        data-testid="input-cep"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
                       <Label htmlFor="estado">Estado</Label>
                       <Select
                         value={formData.estado}
@@ -413,7 +441,9 @@ export default function MinhaContaPage() {
                         </SelectContent>
                       </Select>
                     </div>
+                  </div>
 
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="cidade">Cidade</Label>
                       <Input
@@ -423,6 +453,44 @@ export default function MinhaContaPage() {
                         onChange={(e) => handleChange("cidade", e.target.value)}
                         required
                         data-testid="input-cidade"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="rua">Rua</Label>
+                      <Input
+                        id="rua"
+                        type="text"
+                        value={formData.rua}
+                        onChange={(e) => handleChange("rua", e.target.value)}
+                        placeholder="Nome da rua"
+                        data-testid="input-rua"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="numero">Número</Label>
+                      <Input
+                        id="numero"
+                        type="text"
+                        value={formData.numero}
+                        onChange={(e) => handleChange("numero", e.target.value)}
+                        placeholder="Número"
+                        data-testid="input-numero"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="complemento">Complemento</Label>
+                      <Input
+                        id="complemento"
+                        type="text"
+                        value={formData.complemento}
+                        onChange={(e) => handleChange("complemento", e.target.value)}
+                        placeholder="Apto, Bloco, etc."
+                        data-testid="input-complemento"
                       />
                     </div>
                   </div>
@@ -494,6 +562,55 @@ export default function MinhaContaPage() {
             )}
           </CardContent>
         </Card>
+
+        {!isEditing && (
+          <Card className="mt-4">
+            <CardHeader>
+              <CardTitle>Endereço</CardTitle>
+              <CardDescription>Seu endereço de residência</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-muted-foreground text-sm">CEP</Label>
+                    <p className="text-foreground font-medium" data-testid="text-cep">
+                      {formData.cep || "-"}
+                    </p>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground text-sm">Cidade/Estado</Label>
+                    <p className="text-foreground font-medium" data-testid="text-localizacao">
+                      {formData.cidade} - {formData.estado}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-muted-foreground text-sm">Rua</Label>
+                    <p className="text-foreground font-medium" data-testid="text-rua">
+                      {formData.rua || "-"}
+                    </p>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground text-sm">Número</Label>
+                    <p className="text-foreground font-medium" data-testid="text-numero">
+                      {formData.numero || "-"}
+                    </p>
+                  </div>
+                </div>
+
+                <div>
+                  <Label className="text-muted-foreground text-sm">Complemento</Label>
+                  <p className="text-foreground font-medium" data-testid="text-complemento">
+                    {formData.complemento || "-"}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
           <Button
