@@ -219,41 +219,6 @@ export default function MinhaContaPage() {
               </div>
             </div>
           </Button>
-
-          <Button
-            variant="outline"
-            className="justify-start gap-2 h-auto py-4"
-            onClick={() => setIsSupportModalOpen(true)}
-            data-testid="button-suporte"
-          >
-            <Headphones className="w-5 h-5" />
-            <div className="text-left">
-              <div className="font-semibold">Suporte</div>
-              <div className="text-xs text-muted-foreground">
-                Entre em contato com nossa equipe
-              </div>
-            </div>
-          </Button>
-
-          <Button
-            variant="outline"
-            className="justify-start gap-2 h-auto py-4 text-destructive hover:text-destructive"
-            onClick={handleLogout}
-            disabled={isLoggingOut}
-            data-testid="button-sair"
-          >
-            {isLoggingOut ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
-            ) : (
-              <LogOut className="w-5 h-5" />
-            )}
-            <div className="text-left">
-              <div className="font-semibold">Sair</div>
-              <div className="text-xs text-muted-foreground">
-                Encerrar sua sessão
-              </div>
-            </div>
-          </Button>
         </div>
 
         <Card>
@@ -529,6 +494,43 @@ export default function MinhaContaPage() {
             )}
           </CardContent>
         </Card>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+          <Button
+            variant="outline"
+            className="justify-start gap-2 h-auto py-4"
+            onClick={() => setIsSupportModalOpen(true)}
+            data-testid="button-suporte"
+          >
+            <Headphones className="w-5 h-5" />
+            <div className="text-left">
+              <div className="font-semibold">Suporte</div>
+              <div className="text-xs text-muted-foreground">
+                Entre em contato com nossa equipe
+              </div>
+            </div>
+          </Button>
+
+          <Button
+            variant="outline"
+            className="justify-start gap-2 h-auto py-4 text-destructive hover:text-destructive"
+            onClick={handleLogout}
+            disabled={isLoggingOut}
+            data-testid="button-sair"
+          >
+            {isLoggingOut ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              <LogOut className="w-5 h-5" />
+            )}
+            <div className="text-left">
+              <div className="font-semibold">Sair</div>
+              <div className="text-xs text-muted-foreground">
+                Encerrar sua sessão
+              </div>
+            </div>
+          </Button>
+        </div>
       </div>
 
       <Dialog open={isSupportModalOpen} onOpenChange={setIsSupportModalOpen}>
