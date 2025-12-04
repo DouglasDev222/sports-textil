@@ -9,6 +9,10 @@ interface Athlete {
   telefone: string;
   cidade: string;
   estado: string;
+  cep?: string | null;
+  rua?: string | null;
+  numero?: string | null;
+  complemento?: string | null;
   dataNascimento: string;
   sexo: string;
   escolaridade?: string | null;
@@ -21,6 +25,10 @@ interface UpdateAthleteData {
   telefone?: string;
   estado?: string;
   cidade?: string;
+  cep?: string;
+  rua?: string;
+  numero?: string;
+  complemento?: string;
   escolaridade?: string;
   profissao?: string;
   dataNascimento?: string;
