@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, date, integer, timestamp, boolean, decimal, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, date, integer, timestamp, boolean, decimal, pgEnum, unique } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -60,6 +60,7 @@ export const events = pgTable("events", {
   aberturaInscricoes: timestamp("abertura_inscricoes", { withTimezone: true }).notNull(),
   encerramentoInscricoes: timestamp("encerramento_inscricoes", { withTimezone: true }).notNull(),
   limiteVagasTotal: integer("limite_vagas_total").notNull(),
+  vagasOcupadas: integer("vagas_ocupadas").default(0).notNull(),
   status: eventStatusEnum("status").default("rascunho").notNull(),
   entregaCamisaNoKit: boolean("entrega_camisa_no_kit").default(true).notNull(),
   usarGradePorModalidade: boolean("usar_grade_por_modalidade").default(false).notNull(),
@@ -186,7 +187,9 @@ export const registrations = pgTable("registrations", {
   dataNascimento: date("data_nascimento"),
   sexo: varchar("sexo", { length: 20 }),
   dataInscricao: timestamp("data_inscricao", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (table) => [
+  unique("unique_event_athlete").on(table.eventId, table.athleteId)
+]);
 
 export const documentAcceptances = pgTable("document_acceptances", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
