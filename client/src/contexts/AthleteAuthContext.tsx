@@ -53,6 +53,10 @@ interface RegisterData {
   telefone: string;
   estado: string;
   cidade: string;
+  cep?: string;
+  rua?: string;
+  numero?: string;
+  complemento?: string;
   escolaridade?: string;
   profissao?: string;
 }

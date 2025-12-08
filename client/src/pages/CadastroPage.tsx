@@ -38,6 +38,10 @@ export default function CadastroPage() {
   const [telefone, setTelefone] = useState("");
   const [estado, setEstado] = useState("");
   const [cidade, setCidade] = useState("");
+  const [cep, setCep] = useState("");
+  const [rua, setRua] = useState("");
+  const [numero, setNumero] = useState("");
+  const [complemento, setComplemento] = useState("");
   const [escolaridade, setEscolaridade] = useState("");
   const [profissao, setProfissao] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -106,6 +110,18 @@ export default function CadastroPage() {
     setTelefone(formatTelefone(e.target.value));
   };
 
+  const formatCEP = (value: string) => {
+    const numbers = value.replace(/\D/g, '');
+    if (numbers.length <= 8) {
+      return numbers.replace(/(\d{5})(\d)/, '$1-$2');
+    }
+    return cep;
+  };
+
+  const handleCEPChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setCep(formatCEP(e.target.value));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -139,6 +155,10 @@ export default function CadastroPage() {
         telefone: telefone.replace(/\D/g, ''),
         estado,
         cidade,
+        cep: cep.replace(/\D/g, '') || undefined,
+        rua: rua || undefined,
+        numero: numero || undefined,
+        complemento: complemento || undefined,
         escolaridade: escolaridade || undefined,
         profissao: profissao || undefined,
       });
@@ -296,6 +316,19 @@ export default function CadastroPage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
+                    <Label htmlFor="cep">CEP</Label>
+                    <Input
+                      id="cep"
+                      type="text"
+                      placeholder="00000-000"
+                      value={cep}
+                      onChange={handleCEPChange}
+                      maxLength={9}
+                      data-testid="input-cep"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
                     <Label htmlFor="estado">
                       Estado <span className="text-accent">*</span>
                     </Label>
@@ -312,19 +345,57 @@ export default function CadastroPage() {
                       </SelectContent>
                     </Select>
                   </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="cidade">
+                    Cidade <span className="text-accent">*</span>
+                  </Label>
+                  <Input
+                    id="cidade"
+                    type="text"
+                    placeholder="Sua cidade"
+                    value={cidade}
+                    onChange={(e) => setCidade(e.target.value)}
+                    required
+                    data-testid="input-cidade"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="rua">Rua/Logradouro</Label>
+                  <Input
+                    id="rua"
+                    type="text"
+                    placeholder="Nome da rua"
+                    value={rua}
+                    onChange={(e) => setRua(e.target.value)}
+                    data-testid="input-rua"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="numero">Número</Label>
+                    <Input
+                      id="numero"
+                      type="text"
+                      placeholder="123"
+                      value={numero}
+                      onChange={(e) => setNumero(e.target.value)}
+                      data-testid="input-numero"
+                    />
+                  </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="cidade">
-                      Cidade <span className="text-accent">*</span>
-                    </Label>
+                    <Label htmlFor="complemento">Complemento</Label>
                     <Input
-                      id="cidade"
+                      id="complemento"
                       type="text"
-                      placeholder="Sua cidade"
-                      value={cidade}
-                      onChange={(e) => setCidade(e.target.value)}
-                      required
-                      data-testid="input-cidade"
+                      placeholder="Apto, Bloco, etc."
+                      value={complemento}
+                      onChange={(e) => setComplemento(e.target.value)}
+                      data-testid="input-complemento"
                     />
                   </div>
                 </div>
