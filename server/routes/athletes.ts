@@ -86,11 +86,19 @@ router.post("/register", async (req, res) => {
       });
     }
 
-    const existingAthlete = await storage.getAthleteByCpf(parsed.data.cpf);
-    if (existingAthlete) {
+    const existingAthleteByCpf = await storage.getAthleteByCpf(parsed.data.cpf);
+    if (existingAthleteByCpf) {
       return res.status(409).json({ 
         success: false, 
         error: "CPF ja cadastrado. Faca login com suas credenciais." 
+      });
+    }
+
+    const existingAthleteByEmail = await storage.getAthleteByEmail(parsed.data.email);
+    if (existingAthleteByEmail) {
+      return res.status(409).json({ 
+        success: false, 
+        error: "E-mail ja cadastrado. Use outro e-mail ou faca login." 
       });
     }
 

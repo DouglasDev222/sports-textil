@@ -89,6 +89,7 @@ export interface IStorage {
 
   getAthlete(id: string): Promise<Athlete | undefined>;
   getAthleteByCpf(cpf: string): Promise<Athlete | undefined>;
+  getAthleteByEmail(email: string): Promise<Athlete | undefined>;
   createAthlete(athlete: InsertAthlete): Promise<Athlete>;
   updateAthlete(id: string, athlete: Partial<InsertAthlete>): Promise<Athlete | undefined>;
 
@@ -454,6 +455,11 @@ export class DbStorage implements IStorage {
 
   async getAthleteByCpf(cpf: string): Promise<Athlete | undefined> {
     const [athlete] = await db.select().from(athletes).where(eq(athletes.cpf, cpf));
+    return athlete;
+  }
+
+  async getAthleteByEmail(email: string): Promise<Athlete | undefined> {
+    const [athlete] = await db.select().from(athletes).where(eq(athletes.email, email.toLowerCase()));
     return athlete;
   }
 
