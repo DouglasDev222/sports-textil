@@ -370,6 +370,8 @@ router.get("/my-registrations", async (req, res) => {
         const modality = await storage.getModality(reg.modalityId);
         const order = await storage.getOrder(reg.orderId);
         
+        const athlete = await storage.getAthlete(reg.athleteId);
+        
         return {
           id: reg.id,
           numeroInscricao: reg.numeroInscricao,
@@ -378,6 +380,12 @@ router.get("/my-registrations", async (req, res) => {
           equipe: reg.equipe,
           dataInscricao: reg.dataInscricao,
           valorPago: parseFloat(reg.valorUnitario) + parseFloat(reg.taxaComodidade),
+          participanteNome: reg.nomeCompleto || athlete?.nome || "Participante",
+          participanteCpf: reg.cpf || athlete?.cpf || null,
+          participanteDataNascimento: reg.dataNascimento || athlete?.dataNascimento || null,
+          participanteSexo: reg.sexo || athlete?.sexo || null,
+          participanteTelefone: athlete?.telefone || null,
+          participanteEmail: athlete?.email || null,
           evento: event ? {
             id: event.id,
             nome: event.nome,
@@ -433,7 +441,10 @@ router.get("/my-orders", async (req, res) => {
               status: reg.status,
               tamanhoCamisa: reg.tamanhoCamisa,
               equipe: reg.equipe,
-              participanteNome: athlete?.nome || "Participante",
+              participanteNome: reg.nomeCompleto || athlete?.nome || "Participante",
+              participanteCpf: reg.cpf || athlete?.cpf || null,
+              participanteDataNascimento: reg.dataNascimento || athlete?.dataNascimento || null,
+              participanteSexo: reg.sexo || athlete?.sexo || null,
               valorUnitario: parseFloat(reg.valorUnitario),
               taxaComodidade: parseFloat(reg.taxaComodidade),
               modalidade: modality ? {

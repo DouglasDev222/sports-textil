@@ -191,6 +191,32 @@ export function getStatusLabel(status: 'upcoming' | 'open' | 'closed'): string {
   }
 }
 
+export function formatCPF(cpf: string | null | undefined): string {
+  if (!cpf) return '';
+  
+  const digits = cpf.replace(/\D/g, '');
+  
+  if (digits.length !== 11) return cpf;
+  
+  return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9, 11)}`;
+}
+
+export function formatPhone(phone: string | null | undefined): string {
+  if (!phone) return '';
+  
+  const digits = phone.replace(/\D/g, '');
+  
+  if (digits.length === 11) {
+    return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7, 11)}`;
+  }
+  
+  if (digits.length === 10) {
+    return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6, 10)}`;
+  }
+  
+  return phone;
+}
+
 export function formatRelativeDate(dateString: string | Date | null | undefined): string {
   if (!dateString) return '';
   

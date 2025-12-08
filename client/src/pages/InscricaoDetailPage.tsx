@@ -22,7 +22,7 @@ import {
   PartyPopper
 } from "lucide-react";
 import heroImage from '@assets/generated_images/Marathon_runners_landscape_hero_b439e181.png';
-import { formatDateOnlyLong, formatDateOnlyBrazil } from "@/lib/timezone";
+import { formatDateOnlyLong, formatDateOnlyBrazil, formatCPF, formatPhone } from "@/lib/timezone";
 import { useAthleteAuth } from "@/contexts/AthleteAuthContext";
 import { useEffect } from "react";
 
@@ -34,6 +34,12 @@ interface RegistrationDetail {
   equipe: string | null;
   dataInscricao: string;
   valorPago: number;
+  participanteNome: string;
+  participanteCpf: string | null;
+  participanteDataNascimento: string | null;
+  participanteSexo: string | null;
+  participanteTelefone: string | null;
+  participanteEmail: string | null;
   evento: {
     id: string;
     nome: string;
@@ -292,28 +298,28 @@ export default function InscricaoDetailPage() {
               <CardContent className="space-y-4">
                 <div>
                   <p className="text-sm text-muted-foreground mb-1">Nome</p>
-                  <p className="font-semibold text-foreground">{athlete.nome}</p>
+                  <p className="font-semibold text-foreground">{registration.participanteNome}</p>
                 </div>
                 <Separator />
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm text-muted-foreground mb-1">CPF</p>
-                    <p className="text-sm text-foreground">{athlete.cpf}</p>
+                    <p className="text-sm text-foreground">{formatCPF(registration.participanteCpf)}</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground mb-1">Data de Nascimento</p>
-                    <p className="text-sm text-foreground">{formatDateOnlyBrazil(athlete.dataNascimento)}</p>
+                    <p className="text-sm text-foreground">{formatDateOnlyBrazil(registration.participanteDataNascimento)}</p>
                   </div>
                 </div>
                 <Separator />
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm text-muted-foreground mb-1">E-mail</p>
-                    <p className="text-sm text-foreground">{athlete.email}</p>
+                    <p className="text-sm text-foreground">{registration.participanteEmail || athlete?.email}</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground mb-1">Telefone</p>
-                    <p className="text-sm text-foreground">{athlete.telefone}</p>
+                    <p className="text-sm text-foreground">{formatPhone(registration.participanteTelefone || athlete?.telefone)}</p>
                   </div>
                 </div>
               </CardContent>
