@@ -181,6 +181,10 @@ export const registrations = pgTable("registrations", {
   taxaComodidade: decimal("taxa_comodidade", { precision: 10, scale: 2 }).default("0").notNull(),
   status: registrationStatusEnum("status").default("pendente").notNull(),
   equipe: text("equipe"),
+  nomeCompleto: text("nome_completo"),
+  cpf: varchar("cpf", { length: 14 }),
+  dataNascimento: date("data_nascimento"),
+  sexo: varchar("sexo", { length: 20 }),
   dataInscricao: timestamp("data_inscricao", { withTimezone: true }).defaultNow().notNull(),
 });
 
