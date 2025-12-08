@@ -22,7 +22,7 @@ import {
   PartyPopper
 } from "lucide-react";
 import heroImage from '@assets/generated_images/Marathon_runners_landscape_hero_b439e181.png';
-import { formatDateOnlyLong } from "@/lib/timezone";
+import { formatDateOnlyLong, formatDateOnlyBrazil } from "@/lib/timezone";
 import { useAthleteAuth } from "@/contexts/AthleteAuthContext";
 import { useEffect } from "react";
 
@@ -153,11 +153,6 @@ export default function InscricaoDetailPage() {
 
   const currentStatus = statusConfig[registration.status as keyof typeof statusConfig] || statusConfig.pendente;
   const StatusIcon = currentStatus.icon;
-
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('pt-BR');
-  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -307,7 +302,7 @@ export default function InscricaoDetailPage() {
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground mb-1">Data de Nascimento</p>
-                    <p className="text-sm text-foreground">{formatDate(athlete.dataNascimento)}</p>
+                    <p className="text-sm text-foreground">{formatDateOnlyBrazil(athlete.dataNascimento)}</p>
                   </div>
                 </div>
                 <Separator />

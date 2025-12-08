@@ -11,6 +11,7 @@ import Header from "@/components/Header";
 import { useAthleteAuth } from "@/contexts/AthleteAuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { formatDateOnlyBrazil } from "@/lib/timezone";
 
 interface ModalityInfo {
   id: string;
@@ -196,11 +197,6 @@ export default function InscricaoResumoPage() {
     return cpf;
   };
 
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('pt-BR');
-  };
-
   const formatPrice = (value: number) => {
     if (value === 0) return "Gratuito";
     return `R$ ${value.toFixed(2).replace('.', ',')}`;
@@ -256,7 +252,7 @@ export default function InscricaoResumoPage() {
                 <p className="font-semibold text-foreground">{athlete.nome}</p>
                 <p className="text-sm text-muted-foreground">CPF: {formatCpf(athlete.cpf)}</p>
                 <p className="text-sm text-muted-foreground">
-                  Data de Nascimento: {formatDate(athlete.dataNascimento)}
+                  Data de Nascimento: {formatDateOnlyBrazil(athlete.dataNascimento)}
                 </p>
               </div>
 
