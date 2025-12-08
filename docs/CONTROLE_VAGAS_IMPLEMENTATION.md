@@ -50,6 +50,7 @@ Portal de inscricao para eventos de corrida que precisa de uma camada robusta de
 - [x] Verificar que transacao e curta (sem operacoes externas)
 - [x] Revisar comentarios explicativos no codigo
 - [x] Testar fluxo completo manualmente
+- [x] Todos os 5 testes automatizados passando (inscricao, duplicata, vagas esgotadas, atomicidade, evento inexistente)
 
 ---
 

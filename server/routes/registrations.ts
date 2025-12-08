@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { storage } from "../storage";
 import { z } from "zod";
+import { registerForEventAtomic } from "../services/registration-service";
 
 const router = Router();
 
@@ -187,17 +188,6 @@ router.post("/", async (req, res) => {
       return res.status(400).json({ success: false, error: "Nenhum lote disponivel" });
     }
 
-    const existingRegistrations = await storage.getRegistrationsByAthlete(athleteId);
-    const duplicateRegistration = existingRegistrations.find(
-      r => r.eventId === eventId && r.modalityId === modalityId && r.status === "confirmada"
-    );
-    if (duplicateRegistration) {
-      return res.status(409).json({ 
-        success: false, 
-        error: "Voce ja possui inscricao confirmada nesta modalidade" 
-      });
-    }
-
     const athlete = await storage.getAthlete(athleteId);
     if (!athlete) {
       return res.status(404).json({ success: false, error: "Atleta nao encontrado" });
@@ -211,51 +201,53 @@ router.post("/", async (req, res) => {
     const isGratuita = modality.tipoAcesso === "gratuita" || valorTotal === 0;
 
     const orderNumber = await storage.getNextOrderNumber();
-    const order = await storage.createOrder({
-      numeroPedido: orderNumber,
-      eventId,
-      compradorId: athleteId,
-      valorTotal: valorTotal.toString(),
-      valorDesconto: "0",
-      status: isGratuita ? "pago" : "pendente",
-      metodoPagamento: isGratuita ? "gratuito" : null,
-      ipComprador: req.ip || null
-    });
-
     const registrationNumber = await storage.getNextRegistrationNumber();
-    const registration = await storage.createRegistration({
-      numeroInscricao: registrationNumber,
-      orderId: order.id,
-      eventId,
-      modalityId,
-      batchId: activeBatch.id,
-      athleteId,
-      tamanhoCamisa: tamanhoCamisa || null,
-      valorUnitario: valorInscricao.toString(),
-      taxaComodidade: taxaComodidade.toString(),
-      status: isGratuita ? "confirmada" : "pendente",
-      equipe: equipe || null,
-      nomeCompleto: athlete.nome,
-      cpf: athlete.cpf,
-      dataNascimento: athlete.dataNascimento,
-      sexo: athlete.sexo
-    });
+
+    const result = await registerForEventAtomic(
+      {
+        numeroPedido: orderNumber,
+        eventId,
+        compradorId: athleteId,
+        valorTotal: valorTotal.toString(),
+        valorDesconto: "0",
+        status: isGratuita ? "pago" : "pendente",
+        metodoPagamento: isGratuita ? "gratuito" : null,
+        ipComprador: req.ip || null
+      },
+      {
+        eventId,
+        athleteId,
+        modalityId,
+        batchId: activeBatch.id,
+        orderId: "",
+        numeroInscricao: registrationNumber,
+        tamanhoCamisa: tamanhoCamisa || null,
+        equipe: equipe || null,
+        valorUnitario: valorInscricao.toString(),
+        taxaComodidade: taxaComodidade.toString(),
+        status: isGratuita ? "confirmada" : "pendente",
+        nomeCompleto: athlete.nome,
+        cpf: athlete.cpf,
+        dataNascimento: athlete.dataNascimento,
+        sexo: athlete.sexo
+      }
+    );
+
+    if (!result.success) {
+      const statusCode = result.errorCode === 'EVENT_NOT_FOUND' ? 404 :
+                         result.errorCode === 'VAGAS_ESGOTADAS' ? 409 :
+                         result.errorCode === 'JA_INSCRITO' ? 409 : 500;
+      return res.status(statusCode).json({ success: false, error: result.error });
+    }
 
     res.status(201).json({
       success: true,
       data: {
-        order: {
-          id: order.id,
-          numeroPedido: order.numeroPedido,
-          valorTotal: parseFloat(order.valorTotal),
-          status: order.status
-        },
+        order: result.order,
         registration: {
-          id: registration.id,
-          numeroInscricao: registration.numeroInscricao,
+          ...result.registration,
           modalidade: modality.nome,
-          tamanhoCamisa: registration.tamanhoCamisa,
-          status: registration.status
+          tamanhoCamisa: tamanhoCamisa || null
         },
         evento: {
           nome: event.nome,
