@@ -19,6 +19,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { FileText, Users, Edit, Loader2, LogOut, Headphones, Mail, Phone } from "lucide-react";
 import { useAthleteAuth } from "@/contexts/AthleteAuthContext";
@@ -477,17 +482,30 @@ export default function MinhaContaPage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="dataNascimento">Data de Nascimento</Label>
-                      <Input
-                        id="dataNascimento"
-                        type="text"
-                        inputMode="numeric"
-                        placeholder="DD/MM/AAAA"
-                        value={formData.dataNascimento}
-                        onChange={(e) => handleChange("dataNascimento", formatDataNascimento(e.target.value))}
-                        maxLength={10}
-                        required
-                        data-testid="input-data-nascimento"
-                      />
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="relative cursor-not-allowed">
+                            <Input
+                              id="dataNascimento"
+                              type="text"
+                              inputMode="numeric"
+                              placeholder="DD/MM/AAAA"
+                              value={formData.dataNascimento}
+                              readOnly
+                              tabIndex={-1}
+                              aria-disabled="true"
+                              className="pointer-events-none bg-muted/50 text-muted-foreground"
+                              data-testid="input-data-nascimento"
+                            />
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom">
+                          <p>Para mudar a data de nascimento entre em contato com o suporte</p>
+                        </TooltipContent>
+                      </Tooltip>
+                      <p className="text-xs text-muted-foreground md:hidden">
+                        Para mudar a data de nascimento entre em contato com o suporte
+                      </p>
                     </div>
 
                     <div className="space-y-2">
