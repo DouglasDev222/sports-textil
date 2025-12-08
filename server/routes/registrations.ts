@@ -198,6 +198,11 @@ router.post("/", async (req, res) => {
       });
     }
 
+    const athlete = await storage.getAthlete(athleteId);
+    if (!athlete) {
+      return res.status(404).json({ success: false, error: "Atleta nao encontrado" });
+    }
+
     const price = await storage.getPrice(modalityId, activeBatch.id);
     const valorInscricao = price ? parseFloat(price.valor) : 0;
     const taxaComodidade = parseFloat(modality.taxaComodidade) || 0;
@@ -229,7 +234,11 @@ router.post("/", async (req, res) => {
       valorUnitario: valorInscricao.toString(),
       taxaComodidade: taxaComodidade.toString(),
       status: isGratuita ? "confirmada" : "pendente",
-      equipe: equipe || null
+      equipe: equipe || null,
+      nomeCompleto: athlete.nome,
+      cpf: athlete.cpf,
+      dataNascimento: athlete.dataNascimento,
+      sexo: athlete.sexo
     });
 
     res.status(201).json({
