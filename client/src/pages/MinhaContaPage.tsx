@@ -54,9 +54,34 @@ interface FormData {
   profissao: string;
 }
 
+const formatCPF = (cpf: string) => {
+  const numbers = cpf.replace(/\D/g, '');
+  return numbers
+    .replace(/(\d{3})(\d)/, '$1.$2')
+    .replace(/(\d{3})(\d)/, '$1.$2')
+    .replace(/(\d{3})(\d{1,2})/, '$1-$2');
+};
+
+const formatCEP = (cep: string) => {
+  const numbers = cep.replace(/\D/g, '');
+  return numbers.replace(/(\d{5})(\d)/, '$1-$2');
+};
+
+const formatTelefone = (telefone: string) => {
+  const numbers = telefone.replace(/\D/g, '');
+  if (numbers.length <= 10) {
+    return numbers
+      .replace(/(\d{2})(\d)/, '($1) $2')
+      .replace(/(\d{4})(\d)/, '$1-$2');
+  }
+  return numbers
+    .replace(/(\d{2})(\d)/, '($1) $2')
+    .replace(/(\d{5})(\d)/, '$1-$2');
+};
+
 export default function MinhaContaPage() {
   const [, setLocation] = useLocation();
-  const { athlete, isLoading, updateAthlete, logout } = useAthleteAuth();
+  const { athlete, isLoading, updateAthlete, logout, refreshSession } = useAthleteAuth();
   const [formData, setFormData] = useState<FormData>({
     cpf: "",
     nome: "",
@@ -118,6 +143,10 @@ export default function MinhaContaPage() {
       setLocation("/login");
     }
   }, [isLoading, athlete, setLocation]);
+
+  useEffect(() => {
+    refreshSession();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -274,7 +303,7 @@ export default function MinhaContaPage() {
                   <div>
                     <Label className="text-muted-foreground text-sm">CPF</Label>
                     <p className="text-foreground font-medium" data-testid="text-cpf">
-                      {formData.cpf}
+                      {formData.cpf ? formatCPF(formData.cpf) : "-"}
                     </p>
                   </div>
                 </div>
@@ -289,7 +318,7 @@ export default function MinhaContaPage() {
                   <div>
                     <Label className="text-muted-foreground text-sm">Telefone</Label>
                     <p className="text-foreground font-medium" data-testid="text-telefone">
-                      {formData.telefone}
+                      {formData.telefone ? formatTelefone(formData.telefone) : "-"}
                     </p>
                   </div>
                 </div>
@@ -575,7 +604,7 @@ export default function MinhaContaPage() {
                   <div>
                     <Label className="text-muted-foreground text-sm">CEP</Label>
                     <p className="text-foreground font-medium" data-testid="text-cep">
-                      {formData.cep || "-"}
+                      {formData.cep ? formatCEP(formData.cep) : "-"}
                     </p>
                   </div>
                   <div>

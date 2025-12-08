@@ -163,12 +163,13 @@ export default function CadastroPage() {
         profissao: profissao || undefined,
       });
 
-      if (!result.success) {
+      if (!result || !result.success) {
         toast({
           title: "Erro no cadastro",
-          description: result.error || "Ocorreu um erro ao realizar o cadastro.",
+          description: result?.error || "Ocorreu um erro ao realizar o cadastro.",
           variant: "destructive",
         });
+        setIsLoading(false);
         return;
       }
 
@@ -177,7 +178,10 @@ export default function CadastroPage() {
         description: "Sua conta foi criada com sucesso.",
       });
 
-      setLocation("/");
+      setIsLoading(false);
+      setTimeout(() => {
+        setLocation("/");
+      }, 100);
     } catch (error) {
       console.error("Erro ao cadastrar:", error);
       toast({
@@ -185,7 +189,6 @@ export default function CadastroPage() {
         description: "Ocorreu um erro ao conectar com o servidor.",
         variant: "destructive",
       });
-    } finally {
       setIsLoading(false);
     }
   };
