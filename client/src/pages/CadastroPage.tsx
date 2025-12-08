@@ -10,9 +10,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import Header from "@/components/Header";
+import { useAthleteAuth } from "@/contexts/AthleteAuthContext";
 
 const estadosBrasil = [
   "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG",
@@ -30,7 +31,20 @@ const escolaridades = [
 
 export default function CadastroPage() {
   const [cpf, setCpf] = useState("");
+  const [nome, setNome] = useState("");
+  const [dataNascimento, setDataNascimento] = useState("");
+  const [sexo, setSexo] = useState("");
+  const [email, setEmail] = useState("");
+  const [telefone, setTelefone] = useState("");
+  const [estado, setEstado] = useState("");
+  const [cidade, setCidade] = useState("");
+  const [escolaridade, setEscolaridade] = useState("");
+  const [profissao, setProfissao] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
+  const { register } = useAthleteAuth();
 
   const formatCPF = (value: string) => {
     const numbers = value.replace(/\D/g, '');
@@ -47,13 +61,78 @@ export default function CadastroPage() {
     setCpf(formatCPF(e.target.value));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const formatTelefone = (value: string) => {
+    const numbers = value.replace(/\D/g, '');
+    if (numbers.length <= 11) {
+      if (numbers.length <= 10) {
+        return numbers
+          .replace(/(\d{2})(\d)/, '($1) $2')
+          .replace(/(\d{4})(\d)/, '$1-$2');
+      }
+      return numbers
+        .replace(/(\d{2})(\d)/, '($1) $2')
+        .replace(/(\d{5})(\d)/, '$1-$2');
+    }
+    return telefone;
+  };
+
+  const handleTelefoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setTelefone(formatTelefone(e.target.value));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Cadastro submitted');
-    toast({
-      title: "Cadastro realizado!",
-      description: "Sua conta foi criada com sucesso.",
-    });
+    
+    if (!cpf || !nome || !dataNascimento || !sexo || !email || !telefone || !estado || !cidade) {
+      toast({
+        title: "Campos obrigatórios",
+        description: "Por favor, preencha todos os campos obrigatórios.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const result = await register({
+        cpf: cpf.replace(/\D/g, ''),
+        nome,
+        dataNascimento,
+        sexo,
+        email,
+        telefone: telefone.replace(/\D/g, ''),
+        estado,
+        cidade,
+        escolaridade: escolaridade || undefined,
+        profissao: profissao || undefined,
+      });
+
+      if (!result.success) {
+        toast({
+          title: "Erro no cadastro",
+          description: result.error || "Ocorreu um erro ao realizar o cadastro.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      toast({
+        title: "Cadastro realizado!",
+        description: "Sua conta foi criada com sucesso.",
+      });
+
+      setLocation("/");
+    } catch (error) {
+      console.error("Erro ao cadastrar:", error);
+      toast({
+        title: "Erro",
+        description: "Ocorreu um erro ao conectar com o servidor.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -92,11 +171,15 @@ export default function CadastroPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="nome">Nome Completo</Label>
+                  <Label htmlFor="nome">
+                    Nome Completo <span className="text-accent">*</span>
+                  </Label>
                   <Input
                     id="nome"
                     type="text"
                     placeholder="Seu nome completo"
+                    value={nome}
+                    onChange={(e) => setNome(e.target.value)}
                     required
                     data-testid="input-nome"
                   />
@@ -104,10 +187,14 @@ export default function CadastroPage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="dataNascimento">Data de Nascimento</Label>
+                    <Label htmlFor="dataNascimento">
+                      Data de Nascimento <span className="text-accent">*</span>
+                    </Label>
                     <Input
                       id="dataNascimento"
                       type="date"
+                      value={dataNascimento}
+                      onChange={(e) => setDataNascimento(e.target.value)}
                       required
                       data-testid="input-data-nascimento"
                     />
@@ -117,7 +204,7 @@ export default function CadastroPage() {
                     <Label htmlFor="sexo">
                       Sexo <span className="text-accent">*</span>
                     </Label>
-                    <Select required>
+                    <Select value={sexo} onValueChange={setSexo} required>
                       <SelectTrigger id="sexo" data-testid="select-sexo">
                         <SelectValue placeholder="Selecione" />
                       </SelectTrigger>
@@ -137,22 +224,31 @@ export default function CadastroPage() {
                 </h3>
 
                 <div className="space-y-2">
-                  <Label htmlFor="email">E-mail</Label>
+                  <Label htmlFor="email">
+                    E-mail <span className="text-accent">*</span>
+                  </Label>
                   <Input
                     id="email"
                     type="email"
                     placeholder="seu@email.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
                     required
                     data-testid="input-email"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="telefone">Telefone</Label>
+                  <Label htmlFor="telefone">
+                    Telefone <span className="text-accent">*</span>
+                  </Label>
                   <Input
                     id="telefone"
                     type="tel"
                     placeholder="(00) 00000-0000"
+                    value={telefone}
+                    onChange={handleTelefoneChange}
+                    maxLength={15}
                     required
                     data-testid="input-telefone"
                   />
@@ -166,15 +262,17 @@ export default function CadastroPage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="estado">Estado</Label>
-                    <Select required>
+                    <Label htmlFor="estado">
+                      Estado <span className="text-accent">*</span>
+                    </Label>
+                    <Select value={estado} onValueChange={setEstado} required>
                       <SelectTrigger id="estado" data-testid="select-estado">
                         <SelectValue placeholder="Selecione o estado" />
                       </SelectTrigger>
                       <SelectContent>
-                        {estadosBrasil.map((estado) => (
-                          <SelectItem key={estado} value={estado}>
-                            {estado}
+                        {estadosBrasil.map((est) => (
+                          <SelectItem key={est} value={est}>
+                            {est}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -182,11 +280,15 @@ export default function CadastroPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="cidade">Cidade</Label>
+                    <Label htmlFor="cidade">
+                      Cidade <span className="text-accent">*</span>
+                    </Label>
                     <Input
                       id="cidade"
                       type="text"
                       placeholder="Sua cidade"
+                      value={cidade}
+                      onChange={(e) => setCidade(e.target.value)}
                       required
                       data-testid="input-cidade"
                     />
@@ -200,10 +302,8 @@ export default function CadastroPage() {
                 </h3>
 
                 <div className="space-y-2">
-                  <Label htmlFor="escolaridade">
-                    Escolaridade <span className="text-accent">*</span>
-                  </Label>
-                  <Select required>
+                  <Label htmlFor="escolaridade">Escolaridade</Label>
+                  <Select value={escolaridade} onValueChange={setEscolaridade}>
                     <SelectTrigger id="escolaridade" data-testid="select-escolaridade">
                       <SelectValue placeholder="Selecione" />
                     </SelectTrigger>
@@ -218,14 +318,13 @@ export default function CadastroPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="profissao">
-                    Profissão <span className="text-accent">*</span>
-                  </Label>
+                  <Label htmlFor="profissao">Profissão</Label>
                   <Input
                     id="profissao"
                     type="text"
                     placeholder="Sua profissão"
-                    required
+                    value={profissao}
+                    onChange={(e) => setProfissao(e.target.value)}
                     data-testid="input-profissao"
                   />
                 </div>
@@ -236,9 +335,10 @@ export default function CadastroPage() {
                   type="submit"
                   variant="secondary"
                   className="flex-1"
+                  disabled={isLoading}
                   data-testid="button-submit"
                 >
-                  Completar Cadastro
+                  {isLoading ? "Cadastrando..." : "Completar Cadastro"}
                 </Button>
                 <Link href="/login">
                   <Button
