@@ -41,8 +41,35 @@ export default function LoginPage() {
     return cpf;
   };
 
+  const formatDataNascimento = (value: string) => {
+    const numbers = value.replace(/\D/g, '');
+    if (numbers.length <= 8) {
+      return numbers
+        .replace(/(\d{2})(\d)/, '$1/$2')
+        .replace(/(\d{2})(\d)/, '$1/$2');
+    }
+    return numbers.slice(0, 8)
+      .replace(/(\d{2})(\d)/, '$1/$2')
+      .replace(/(\d{2})(\d)/, '$1/$2');
+  };
+
+  const convertToISO = (dataBR: string): string => {
+    const numbers = dataBR.replace(/\D/g, '');
+    if (numbers.length === 8) {
+      const dia = numbers.slice(0, 2);
+      const mes = numbers.slice(2, 4);
+      const ano = numbers.slice(4, 8);
+      return `${ano}-${mes}-${dia}`;
+    }
+    return '';
+  };
+
   const handleCPFChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setCpf(formatCPF(e.target.value));
+  };
+
+  const handleDataNascimentoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setDataNascimento(formatDataNascimento(e.target.value));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -57,9 +84,19 @@ export default function LoginPage() {
       return;
     }
 
+    const dataISO = convertToISO(dataNascimento);
+    if (!dataISO) {
+      toast({
+        title: "Data invalida",
+        description: "Preencha a data no formato DD/MM/AAAA.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setIsLoading(true);
     
-    const result = await login(cpf, dataNascimento);
+    const result = await login(cpf, dataISO);
     
     setIsLoading(false);
     
@@ -151,9 +188,12 @@ export default function LoginPage() {
                     </Label>
                     <Input
                       id="dataNascimento"
-                      type="date"
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="DD/MM/AAAA"
                       value={dataNascimento}
-                      onChange={(e) => setDataNascimento(e.target.value)}
+                      onChange={handleDataNascimentoChange}
+                      maxLength={10}
                       required
                       disabled={isLoading}
                       data-testid="input-data-nascimento"
