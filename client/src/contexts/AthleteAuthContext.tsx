@@ -103,7 +103,12 @@ export function AthleteAuthProvider({ children }: { children: ReactNode }) {
 
   const register = async (registerData: RegisterData) => {
     try {
-      const response = await apiRequest("POST", "/api/athletes/register", registerData);
+      const response = await fetch("/api/athletes/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(registerData),
+        credentials: "include",
+      });
       const data = await response.json();
       
       if (data.success) {
