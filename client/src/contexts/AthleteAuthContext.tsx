@@ -1,5 +1,4 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
-import { apiRequest } from "@/lib/queryClient";
 
 interface Athlete {
   id: string;
@@ -88,7 +87,12 @@ export function AthleteAuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (cpf: string, dataNascimento: string) => {
     try {
-      const response = await apiRequest("POST", "/api/athletes/login", { cpf, dataNascimento });
+      const response = await fetch("/api/athletes/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cpf, dataNascimento }),
+        credentials: "include",
+      });
       const data = await response.json();
       
       if (data.success) {
@@ -123,7 +127,12 @@ export function AthleteAuthProvider({ children }: { children: ReactNode }) {
 
   const updateAthlete = async (updateData: UpdateAthleteData) => {
     try {
-      const response = await apiRequest("PUT", "/api/athletes/me", updateData);
+      const response = await fetch("/api/athletes/me", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updateData),
+        credentials: "include",
+      });
       const data = await response.json();
       
       if (data.success) {
@@ -138,7 +147,10 @@ export function AthleteAuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     try {
-      await apiRequest("POST", "/api/athletes/logout", {});
+      await fetch("/api/athletes/logout", {
+        method: "POST",
+        credentials: "include",
+      });
     } finally {
       setAthlete(null);
     }
