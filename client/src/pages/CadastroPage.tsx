@@ -122,6 +122,67 @@ export default function CadastroPage() {
     setCep(formatCEP(e.target.value));
   };
 
+  const formatDataNascimento = (value: string) => {
+    const numbers = value.replace(/\D/g, '');
+    if (numbers.length <= 8) {
+      return numbers
+        .replace(/(\d{2})(\d)/, '$1/$2')
+        .replace(/(\d{2})(\d)/, '$1/$2');
+    }
+    return numbers.slice(0, 8)
+      .replace(/(\d{2})(\d)/, '$1/$2')
+      .replace(/(\d{2})(\d)/, '$1/$2');
+  };
+
+  const handleDataNascimentoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setDataNascimento(formatDataNascimento(e.target.value));
+  };
+
+  const parseDataNascimentoToISO = (value: string): string => {
+    const numbers = value.replace(/\D/g, '');
+    if (numbers.length === 8) {
+      const day = numbers.slice(0, 2);
+      const month = numbers.slice(2, 4);
+      const year = numbers.slice(4, 8);
+      return `${year}-${month}-${day}`;
+    }
+    return '';
+  };
+
+  const validateDataNascimento = (value: string): { valid: boolean; error?: string } => {
+    const numbers = value.replace(/\D/g, '');
+    if (numbers.length !== 8) {
+      return { valid: false, error: 'Data incompleta' };
+    }
+    
+    const day = parseInt(numbers.slice(0, 2), 10);
+    const month = parseInt(numbers.slice(2, 4), 10);
+    const year = parseInt(numbers.slice(4, 8), 10);
+    const currentYear = new Date().getFullYear();
+    
+    if (day < 1 || day > 31) {
+      return { valid: false, error: 'Dia deve ser entre 1 e 31' };
+    }
+    
+    if (month < 1 || month > 12) {
+      return { valid: false, error: 'Mes deve ser entre 1 e 12' };
+    }
+    
+    if (year < 1900 || year > currentYear) {
+      return { valid: false, error: `Ano deve ser entre 1900 e ${currentYear}` };
+    }
+    
+    const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    const isLeapYear = (year % 4 === 0 && year % 100 !== 0) || (year % 400 === 0);
+    if (isLeapYear) daysInMonth[1] = 29;
+    
+    if (day > daysInMonth[month - 1]) {
+      return { valid: false, error: `Este mes tem no maximo ${daysInMonth[month - 1]} dias` };
+    }
+    
+    return { valid: true };
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -143,13 +204,23 @@ export default function CadastroPage() {
       return;
     }
 
+    const dateValidation = validateDataNascimento(dataNascimento);
+    if (!dateValidation.valid) {
+      toast({
+        title: "Data de nascimento invalida",
+        description: dateValidation.error,
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsLoading(true);
 
     try {
       const result = await register({
         cpf: cpf.replace(/\D/g, ''),
         nome,
-        dataNascimento,
+        dataNascimento: parseDataNascimentoToISO(dataNascimento),
         sexo,
         email,
         telefone: telefone.replace(/\D/g, ''),
@@ -250,9 +321,12 @@ export default function CadastroPage() {
                     </Label>
                     <Input
                       id="dataNascimento"
-                      type="date"
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="DD/MM/AAAA"
                       value={dataNascimento}
-                      onChange={(e) => setDataNascimento(e.target.value)}
+                      onChange={handleDataNascimentoChange}
+                      maxLength={10}
                       required
                       data-testid="input-data-nascimento"
                     />
