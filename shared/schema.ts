@@ -138,7 +138,7 @@ export const athletes = pgTable("athletes", {
   nome: text("nome").notNull(),
   dataNascimento: date("data_nascimento").notNull(),
   sexo: varchar("sexo", { length: 20 }).notNull(),
-  email: text("email").notNull(),
+  email: text("email").notNull().unique(),
   telefone: varchar("telefone", { length: 20 }).notNull(),
   estado: varchar("estado", { length: 2 }).notNull(),
   cidade: text("cidade").notNull(),

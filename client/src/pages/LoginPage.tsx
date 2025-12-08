@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,8 +20,13 @@ export default function LoginPage() {
   const searchParams = new URLSearchParams(searchString);
   const redirectTo = searchParams.get("redirect") || "/";
 
+  useEffect(() => {
+    if (athlete) {
+      setLocation(redirectTo);
+    }
+  }, [athlete, redirectTo, setLocation]);
+
   if (athlete) {
-    setLocation(redirectTo);
     return null;
   }
 
