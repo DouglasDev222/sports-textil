@@ -464,13 +464,19 @@ export class DbStorage implements IStorage {
   }
 
   async createAthlete(insertAthlete: InsertAthlete): Promise<Athlete> {
-    const [athlete] = await db.insert(athletes).values(insertAthlete).returning();
+    const [athlete] = await db.insert(athletes).values({
+      ...insertAthlete,
+      nome: insertAthlete.nome.toUpperCase()
+    }).returning();
     return athlete;
   }
 
   async updateAthlete(id: string, athleteData: Partial<InsertAthlete>): Promise<Athlete | undefined> {
+    const dataToUpdate = athleteData.nome 
+      ? { ...athleteData, nome: athleteData.nome.toUpperCase() }
+      : athleteData;
     const [athlete] = await db.update(athletes)
-      .set(athleteData)
+      .set(dataToUpdate)
       .where(eq(athletes.id, id))
       .returning();
     return athlete;
