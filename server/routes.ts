@@ -15,6 +15,7 @@ import pricesRoutes from "./routes/admin/prices";
 import shirtsRoutes from "./routes/admin/shirts";
 import attachmentsRoutes from "./routes/admin/attachments";
 import uploadsRoutes from "./routes/admin/uploads";
+import eventStatsRoutes from "./routes/admin/eventStats";
 import athletesRoutes from "./routes/athletes";
 import registrationsRoutes from "./routes/registrations";
 
@@ -31,6 +32,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/admin/events/:eventId/shirts", shirtsRoutes);
   app.use("/api/admin/events/:eventId/attachments", attachmentsRoutes);
   app.use("/api/admin/uploads", uploadsRoutes);
+  app.use("/api/admin/events", eventStatsRoutes);
 
   app.use("/api/athletes", athletesRoutes);
   app.use("/api/registrations", registrationsRoutes);

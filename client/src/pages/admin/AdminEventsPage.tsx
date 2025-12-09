@@ -4,7 +4,7 @@ import { Link } from "wouter";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -21,9 +21,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Eye, Search } from "lucide-react";
+import { Plus, Search, MoreHorizontal, Pencil, Users, Settings } from "lucide-react";
 import { formatDateOnlyBrazil } from "@/lib/timezone";
+import { useToast } from "@/hooks/use-toast";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Event } from "@shared/schema";
 
 const statusColors: Record<string, string> = {
@@ -33,12 +41,40 @@ const statusColors: Record<string, string> = {
   finalizado: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200",
 };
 
+const statusLabels: Record<string, string> = {
+  rascunho: "Rascunho",
+  publicado: "Publicado",
+  cancelado: "Cancelado",
+  finalizado: "Finalizado",
+};
+
 export default function AdminEventsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("todos");
+  const { toast } = useToast();
 
   const { data, isLoading } = useQuery<{ success: boolean; data: Event[] }>({
     queryKey: ["/api/admin/events"],
+  });
+
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({ eventId, status }: { eventId: string; status: string }) => {
+      return apiRequest("PATCH", `/api/admin/events/${eventId}/status`, { status });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/events"] });
+      toast({
+        title: "Status atualizado",
+        description: "O status do evento foi alterado com sucesso.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro ao atualizar status",
+        description: error?.message || "Nao foi possivel alterar o status do evento.",
+        variant: "destructive",
+      });
+    },
   });
 
   const events = data?.data || [];
@@ -49,6 +85,10 @@ export default function AdminEventsPage() {
     const matchesStatus = statusFilter === "todos" || event.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
+
+  const handleStatusChange = (eventId: string, newStatus: string) => {
+    updateStatusMutation.mutate({ eventId, status: newStatus });
+  };
 
   return (
     <AdminLayout 
@@ -120,7 +160,7 @@ export default function AdminEventsPage() {
                     <TableHead>Data</TableHead>
                     <TableHead>Vagas</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Ações</TableHead>
+                    <TableHead className="text-right">Acoes</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -131,25 +171,83 @@ export default function AdminEventsPage() {
                       <TableCell>
                         {formatDateOnlyBrazil(event.dataEvento)}
                       </TableCell>
-                      <TableCell>{event.limiteVagasTotal}</TableCell>
                       <TableCell>
-                        <Badge 
-                          variant="secondary" 
-                          className={statusColors[event.status]}
+                        <span className="font-medium">{event.vagasOcupadas}</span>
+                        <span className="text-muted-foreground">/{event.limiteVagasTotal}</span>
+                      </TableCell>
+                      <TableCell>
+                        <Select
+                          value={event.status}
+                          onValueChange={(value) => handleStatusChange(event.id, value)}
+                          disabled={updateStatusMutation.isPending}
                         >
-                          {event.status}
-                        </Badge>
+                          <SelectTrigger 
+                            className="w-[130px] h-8 border-0 bg-transparent p-0"
+                            data-testid={`select-status-${event.id}`}
+                          >
+                            <Badge 
+                              variant="secondary" 
+                              className={statusColors[event.status]}
+                            >
+                              {statusLabels[event.status]}
+                            </Badge>
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="rascunho">
+                              <Badge variant="secondary" className={statusColors.rascunho}>
+                                Rascunho
+                              </Badge>
+                            </SelectItem>
+                            <SelectItem value="publicado">
+                              <Badge variant="secondary" className={statusColors.publicado}>
+                                Publicado
+                              </Badge>
+                            </SelectItem>
+                            <SelectItem value="cancelado">
+                              <Badge variant="secondary" className={statusColors.cancelado}>
+                                Cancelado
+                              </Badge>
+                            </SelectItem>
+                            <SelectItem value="finalizado">
+                              <Badge variant="secondary" className={statusColors.finalizado}>
+                                Finalizado
+                              </Badge>
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Link href={`/admin/eventos/${event.id}`}>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            data-testid={`button-view-${event.id}`}
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                        </Link>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              data-testid={`button-actions-${event.id}`}
+                            >
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <Link href={`/admin/eventos/${event.id}`}>
+                              <DropdownMenuItem data-testid={`menu-edit-${event.id}`}>
+                                <Pencil className="mr-2 h-4 w-4" />
+                                Editar
+                              </DropdownMenuItem>
+                            </Link>
+                            <Link href={`/admin/eventos/${event.id}/inscritos`}>
+                              <DropdownMenuItem data-testid={`menu-inscritos-${event.id}`}>
+                                <Users className="mr-2 h-4 w-4" />
+                                Inscritos
+                              </DropdownMenuItem>
+                            </Link>
+                            <Link href={`/admin/eventos/${event.id}/gerenciar`}>
+                              <DropdownMenuItem data-testid={`menu-manage-${event.id}`}>
+                                <Settings className="mr-2 h-4 w-4" />
+                                Gerenciar Evento
+                              </DropdownMenuItem>
+                            </Link>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
                   ))}
