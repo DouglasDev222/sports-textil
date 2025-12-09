@@ -9,6 +9,7 @@ export const registrationStatusEnum = pgEnum("registration_status", ["pendente",
 export const orderStatusEnum = pgEnum("order_status", ["pendente", "pago", "cancelado", "reembolsado", "expirado"]);
 export const userRoleEnum = pgEnum("user_role", ["superadmin", "admin", "organizador"]);
 export const userStatusEnum = pgEnum("user_status", ["ativo", "inativo", "bloqueado"]);
+export const batchStatusEnum = pgEnum("batch_status", ["active", "closed", "future"]);
 
 export const organizers = pgTable("organizers", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -82,6 +83,7 @@ export const modalities = pgTable("modalities", {
   imagemUrl: text("imagem_url"),
   mapaPercursoUrl: text("mapa_percurso_url"),
   limiteVagas: integer("limite_vagas"),
+  vagasOcupadas: integer("vagas_ocupadas").default(0).notNull(),
   tipoAcesso: modalityAccessEnum("tipo_acesso").default("paga").notNull(),
   taxaComodidade: decimal("taxa_comodidade", { precision: 10, scale: 2 }).default("0").notNull(),
   idadeMinima: integer("idade_minima"),
@@ -100,12 +102,15 @@ export const shirtSizes = pgTable("shirt_sizes", {
 export const registrationBatches = pgTable("registration_batches", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   eventId: varchar("event_id").notNull().references(() => events.id),
+  modalityId: varchar("modality_id").references(() => modalities.id),
   nome: text("nome").notNull(),
   dataInicio: timestamp("data_inicio", { withTimezone: true }).notNull(),
   dataTermino: timestamp("data_termino", { withTimezone: true }),
   quantidadeMaxima: integer("quantidade_maxima"),
   quantidadeUtilizada: integer("quantidade_utilizada").default(0).notNull(),
   ativo: boolean("ativo").default(true).notNull(),
+  status: batchStatusEnum("status").default("future").notNull(),
+  precoCentavos: integer("preco_centavos"),
   ordem: integer("ordem").default(0).notNull(),
 });
 
