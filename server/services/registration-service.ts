@@ -35,6 +35,7 @@ export type RegistrationErrorCode =
   | 'MODALITY_FULL'
   | 'LOT_FULL'
   | 'LOT_SOLD_OUT_OR_CHANGED'
+  | 'LOTE_ESGOTADO_E_SEM_PROXIMO'
   | 'MODALITY_NOT_FOUND'
   | 'LOT_NOT_FOUND'
   | 'EVENT_NOT_FOUND'
@@ -65,9 +66,8 @@ export interface AtomicRegistrationResult {
 async function closeBatchAndActivateNext(
   client: PoolClient, 
   currentBatchId: string, 
-  eventId: string,
-  modalityId: string | null
-): Promise<void> {
+  eventId: string
+): Promise<{ nextBatchActivated: boolean; nextBatchId: string | null }> {
   await client.query(
     `UPDATE registration_batches SET ativo = false, status = 'closed' WHERE id = $1`,
     [currentBatchId]
@@ -81,38 +81,32 @@ async function closeBatchAndActivateNext(
   if (currentBatchOrder.rows.length > 0) {
     const currentOrder = currentBatchOrder.rows[0].ordem;
     
-    const nextBatchQuery = modalityId 
-      ? `UPDATE registration_batches 
-         SET ativo = true, status = 'active'
-         WHERE id = (
-           SELECT id FROM registration_batches
-           WHERE event_id = $1 
-             AND (modality_id = $2 OR modality_id IS NULL)
-             AND ordem > $3
-             AND (status = 'future' OR (ativo = false AND status != 'closed'))
-           ORDER BY ordem ASC
-           LIMIT 1
-         )
-         RETURNING id`
-      : `UPDATE registration_batches 
-         SET ativo = true, status = 'active'
-         WHERE id = (
-           SELECT id FROM registration_batches
-           WHERE event_id = $1 
-             AND modality_id IS NULL
-             AND ordem > $2
-             AND (status = 'future' OR (ativo = false AND status != 'closed'))
-           ORDER BY ordem ASC
-           LIMIT 1
-         )
-         RETURNING id`;
+    const nextBatchSelect = await client.query(
+      `SELECT id FROM registration_batches
+       WHERE event_id = $1 
+         AND ordem > $2
+         AND status = 'future'
+       ORDER BY ordem ASC
+       LIMIT 1
+       FOR UPDATE`,
+      [eventId, currentOrder]
+    );
 
-    if (modalityId) {
-      await client.query(nextBatchQuery, [eventId, modalityId, currentOrder]);
-    } else {
-      await client.query(nextBatchQuery, [eventId, currentOrder]);
+    if (nextBatchSelect.rows.length > 0) {
+      const nextBatchId = nextBatchSelect.rows[0].id;
+      
+      await client.query(
+        `UPDATE registration_batches 
+         SET ativo = true, status = 'active'
+         WHERE id = $1`,
+        [nextBatchId]
+      );
+
+      return { nextBatchActivated: true, nextBatchId };
     }
   }
+  
+  return { nextBatchActivated: false, nextBatchId: null };
 }
 
 export async function registerForEventAtomic(
@@ -182,45 +176,68 @@ export async function registerForEventAtomic(
       };
     }
 
-    // 3. LOCK ACTIVE BATCH - Check batch capacity and get price
-    const batchResult = await client.query(
-      `SELECT rb.id, rb.quantidade_maxima, rb.quantidade_utilizada, rb.modality_id, p.valor
-       FROM registration_batches rb
-       LEFT JOIN prices p ON p.batch_id = rb.id AND p.modality_id = $2
-       WHERE rb.event_id = $1 
-         AND rb.ativo = true
-         AND (rb.modality_id = $2 OR rb.modality_id IS NULL)
-         AND rb.data_inicio <= NOW()
-         AND (rb.data_termino IS NULL OR rb.data_termino > NOW())
-       ORDER BY rb.ordem ASC
-       LIMIT 1
-       FOR UPDATE OF rb`,
-      [registrationData.eventId, registrationData.modalityId]
-    );
+    // 3. LOCK ACTIVE BATCH - Check batch capacity and get price (batches are global per event)
+    // This loop handles automatic batch switching if the current batch is full
+    let batchId: string = '';
+    let valorUnitario: string = '';
+    let batchSwitchAttempts = 0;
+    const maxBatchSwitchAttempts = 10;
 
-    // CRITICAL: If no active batch is found, reject the registration
-    // Never trust the client-supplied batchId - always use the active batch from DB
-    if (batchResult.rows.length === 0) {
-      await client.query('ROLLBACK');
-      return {
-        success: false,
-        error: 'Nao ha lote ativo disponivel para inscricao. Por favor, tente novamente.',
-        errorCode: 'LOT_SOLD_OUT_OR_CHANGED'
-      };
+    while (batchSwitchAttempts < maxBatchSwitchAttempts) {
+      batchSwitchAttempts++;
+
+      // Query active batch - date restrictions are not applied here because
+      // the ativo=true and status='active' flags are the authoritative source of truth.
+      // Automatic batch switching ignores dates to ensure seamless registration flow.
+      const batchResult = await client.query(
+        `SELECT rb.id, rb.quantidade_maxima, rb.quantidade_utilizada, p.valor
+         FROM registration_batches rb
+         LEFT JOIN prices p ON p.batch_id = rb.id AND p.modality_id = $2
+         WHERE rb.event_id = $1 
+           AND rb.ativo = true
+           AND rb.status = 'active'
+         ORDER BY rb.ordem ASC
+         LIMIT 1
+         FOR UPDATE OF rb`,
+        [registrationData.eventId, registrationData.modalityId]
+      );
+
+      if (batchResult.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return {
+          success: false,
+          error: 'Inscricoes encerradas - nao ha lote ativo disponivel.',
+          errorCode: 'LOTE_ESGOTADO_E_SEM_PROXIMO'
+        };
+      }
+
+      const batch = batchResult.rows[0];
+      
+      if (batch.quantidade_maxima !== null && batch.quantidade_utilizada >= batch.quantidade_maxima) {
+        const { nextBatchActivated } = await closeBatchAndActivateNext(client, batch.id, registrationData.eventId);
+        
+        if (!nextBatchActivated) {
+          await client.query('ROLLBACK');
+          return {
+            success: false,
+            error: 'Inscricoes encerradas - todos os lotes foram esgotados.',
+            errorCode: 'LOTE_ESGOTADO_E_SEM_PROXIMO'
+          };
+        }
+        continue;
+      }
+
+      batchId = batch.id;
+      valorUnitario = batch.valor || registrationData.valorUnitario;
+      break;
     }
 
-    const batch = batchResult.rows[0];
-    const batchId = batch.id;
-    let valorUnitario = batch.valor || registrationData.valorUnitario;
-    
-    // Check if batch has reached capacity
-    if (batch.quantidade_maxima !== null && batch.quantidade_utilizada >= batch.quantidade_maxima) {
-      await closeBatchAndActivateNext(client, batchId, registrationData.eventId, batch.modality_id);
+    if (!batchId!) {
       await client.query('ROLLBACK');
       return {
         success: false,
-        error: 'Lote esgotado ou alterado. Por favor, tente novamente.',
-        errorCode: 'LOT_SOLD_OUT_OR_CHANGED'
+        error: 'Erro ao processar lote. Por favor, tente novamente.',
+        errorCode: 'INTERNAL_ERROR'
       };
     }
     
@@ -329,16 +346,15 @@ export async function registerForEventAtomic(
       [batchId]
     );
 
-    // 8. CHECK IF BATCH IS NOW FULL AND CLOSE IT
-    // Note: batch is guaranteed to exist at this point (we return early if not found)
+    // 8. CHECK IF BATCH IS NOW FULL AND CLOSE IT (automatic lot switching)
     const updatedBatch = await client.query(
-      `SELECT quantidade_maxima, quantidade_utilizada, modality_id FROM registration_batches WHERE id = $1`,
+      `SELECT quantidade_maxima, quantidade_utilizada FROM registration_batches WHERE id = $1`,
       [batchId]
     );
     
     if (updatedBatch.rows[0].quantidade_maxima !== null && 
         updatedBatch.rows[0].quantidade_utilizada >= updatedBatch.rows[0].quantidade_maxima) {
-      await closeBatchAndActivateNext(client, batchId, registrationData.eventId, updatedBatch.rows[0].modality_id);
+      await closeBatchAndActivateNext(client, batchId, registrationData.eventId);
     }
     
     await client.query('COMMIT');

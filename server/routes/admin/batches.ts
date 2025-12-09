@@ -20,8 +20,29 @@ const batchSchema = z.object({
   dataTermino: z.string().refine(val => !isNaN(Date.parse(val)), "Data de termino invalida").optional().nullable(),
   quantidadeMaxima: z.number().int().positive().optional().nullable(),
   ativo: z.boolean().optional(),
+  status: z.enum(["active", "closed", "future"]).optional(),
   ordem: z.number().int().optional()
 });
+
+async function validateSingleActiveBatch(eventId: string, newStatus: string | undefined, newAtivo: boolean | undefined, excludeBatchId?: string): Promise<{ valid: boolean; error?: string }> {
+  if (newStatus !== 'active' && newAtivo !== true) {
+    return { valid: true };
+  }
+  
+  const existingBatches = await storage.getBatchesByEvent(eventId);
+  const activeBatches = existingBatches.filter(b => 
+    b.status === 'active' && b.ativo === true && b.id !== excludeBatchId
+  );
+  
+  if (activeBatches.length > 0) {
+    return { 
+      valid: false, 
+      error: "Somente um lote pode estar ativo ao mesmo tempo. Desative o lote atual antes de ativar outro." 
+    };
+  }
+  
+  return { valid: true };
+}
 
 router.get("/", requireAuth, async (req, res) => {
   try {
@@ -77,12 +98,24 @@ router.post("/", requireAuth, requireRole("superadmin", "admin"), async (req, re
       ? Math.max(...currentBatches.map(b => b.ordem)) + 1 
       : 0;
 
+    const willBeAtivo = validation.data.ativo ?? false;
+    const willBeStatus = validation.data.status ?? 'future';
+
+    const activeBatchValidation = await validateSingleActiveBatch(eventId, willBeStatus, willBeAtivo);
+    if (!activeBatchValidation.valid) {
+      return res.status(400).json({
+        success: false,
+        error: { code: "MULTIPLE_ACTIVE_BATCHES", message: activeBatchValidation.error }
+      });
+    }
+
     const batch = await storage.createBatch({
       ...validation.data,
       eventId,
       dataInicio: localToBrazilUTC(validation.data.dataInicio),
       dataTermino: localToBrazilUTCOptional(validation.data.dataTermino),
-      ativo: validation.data.ativo ?? true,
+      ativo: willBeAtivo,
+      status: willBeStatus,
       ordem: validation.data.ordem ?? nextOrder
     });
 
@@ -121,6 +154,14 @@ router.patch("/:id", requireAuth, requireRole("superadmin", "admin"), async (req
       return res.status(400).json({
         success: false,
         error: { code: "VALIDATION_ERROR", message: validation.error.errors[0].message }
+      });
+    }
+
+    const activeBatchValidation = await validateSingleActiveBatch(eventId, validation.data.status, validation.data.ativo, req.params.id);
+    if (!activeBatchValidation.valid) {
+      return res.status(400).json({
+        success: false,
+        error: { code: "MULTIPLE_ACTIVE_BATCHES", message: activeBatchValidation.error }
       });
     }
 
