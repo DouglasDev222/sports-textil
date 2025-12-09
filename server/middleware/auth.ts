@@ -14,7 +14,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   if (!req.session?.adminUserId) {
     return res.status(401).json({ 
       success: false, 
-      error: { code: "UNAUTHORIZED", message: "Autenticacao necessaria" } 
+      error: { code: "UNAUTHORIZED", message: "Autenticação necessária" } 
     });
   }
 
@@ -23,7 +23,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     if (!user) {
       return res.status(401).json({ 
         success: false, 
-        error: { code: "UNAUTHORIZED", message: "Usuario nao encontrado" } 
+        error: { code: "UNAUTHORIZED", message: "Usuário não encontrado" } 
       });
     }
 
@@ -50,14 +50,14 @@ export function requireRole(...allowedRoles: UserRole[]) {
     if (!req.adminUser) {
       return res.status(401).json({ 
         success: false, 
-        error: { code: "UNAUTHORIZED", message: "Autenticacao necessaria" } 
+        error: { code: "UNAUTHORIZED", message: "Autenticação necessária" } 
       });
     }
     
     if (!allowedRoles.includes(req.adminUser.role)) {
       return res.status(403).json({ 
         success: false, 
-        error: { code: "FORBIDDEN", message: "Permissao negada" } 
+        error: { code: "FORBIDDEN", message: "Permissão negada" } 
       });
     }
     

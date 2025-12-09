@@ -165,7 +165,7 @@ export default function CadastroPage() {
     }
     
     if (month < 1 || month > 12) {
-      return { valid: false, error: 'Mes deve ser entre 1 e 12' };
+      return { valid: false, error: 'Mês deve ser entre 1 e 12' };
     }
     
     if (year < 1900 || year > currentYear) {
@@ -177,7 +177,7 @@ export default function CadastroPage() {
     if (isLeapYear) daysInMonth[1] = 29;
     
     if (day > daysInMonth[month - 1]) {
-      return { valid: false, error: `Este mes tem no maximo ${daysInMonth[month - 1]} dias` };
+      return { valid: false, error: `Este mês tem no máximo ${daysInMonth[month - 1]} dias` };
     }
     
     return { valid: true };
@@ -207,7 +207,7 @@ export default function CadastroPage() {
     const dateValidation = validateDataNascimento(dataNascimento);
     if (!dateValidation.valid) {
       toast({
-        title: "Data de nascimento invalida",
+        title: "Data de nascimento inválida",
         description: dateValidation.error,
         variant: "destructive",
       });

@@ -134,7 +134,7 @@ export default function InscricaoModalidadePage() {
           <AlertCircle className="h-16 w-16 mx-auto text-destructive mb-4" />
           <h1 className="text-2xl font-bold mb-2">Erro ao carregar dados</h1>
           <p className="text-muted-foreground mb-6">
-            Nao foi possivel carregar as informacoes do evento.
+            Não foi possível carregar as informações do evento.
           </p>
           <Button onClick={() => setLocation(`/evento/${slug}`)}>
             Voltar para o evento
@@ -176,11 +176,11 @@ export default function InscricaoModalidadePage() {
       case "paga":
         return null;
       case "voucher":
-        return <Badge>Codigo</Badge>;
+        return <Badge>Código</Badge>;
       case "pcd":
         return <Badge>PCD</Badge>;
       case "aprovacao_manual":
-        return <Badge>Aprovacao</Badge>;
+        return <Badge>Aprovação</Badge>;
       default:
         return null;
     }
@@ -210,7 +210,7 @@ export default function InscricaoModalidadePage() {
             Escolha a Modalidade
           </h1>
           <p className="text-muted-foreground">
-            Selecione a distancia e o tamanho da sua camisa
+            Selecione a distância e o tamanho da sua camisa
           </p>
           {activeBatch && (
             <p className="text-sm text-primary mt-1">
@@ -284,12 +284,12 @@ export default function InscricaoModalidadePage() {
                 <ShieldCheck className="h-5 w-5 text-primary" />
                 <div className="flex-1">
                   <AlertDescription className="text-sm">
-                    Esta modalidade requer um codigo de acesso. Insira o codigo fornecido para continuar.
+                    Esta modalidade requer um código de acesso. Insira o código fornecido para continuar.
                   </AlertDescription>
                   
                   <div className="mt-3">
                     <Label htmlFor="codigo-comprovacao" className="text-sm font-medium mb-2 block">
-                      Codigo de Acesso
+                      Código de Acesso
                     </Label>
                     <Input
                       id="codigo-comprovacao"
@@ -311,7 +311,7 @@ export default function InscricaoModalidadePage() {
                 <AlertCircle className="h-5 w-5 text-primary" />
                 <div className="flex-1">
                   <AlertDescription className="text-sm">
-                    Esta modalidade requer aprovacao. Sua inscricao sera analisada e voce recebera a confirmacao por email em ate 48 horas.
+                    Esta modalidade requer aprovação. Sua inscrição será analisada e você receberá a confirmação por email em até 48 horas.
                   </AlertDescription>
                 </div>
               </div>
@@ -366,7 +366,7 @@ export default function InscricaoModalidadePage() {
                   ) : (
                     <p className="text-lg md:text-xl font-bold text-green-600 dark:text-green-400 flex items-center gap-2">
                       <CheckCircle className="h-5 w-5" />
-                      Inscricao Gratuita
+                      Inscrição Gratuita
                     </p>
                   )}
                 </>

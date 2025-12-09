@@ -77,7 +77,7 @@ export default function LoginPage() {
     
     if (!cpf || !dataNascimento) {
       toast({
-        title: "Campos obrigatorios",
+        title: "Campos obrigatórios",
         description: "Preencha o CPF e a data de nascimento.",
         variant: "destructive"
       });
@@ -87,7 +87,7 @@ export default function LoginPage() {
     const dataISO = convertToISO(dataNascimento);
     if (!dataISO) {
       toast({
-        title: "Data invalida",
+        title: "Data inválida",
         description: "Preencha a data no formato DD/MM/AAAA.",
         variant: "destructive"
       });
@@ -103,7 +103,7 @@ export default function LoginPage() {
     if (result.success) {
       toast({
         title: "Login realizado!",
-        description: "Voce sera redirecionado em instantes.",
+        description: "Você será redirecionado em instantes.",
       });
       setLocation(redirectTo);
     } else {
@@ -127,7 +127,7 @@ export default function LoginPage() {
                 Acesse sua Conta
               </h1>
               <p className="text-lg text-muted-foreground">
-                Entre para gerenciar suas inscricoes, acompanhar eventos e manter seus dados atualizados.
+                Entre para gerenciar suas inscrições, acompanhar eventos e manter seus dados atualizados.
               </p>
             </div>
 
@@ -137,7 +137,7 @@ export default function LoginPage() {
                   <LogIn className="h-5 w-5 text-primary" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-foreground mb-1">Acesso Rapido</h3>
+                  <h3 className="font-semibold text-foreground mb-1">Acesso Rápido</h3>
                   <p className="text-sm text-muted-foreground">
                     Use seu CPF e data de nascimento para entrar de forma segura
                   </p>
@@ -223,7 +223,7 @@ export default function LoginPage() {
                     </div>
                     <div className="relative flex justify-center text-xs uppercase">
                       <span className="bg-card px-2 text-muted-foreground">
-                        Nao tem conta?
+                        Não tem conta?
                       </span>
                     </div>
                   </div>

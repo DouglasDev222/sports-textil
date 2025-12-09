@@ -48,7 +48,7 @@ const menuItems: MenuItem[] = [
     icon: Calendar,
   },
   {
-    title: "Usuarios",
+    title: "Usuários",
     url: "/admin/usuarios",
     icon: UserCog,
     roles: ["superadmin"],

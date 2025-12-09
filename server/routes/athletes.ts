@@ -25,7 +25,7 @@ router.post("/login", async (req, res) => {
     if (!parsed.success) {
       return res.status(400).json({ 
         success: false, 
-        error: "Dados invalidos",
+        error: "Dados inválidos",
         details: parsed.error.flatten() 
       });
     }
@@ -41,7 +41,7 @@ router.post("/login", async (req, res) => {
     if (!athlete) {
       return res.status(404).json({ 
         success: false, 
-        error: "Atleta nao encontrado. Verifique o CPF ou faca seu cadastro." 
+        error: "Atleta não encontrado. Verifique o CPF ou faça seu cadastro." 
       });
     }
 
@@ -81,7 +81,7 @@ router.post("/register", async (req, res) => {
     if (!parsed.success) {
       return res.status(400).json({ 
         success: false, 
-        error: "Dados invalidos",
+        error: "Dados inválidos",
         details: parsed.error.flatten() 
       });
     }
@@ -90,7 +90,7 @@ router.post("/register", async (req, res) => {
     if (existingAthleteByCpf) {
       return res.status(409).json({ 
         success: false, 
-        error: "CPF ja cadastrado. Faca login com suas credenciais." 
+        error: "CPF já cadastrado. Faça login com suas credenciais." 
       });
     }
 
@@ -98,7 +98,7 @@ router.post("/register", async (req, res) => {
     if (existingAthleteByEmail) {
       return res.status(409).json({ 
         success: false, 
-        error: "E-mail ja cadastrado. Use outro e-mail ou faca login." 
+        error: "E-mail já cadastrado. Use outro e-mail ou faça login." 
       });
     }
 
@@ -133,7 +133,7 @@ router.get("/me", async (req, res) => {
     if (!athleteId) {
       return res.status(401).json({ 
         success: false, 
-        error: "Nao autenticado" 
+        error: "Não autenticado" 
       });
     }
 
@@ -142,7 +142,7 @@ router.get("/me", async (req, res) => {
     if (!athlete) {
       return res.status(404).json({ 
         success: false, 
-        error: "Atleta nao encontrado" 
+        error: "Atleta não encontrado" 
       });
     }
 
@@ -179,7 +179,7 @@ router.put("/me", async (req, res) => {
     if (!athleteId) {
       return res.status(401).json({ 
         success: false, 
-        error: "Nao autenticado" 
+        error: "Não autenticado" 
       });
     }
 
@@ -203,7 +203,7 @@ router.put("/me", async (req, res) => {
     if (!parsed.success) {
       return res.status(400).json({ 
         success: false, 
-        error: "Dados invalidos",
+        error: "Dados inválidos",
         details: parsed.error.flatten() 
       });
     }
@@ -213,7 +213,7 @@ router.put("/me", async (req, res) => {
     if (!updatedAthlete) {
       return res.status(404).json({ 
         success: false, 
-        error: "Atleta nao encontrado" 
+        error: "Atleta não encontrado" 
       });
     }
 

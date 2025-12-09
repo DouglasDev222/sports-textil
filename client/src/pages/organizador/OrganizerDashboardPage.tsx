@@ -88,7 +88,7 @@ export default function OrganizerDashboardPage() {
               <StatsCard
                 title="Pagos"
                 value={0}
-                description="Inscricoes confirmadas"
+                description="Inscrições confirmadas"
                 icon={TrendingUp}
                 isLoading={isLoading}
               />
@@ -111,12 +111,12 @@ export default function OrganizerDashboardPage() {
             <div className="grid gap-4 md:grid-cols-2">
               <Card>
                 <CardHeader>
-                  <CardTitle>Inscricoes Recentes</CardTitle>
-                  <CardDescription>Ultimas inscricoes no evento</CardDescription>
+                  <CardTitle>Inscrições Recentes</CardTitle>
+                  <CardDescription>Últimas inscrições no evento</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm text-muted-foreground py-4 text-center">
-                    Nenhuma inscricao ainda
+                    Nenhuma inscrição ainda
                   </p>
                 </CardContent>
               </Card>
@@ -138,7 +138,7 @@ export default function OrganizerDashboardPage() {
           <Card>
             <CardContent className="py-8">
               <p className="text-center text-muted-foreground">
-                Voce nao tem nenhum evento vinculado a sua conta.
+                Você não tem nenhum evento vinculado a sua conta.
                 Entre em contato com o administrador.
               </p>
             </CardContent>

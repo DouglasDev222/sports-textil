@@ -36,7 +36,7 @@ export default function EventosPage() {
         <div className="absolute inset-0 z-20 flex items-center justify-center">
           <div className="text-center px-4 max-w-3xl">
             <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
-              Encontre Sua Proxima Corrida
+              Encontre Sua Próxima Corrida
             </h1>
             <p className="text-lg md:text-xl text-white/90 mb-6">
               Inscreva-se nos melhores eventos esportivos do Brasil
@@ -62,7 +62,7 @@ export default function EventosPage() {
 
         <div className="mb-6">
           <h2 className="text-2xl md:text-3xl font-bold text-foreground">
-            Eventos Disponiveis
+            Eventos Disponíveis
           </h2>
           <p className="text-muted-foreground mt-1">
             {isLoading ? "Carregando..." : `${filteredEvents.length} ${filteredEvents.length === 1 ? 'evento encontrado' : 'eventos encontrados'}`}
@@ -108,10 +108,10 @@ export default function EventosPage() {
             ) : (
               <>
                 <p className="text-muted-foreground text-lg mb-2">
-                  Nenhum evento disponivel no momento
+                  Nenhum evento disponível no momento
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  Novos eventos serao publicados em breve. Volte mais tarde!
+                  Novos eventos serão publicados em breve. Volte mais tarde!
                 </p>
               </>
             )}

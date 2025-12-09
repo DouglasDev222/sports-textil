@@ -5,11 +5,11 @@ import { Home } from "lucide-react";
 
 export default function OrganizerNotFound() {
   return (
-    <OrganizerLayout title="Pagina nao encontrada">
+    <OrganizerLayout title="Página não encontrada">
       <div className="flex flex-col items-center justify-center py-16">
         <h1 className="text-4xl font-bold text-muted-foreground">404</h1>
         <p className="mt-2 text-lg text-muted-foreground">
-          Pagina nao encontrada
+          Página não encontrada
         </p>
         <Button asChild className="mt-6">
           <Link href="/organizadores">

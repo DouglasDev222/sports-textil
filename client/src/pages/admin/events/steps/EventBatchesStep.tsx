@@ -100,9 +100,9 @@ export function EventBatchesStep({ formData, updateFormData }: EventBatchesStepP
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
           <div>
-            <CardTitle>Lotes de Inscricao</CardTitle>
+            <CardTitle>Lotes de Inscrição</CardTitle>
             <p className="text-sm text-muted-foreground mt-1">
-              Configure os periodos de inscricao e seus limites
+              Configure os períodos de inscrição e seus limites
             </p>
           </div>
           <Dialog open={batchDialogOpen} onOpenChange={setBatchDialogOpen}>
@@ -123,7 +123,7 @@ export function EventBatchesStep({ formData, updateFormData }: EventBatchesStepP
                 <div className="flex items-start gap-2 p-3 bg-muted/50 rounded-md text-sm">
                   <Info className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
                   <div className="text-muted-foreground">
-                    <span className="font-medium text-foreground">Periodo de inscricoes do evento:</span>
+                    <span className="font-medium text-foreground">Período de inscrições do evento:</span>
                     <br />
                     {formData.event.aberturaInscricoes && (
                       <span>Inicio: {formatTimestampAsDateBrazil(formData.event.aberturaInscricoes)}</span>

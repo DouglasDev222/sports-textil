@@ -18,11 +18,11 @@ router.get("/events/:slug/registration-info", async (req, res) => {
     
     const event = await storage.getEventBySlug(slug);
     if (!event) {
-      return res.status(404).json({ success: false, error: "Evento nao encontrado" });
+      return res.status(404).json({ success: false, error: "Evento não encontrado" });
     }
 
     if (event.status !== "publicado") {
-      return res.status(400).json({ success: false, error: "Evento nao disponivel para inscricoes" });
+      return res.status(400).json({ success: false, error: "Evento não disponível para inscrições" });
     }
 
     const now = new Date();
@@ -32,7 +32,7 @@ router.get("/events/:slug/registration-info", async (req, res) => {
     if (now < abertura) {
       return res.status(400).json({ 
         success: false, 
-        error: "Inscricoes ainda nao abertas",
+        error: "Inscrições ainda não abertas",
         aberturaInscricoes: event.aberturaInscricoes
       });
     }
@@ -40,7 +40,7 @@ router.get("/events/:slug/registration-info", async (req, res) => {
     if (now > encerramento) {
       return res.status(400).json({ 
         success: false, 
-        error: "Inscricoes encerradas" 
+        error: "Inscrições encerradas" 
       });
     }
 
@@ -140,7 +140,7 @@ router.get("/events/:slug/registration-info", async (req, res) => {
       }
     });
   } catch (error) {
-    console.error("Erro ao buscar informacoes de inscricao:", error);
+    console.error("Erro ao buscar informações de inscrição:", error);
     res.status(500).json({ success: false, error: "Erro interno do servidor" });
   }
 });
@@ -149,14 +149,14 @@ router.post("/", async (req, res) => {
   try {
     const sessionAthleteId = (req.session as any)?.athleteId;
     if (!sessionAthleteId) {
-      return res.status(401).json({ success: false, error: "Nao autenticado" });
+      return res.status(401).json({ success: false, error: "Não autenticado" });
     }
 
     const parsed = createRegistrationSchema.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({ 
         success: false, 
-        error: "Dados invalidos",
+        error: "Dados inválidos",
         details: parsed.error.flatten() 
       });
     }
@@ -166,31 +166,31 @@ router.post("/", async (req, res) => {
 
     const event = await storage.getEvent(eventId);
     if (!event) {
-      return res.status(404).json({ success: false, error: "Evento nao encontrado" });
+      return res.status(404).json({ success: false, error: "Evento não encontrado" });
     }
 
     if (event.status !== "publicado") {
-      return res.status(400).json({ success: false, error: "Evento nao disponivel para inscricoes" });
+      return res.status(400).json({ success: false, error: "Evento não disponível para inscrições" });
     }
 
     const now = new Date();
     if (now < new Date(event.aberturaInscricoes) || now > new Date(event.encerramentoInscricoes)) {
-      return res.status(400).json({ success: false, error: "Periodo de inscricoes encerrado" });
+      return res.status(400).json({ success: false, error: "Período de inscrições encerrado" });
     }
 
     const modality = await storage.getModality(modalityId);
     if (!modality || modality.eventId !== eventId) {
-      return res.status(404).json({ success: false, error: "Modalidade nao encontrada" });
+      return res.status(404).json({ success: false, error: "Modalidade não encontrada" });
     }
 
     const activeBatch = await storage.getActiveBatch(eventId);
     if (!activeBatch) {
-      return res.status(400).json({ success: false, error: "Nenhum lote disponivel" });
+      return res.status(400).json({ success: false, error: "Nenhum lote disponível" });
     }
 
     const athlete = await storage.getAthlete(athleteId);
     if (!athlete) {
-      return res.status(404).json({ success: false, error: "Atleta nao encontrado" });
+      return res.status(404).json({ success: false, error: "Atleta não encontrado" });
     }
 
     const price = await storage.getPrice(modalityId, activeBatch.id);
@@ -260,7 +260,7 @@ router.post("/", async (req, res) => {
     });
 
   } catch (error: any) {
-    console.error("Erro ao criar inscricao:", error);
+    console.error("Erro ao criar inscrição:", error);
     
     if (error.message?.includes("Lote esgotado")) {
       return res.status(400).json({ success: false, error: "Lote esgotado" });
@@ -280,18 +280,18 @@ router.get("/orders/:orderId", async (req, res) => {
   try {
     const athleteId = (req.session as any)?.athleteId;
     if (!athleteId) {
-      return res.status(401).json({ success: false, error: "Nao autenticado" });
+      return res.status(401).json({ success: false, error: "Não autenticado" });
     }
 
     const { orderId } = req.params;
     const order = await storage.getOrder(orderId);
     
     if (!order) {
-      return res.status(404).json({ success: false, error: "Pedido nao encontrado" });
+      return res.status(404).json({ success: false, error: "Pedido não encontrado" });
     }
 
     if (order.compradorId !== athleteId) {
-      return res.status(403).json({ success: false, error: "Acesso nao autorizado" });
+      return res.status(403).json({ success: false, error: "Acesso não autorizado" });
     }
 
     const event = await storage.getEvent(order.eventId);
@@ -351,7 +351,7 @@ router.get("/my-registrations", async (req, res) => {
   try {
     const athleteId = (req.session as any)?.athleteId;
     if (!athleteId) {
-      return res.status(401).json({ success: false, error: "Nao autenticado" });
+      return res.status(401).json({ success: false, error: "Não autenticado" });
     }
 
     const registrations = await storage.getRegistrationsByAthlete(athleteId);
@@ -403,7 +403,7 @@ router.get("/my-registrations", async (req, res) => {
 
     res.json({ success: true, data: registrationsWithDetails });
   } catch (error) {
-    console.error("Erro ao buscar inscricoes:", error);
+    console.error("Erro ao buscar inscrições:", error);
     res.status(500).json({ success: false, error: "Erro interno do servidor" });
   }
 });
@@ -412,7 +412,7 @@ router.get("/my-orders", async (req, res) => {
   try {
     const athleteId = (req.session as any)?.athleteId;
     if (!athleteId) {
-      return res.status(401).json({ success: false, error: "Nao autenticado" });
+      return res.status(401).json({ success: false, error: "Não autenticado" });
     }
 
     const orders = await storage.getOrdersByBuyer(athleteId);

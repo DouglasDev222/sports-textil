@@ -210,7 +210,7 @@ export function EventBasicInfoStep({ formData, updateFormData }: EventBasicInfoS
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="encerramentoInscricoes">Encerramento das Inscricoes *</Label>
+          <Label htmlFor="encerramentoInscricoes">Encerramento das Inscrições *</Label>
           <Input
             id="encerramentoInscricoes"
             type="datetime-local"
@@ -227,7 +227,7 @@ export function EventBasicInfoStep({ formData, updateFormData }: EventBasicInfoS
 
       <div className="grid gap-4 md:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor="idadeMinimaEvento">Idade Minima para Inscricao</Label>
+          <Label htmlFor="idadeMinimaEvento">Idade Mínima para Inscrição</Label>
           <Input
             id="idadeMinimaEvento"
             type="number"
@@ -239,7 +239,7 @@ export function EventBasicInfoStep({ formData, updateFormData }: EventBasicInfoS
             data-testid="input-minimum-age"
           />
           <p className="text-xs text-muted-foreground">
-            Idade minima padrao para todas as modalidades. Pode ser personalizado por modalidade.
+            Idade mínima padrão para todas as modalidades. Pode ser personalizado por modalidade.
           </p>
         </div>
       </div>
@@ -248,10 +248,10 @@ export function EventBasicInfoStep({ formData, updateFormData }: EventBasicInfoS
         <CardContent className="pt-6">
           <div className="flex items-center justify-between gap-4">
             <div className="space-y-0.5">
-              <Label htmlFor="permitirMultiplasModalidades">Permitir Multiplas Modalidades por Atleta</Label>
+              <Label htmlFor="permitirMultiplasModalidades">Permitir Múltiplas Modalidades por Atleta</Label>
               <p className="text-xs text-muted-foreground">
                 Quando ativado, o atleta pode se inscrever em mais de uma modalidade no mesmo evento. 
-                Ainda nao podera repetir a mesma modalidade.
+                Ainda não poderá repetir a mesma modalidade.
               </p>
             </div>
             <Switch

@@ -109,8 +109,8 @@ export function EventModalitiesStep({ formData, updateFormData }: EventModalitie
     const file = files[0];
     if (!file.type.startsWith("image/")) {
       toast({
-        title: "Arquivo invalido",
-        description: "Apenas imagens sao permitidas",
+        title: "Arquivo inválido",
+        description: "Apenas imagens são permitidas",
         variant: "destructive"
       });
       return;
@@ -125,7 +125,7 @@ export function EventModalitiesStep({ formData, updateFormData }: EventModalitie
     reader.onerror = () => {
       toast({
         title: "Erro ao carregar imagem",
-        description: "Nao foi possivel carregar a imagem",
+        description: "Não foi possível carregar a imagem",
         variant: "destructive"
       });
       setIsUploadingImage(false);

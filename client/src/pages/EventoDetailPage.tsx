@@ -61,9 +61,9 @@ export default function EventoDetailPage() {
         <Header />
         <div className="max-w-7xl mx-auto px-4 md:px-6 py-16 text-center">
           <AlertCircle className="h-16 w-16 mx-auto text-destructive mb-4" />
-          <h1 className="text-2xl font-bold mb-2">Evento nao encontrado</h1>
+          <h1 className="text-2xl font-bold mb-2">Evento não encontrado</h1>
           <p className="text-muted-foreground mb-6">
-            O evento que voce esta procurando nao existe ou nao esta mais disponivel.
+            O evento que você está procurando não existe ou não está mais disponível.
           </p>
           <Button onClick={() => setLocation("/")}>
             Ver todos os eventos
@@ -225,7 +225,7 @@ export default function EventoDetailPage() {
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <Award className="h-5 w-5" />
-                      Modalidades Disponiveis
+                      Modalidades Disponíveis
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -251,7 +251,7 @@ export default function EventoDetailPage() {
                                 <span>Limite: {mod.limiteVagas} vagas</span>
                               )}
                               {(mod.idadeMinima !== null && mod.idadeMinima !== undefined) || event.idadeMinimaEvento ? (
-                                <span>Idade minima: {mod.idadeMinima ?? event.idadeMinimaEvento} anos</span>
+                                <span>Idade mínima: {mod.idadeMinima ?? event.idadeMinimaEvento} anos</span>
                               ) : null}
                             </div>
                           </div>
@@ -278,10 +278,10 @@ export default function EventoDetailPage() {
                     <div className="text-center py-8">
                       <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                       <p className="text-muted-foreground font-medium mb-2">
-                        Informacoes em breve
+                        Informações em breve
                       </p>
                       <p className="text-sm text-muted-foreground">
-                        As informacoes sobre retirada de kit serao divulgadas em breve.
+                        As informações sobre retirada de kit serão divulgadas em breve.
                       </p>
                     </div>
                   </CardContent>
@@ -309,7 +309,7 @@ export default function EventoDetailPage() {
                               <div>
                                 <p className="font-medium text-foreground">{doc.nome}</p>
                                 {doc.obrigatorioAceitar && (
-                                  <span className="text-xs text-destructive">Aceite obrigatorio</span>
+                                  <span className="text-xs text-destructive">Aceite obrigatório</span>
                                 )}
                               </div>
                             </div>

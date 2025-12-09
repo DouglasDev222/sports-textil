@@ -42,7 +42,7 @@ export function ImageUpload({
     if (remainingSlots <= 0) {
       toast({
         title: "Limite atingido",
-        description: `Voce pode adicionar no maximo ${maxImages} imagens`,
+        description: `Você pode adicionar no máximo ${maxImages} imagens`,
         variant: "destructive"
       });
       return;
@@ -53,8 +53,8 @@ export function ImageUpload({
     for (const file of filesToUpload) {
       if (!file.type.startsWith("image/")) {
         toast({
-          title: "Arquivo invalido",
-          description: "Apenas imagens sao permitidas",
+          title: "Arquivo inválido",
+          description: "Apenas imagens são permitidas",
           variant: "destructive"
         });
         return;
@@ -94,7 +94,7 @@ export function ImageUpload({
         console.error("Upload error:", error);
         toast({
           title: "Erro no upload",
-          description: "Nao foi possivel fazer upload das imagens",
+          description: "Não foi possível fazer upload das imagens",
           variant: "destructive"
         });
       } finally {
@@ -136,7 +136,7 @@ export function ImageUpload({
         console.error("Remove error:", error);
         toast({
           title: "Erro ao remover",
-          description: "Nao foi possivel remover a imagem",
+          description: "Não foi possível remover a imagem",
           variant: "destructive"
         });
         return;
@@ -283,8 +283,8 @@ export function SingleImageUpload({
     const file = files[0];
     if (!file.type.startsWith("image/")) {
       toast({
-        title: "Arquivo invalido",
-        description: "Apenas imagens sao permitidas",
+        title: "Arquivo inválido",
+        description: "Apenas imagens são permitidas",
         variant: "destructive"
       });
       return;
@@ -322,7 +322,7 @@ export function SingleImageUpload({
         console.error("Upload error:", error);
         toast({
           title: "Erro no upload",
-          description: "Nao foi possivel fazer upload da imagem",
+          description: "Não foi possível fazer upload da imagem",
           variant: "destructive"
         });
       } finally {
@@ -352,7 +352,7 @@ export function SingleImageUpload({
         console.error("Remove error:", error);
         toast({
           title: "Erro ao remover",
-          description: "Nao foi possivel remover a imagem",
+          description: "Não foi possível remover a imagem",
           variant: "destructive"
         });
         return;

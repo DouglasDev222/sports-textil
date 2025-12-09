@@ -121,12 +121,12 @@ export default function InscricaoDetailPage() {
         <Header />
         <div className="max-w-5xl mx-auto px-4 md:px-6 py-16 text-center">
           <AlertCircle className="h-16 w-16 mx-auto text-destructive mb-4" />
-          <h1 className="text-2xl font-bold mb-2">Inscricao nao encontrada</h1>
+          <h1 className="text-2xl font-bold mb-2">Inscrição não encontrada</h1>
           <p className="text-muted-foreground mb-6">
-            A inscricao que voce esta procurando nao existe ou nao esta disponivel.
+            A inscrição que você está procurando não existe ou não está disponível.
           </p>
           <Button onClick={() => setLocation("/minhas-inscricoes")}>
-            Ver minhas inscricoes
+            Ver minhas inscrições
           </Button>
         </div>
       </div>
@@ -141,19 +141,19 @@ export default function InscricaoDetailPage() {
       variant: "default" as const,
       label: "Confirmada",
       icon: CheckCircle2,
-      description: "Sua inscricao esta confirmada! Voce recebera um e-mail com mais informacoes sobre a retirada do kit."
+      description: "Sua inscrição está confirmada! Você receberá um e-mail com mais informações sobre a retirada do kit."
     },
     pendente: {
       variant: "secondary" as const,
       label: "Aguardando Pagamento",
       icon: Clock,
-      description: "Estamos aguardando a confirmacao do pagamento. Isso pode levar ate 48 horas."
+      description: "Estamos aguardando a confirmação do pagamento. Isso pode levar até 48 horas."
     },
     cancelada: {
       variant: "destructive" as const,
       label: "Cancelada",
       icon: AlertCircle,
-      description: "Esta inscricao foi cancelada."
+      description: "Esta inscrição foi cancelada."
     }
   };
 
@@ -195,7 +195,7 @@ export default function InscricaoDetailPage() {
                 )}
                 <div className="flex items-center gap-1">
                   <Hash className="h-4 w-4" />
-                  <span className="text-sm font-medium">Inscricao #{registration.numeroInscricao}</span>
+                  <span className="text-sm font-medium">Inscrição #{registration.numeroInscricao}</span>
                 </div>
               </div>
               <h1 className="text-2xl md:text-4xl font-bold text-white mb-2">
@@ -224,10 +224,10 @@ export default function InscricaoDetailPage() {
                 <PartyPopper className="h-8 w-8 text-green-600" />
                 <div>
                   <p className="font-semibold text-green-800 dark:text-green-400">
-                    Inscricao realizada com sucesso!
+                    Inscrição realizada com sucesso!
                   </p>
                   <p className="text-sm text-green-700 dark:text-green-500">
-                    Sua inscricao foi confirmada. Guarde o numero da inscricao para referencia.
+                    Sua inscrição foi confirmada. Guarde o número da inscrição para referência.
                   </p>
                 </div>
               </div>
@@ -244,7 +244,7 @@ export default function InscricaoDetailPage() {
                     <StatusIcon className="h-5 w-5 text-primary" />
                   </div>
                   <div>
-                    <CardTitle>Status da Inscricao</CardTitle>
+                    <CardTitle>Status da Inscrição</CardTitle>
                   </div>
                 </div>
               </CardHeader>
@@ -260,7 +260,7 @@ export default function InscricaoDetailPage() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Calendar className="h-5 w-5" />
-                    Informacoes do Evento
+                    Informações do Evento
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -282,7 +282,7 @@ export default function InscricaoDetailPage() {
                     onClick={() => handleVerEvento(registration.evento!.slug)}
                     data-testid="button-ver-evento"
                   >
-                    Ver Pagina do Evento
+                    Ver Página do Evento
                   </Button>
                 </CardContent>
               </Card>
@@ -331,12 +331,12 @@ export default function InscricaoDetailPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Award className="h-5 w-5" />
-                  Detalhes da Inscricao
+                  Detalhes da Inscrição
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <p className="text-sm text-muted-foreground mb-1">Numero da Inscricao</p>
+                  <p className="text-sm text-muted-foreground mb-1">Número da Inscrição</p>
                   <p className="font-mono text-2xl font-bold text-primary flex items-center gap-2">
                     <Hash className="h-5 w-5" />
                     {registration.numeroInscricao}
@@ -380,7 +380,7 @@ export default function InscricaoDetailPage() {
                 )}
                 <Separator />
                 <div>
-                  <p className="text-sm text-muted-foreground mb-1">Data da Inscricao</p>
+                  <p className="text-sm text-muted-foreground mb-1">Data da Inscrição</p>
                   <p className="text-sm text-foreground">{formattedInscricaoDate}</p>
                 </div>
                 <Separator />

@@ -428,7 +428,7 @@ export function EventFinishStep({ formData, updateFormData }: EventFinishStepPro
 
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
-                    <Label>Aceite Obrigatorio</Label>
+                    <Label>Aceite Obrigatório</Label>
                     <p className="text-sm text-muted-foreground">
                       Participante deve aceitar para se inscrever
                     </p>
@@ -488,7 +488,7 @@ export function EventFinishStep({ formData, updateFormData }: EventFinishStepPro
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-medium">{attachment.nome}</span>
                           {attachment.obrigatorioAceitar && (
-                            <span className="text-xs text-destructive">(Aceite obrigatorio)</span>
+                            <span className="text-xs text-destructive">(Aceite obrigatório)</span>
                           )}
                         </div>
                         {isLocalFile ? (

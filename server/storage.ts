@@ -539,17 +539,17 @@ export class DbStorage implements IStorage {
 
     const event = await this.getEvent(insertRegistration.eventId);
     if (!event) {
-      throw new Error("Evento nao encontrado");
+      throw new Error("Evento não encontrado");
     }
 
     const modality = await this.getModality(insertRegistration.modalityId);
     if (!modality) {
-      throw new Error("Modalidade nao encontrada");
+      throw new Error("Modalidade não encontrada");
     }
 
     const athlete = await this.getAthlete(insertRegistration.athleteId);
     if (!athlete) {
-      throw new Error("Atleta nao encontrado");
+      throw new Error("Atleta não encontrado");
     }
 
     const idadeMinima = modality.idadeMinima ?? event.idadeMinimaEvento ?? 18;
@@ -563,7 +563,7 @@ export class DbStorage implements IStorage {
     }
 
     if (age < idadeMinima) {
-      throw new Error(`Idade minima para esta modalidade e ${idadeMinima} anos. O participante tera ${age} anos na data do evento.`);
+      throw new Error(`Idade mínima para esta modalidade é ${idadeMinima} anos. O participante terá ${age} anos na data do evento.`);
     }
 
     if (insertRegistration.tamanhoCamisa) {
@@ -578,7 +578,7 @@ export class DbStorage implements IStorage {
       }
 
       if (!shirtSize) {
-        throw new Error(`Tamanho ${insertRegistration.tamanhoCamisa} nao disponivel para este evento/modalidade`);
+        throw new Error(`Tamanho ${insertRegistration.tamanhoCamisa} não disponível para este evento/modalidade`);
       }
 
       if (shirtSize.quantidadeDisponivel <= 0) {
