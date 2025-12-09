@@ -24,10 +24,12 @@ router.get("/:eventId/stats", requireAuth, async (req, res) => {
       });
     }
 
-    const [registrations, modalities, orders] = await Promise.all([
+    const [registrations, modalities, orders, batches, shirtSizes] = await Promise.all([
       storage.getRegistrationsByEvent(eventId),
       storage.getModalitiesByEvent(eventId),
-      storage.getOrdersByEvent(eventId)
+      storage.getOrdersByEvent(eventId),
+      storage.getBatchesByEvent(eventId),
+      storage.getShirtSizesByEvent(eventId)
     ]);
 
     const confirmedRegistrations = registrations.filter(r => r.status === "confirmada");
@@ -49,6 +51,40 @@ router.get("/:eventId/stats", requireAuth, async (req, res) => {
     const totalDescontos = paidOrders.reduce((sum, o) => sum + parseFloat(o.valorDesconto), 0);
     const totalTaxaComodidade = confirmedRegistrations.reduce((sum, r) => sum + parseFloat(r.taxaComodidade), 0);
 
+    const shirtSizeConsumo = confirmedRegistrations.reduce((acc, reg) => {
+      if (reg.tamanhoCamisa) {
+        acc[reg.tamanhoCamisa] = (acc[reg.tamanhoCamisa] || 0) + 1;
+      }
+      return acc;
+    }, {} as Record<string, number>);
+
+    const shirtGrid = shirtSizes.map(size => ({
+      id: size.id,
+      tamanho: size.tamanho,
+      quantidadeTotal: size.quantidadeTotal,
+      quantidadeDisponivel: size.quantidadeDisponivel,
+      consumo: shirtSizeConsumo[size.tamanho] || 0
+    }));
+
+    const now = new Date();
+    const activeBatch = batches.find(b => 
+      b.ativo && 
+      new Date(b.dataInicio) <= now &&
+      (!b.dataTermino || new Date(b.dataTermino) > now) &&
+      (!b.quantidadeMaxima || b.quantidadeUtilizada < b.quantidadeMaxima)
+    );
+
+    const batchesInfo = batches.map(batch => ({
+      id: batch.id,
+      nome: batch.nome,
+      dataInicio: batch.dataInicio,
+      dataTermino: batch.dataTermino,
+      quantidadeMaxima: batch.quantidadeMaxima,
+      quantidadeUtilizada: batch.quantidadeUtilizada,
+      ativo: batch.ativo,
+      isVigente: activeBatch?.id === batch.id
+    }));
+
     res.json({
       success: true,
       data: {
@@ -67,7 +103,10 @@ router.get("/:eventId/stats", requireAuth, async (req, res) => {
           total: event.limiteVagasTotal,
           ocupadas: event.vagasOcupadas,
           disponiveis: event.limiteVagasTotal - event.vagasOcupadas
-        }
+        },
+        shirtGrid,
+        batches: batchesInfo,
+        activeBatchId: activeBatch?.id || null
       }
     });
   } catch (error) {

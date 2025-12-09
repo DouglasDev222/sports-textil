@@ -5,6 +5,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Progress } from "@/components/ui/progress";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { 
   Users, 
   TrendingUp, 
@@ -12,9 +21,33 @@ import {
   BarChart3,
   FileSpreadsheet,
   Pencil,
-  ArrowLeft
+  ArrowLeft,
+  Shirt,
+  Layers,
+  Check,
+  Clock
 } from "lucide-react";
+import { formatDateOnlyBrazil } from "@/lib/timezone";
 import type { Event } from "@shared/schema";
+
+interface ShirtGridItem {
+  id: string;
+  tamanho: string;
+  quantidadeTotal: number;
+  quantidadeDisponivel: number;
+  consumo: number;
+}
+
+interface BatchInfo {
+  id: string;
+  nome: string;
+  dataInicio: string;
+  dataTermino: string | null;
+  quantidadeMaxima: number | null;
+  quantidadeUtilizada: number;
+  ativo: boolean;
+  isVigente: boolean;
+}
 
 interface EventStats {
   totalInscritos: number;
@@ -39,6 +72,9 @@ interface EventStats {
     ocupadas: number;
     disponiveis: number;
   };
+  shirtGrid: ShirtGridItem[];
+  batches: BatchInfo[];
+  activeBatchId: string | null;
 }
 
 export default function AdminEventManagePage() {
@@ -107,6 +143,8 @@ export default function AdminEventManagePage() {
       </AdminLayout>
     );
   }
+
+  const activeBatch = stats?.batches?.find(b => b.isVigente);
 
   return (
     <AdminLayout
@@ -207,6 +245,45 @@ export default function AdminEventManagePage() {
           </Card>
         </div>
 
+        {activeBatch && (
+          <Card className="border-primary/50 bg-primary/5">
+            <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Layers className="h-5 w-5 text-primary" />
+                Lote Vigente
+              </CardTitle>
+              <Badge variant="default">Ativo</Badge>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-xl font-semibold">{activeBatch.nome}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {formatDateOnlyBrazil(activeBatch.dataInicio)}
+                      {activeBatch.dataTermino && ` - ${formatDateOnlyBrazil(activeBatch.dataTermino)}`}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-2xl font-bold">{activeBatch.quantidadeUtilizada}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {activeBatch.quantidadeMaxima 
+                        ? `de ${activeBatch.quantidadeMaxima} vagas` 
+                        : "sem limite"}
+                    </p>
+                  </div>
+                </div>
+                {activeBatch.quantidadeMaxima && (
+                  <Progress 
+                    value={(activeBatch.quantidadeUtilizada / activeBatch.quantidadeMaxima) * 100} 
+                    className="h-2"
+                  />
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Card>
             <CardHeader>
@@ -272,6 +349,106 @@ export default function AdminEventManagePage() {
                   </span>
                 </div>
               </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between gap-2">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Shirt className="h-5 w-5" />
+                Grade de Camisas
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {stats?.shirtGrid && stats.shirtGrid.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Tamanho</TableHead>
+                      <TableHead className="text-right">Consumo</TableHead>
+                      <TableHead className="text-right">Disponivel</TableHead>
+                      <TableHead className="text-right">Total</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {stats.shirtGrid.map((size) => (
+                      <TableRow key={size.id} data-testid={`shirt-size-${size.tamanho}`}>
+                        <TableCell className="font-medium">{size.tamanho}</TableCell>
+                        <TableCell className="text-right">
+                          <Badge variant="secondary">{size.consumo}</Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Badge 
+                            variant={size.quantidadeDisponivel > 0 ? "outline" : "destructive"}
+                          >
+                            {size.quantidadeDisponivel}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right text-muted-foreground">
+                          {size.quantidadeTotal}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <p className="text-muted-foreground text-center py-4">
+                  Nenhum tamanho de camisa configurado
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between gap-2">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Layers className="h-5 w-5" />
+                Lotes de Inscricao
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {stats?.batches && stats.batches.length > 0 ? (
+                <div className="space-y-3">
+                  {stats.batches.map((batch) => (
+                    <div 
+                      key={batch.id} 
+                      className={`p-3 rounded-md border ${batch.isVigente ? 'border-primary bg-primary/5' : ''}`}
+                      data-testid={`batch-info-${batch.id}`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          {batch.isVigente ? (
+                            <Check className="h-4 w-4 text-primary" />
+                          ) : batch.ativo ? (
+                            <Clock className="h-4 w-4 text-muted-foreground" />
+                          ) : null}
+                          <span className="font-medium">{batch.nome}</span>
+                          {batch.isVigente && (
+                            <Badge variant="default" size="sm">Vigente</Badge>
+                          )}
+                          {!batch.ativo && (
+                            <Badge variant="secondary" size="sm">Inativo</Badge>
+                          )}
+                        </div>
+                        <span className="font-semibold">
+                          {batch.quantidadeUtilizada}
+                          {batch.quantidadeMaxima && `/${batch.quantidadeMaxima}`}
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {formatDateOnlyBrazil(batch.dataInicio)}
+                        {batch.dataTermino && ` - ${formatDateOnlyBrazil(batch.dataTermino)}`}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-muted-foreground text-center py-4">
+                  Nenhum lote configurado
+                </p>
+              )}
             </CardContent>
           </Card>
         </div>
