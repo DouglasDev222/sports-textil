@@ -273,9 +273,9 @@ export default function AdminEventManagePage() {
                     </p>
                   </div>
                 </div>
-                {activeBatch.quantidadeMaxima && (
+                {activeBatch.quantidadeMaxima && activeBatch.quantidadeMaxima > 0 && (
                   <Progress 
-                    value={(activeBatch.quantidadeUtilizada / activeBatch.quantidadeMaxima) * 100} 
+                    value={Math.min(100, Math.max(0, (activeBatch.quantidadeUtilizada / activeBatch.quantidadeMaxima) * 100))} 
                     className="h-2"
                   />
                 )}
@@ -426,10 +426,10 @@ export default function AdminEventManagePage() {
                           ) : null}
                           <span className="font-medium">{batch.nome}</span>
                           {batch.isVigente && (
-                            <Badge variant="default" size="sm">Vigente</Badge>
+                            <Badge variant="default">Vigente</Badge>
                           )}
                           {!batch.ativo && (
-                            <Badge variant="secondary" size="sm">Inativo</Badge>
+                            <Badge variant="secondary">Inativo</Badge>
                           )}
                         </div>
                         <span className="font-semibold">

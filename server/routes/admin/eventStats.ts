@@ -138,21 +138,28 @@ router.get("/:eventId/registrations", requireAuth, async (req, res) => {
       });
     }
 
-    const [registrations, modalities, athletes] = await Promise.all([
+    const [registrations, modalities, batches] = await Promise.all([
       storage.getRegistrationsByEvent(eventId),
       storage.getModalitiesByEvent(eventId),
-      Promise.resolve([])
+      storage.getBatchesByEvent(eventId)
     ]);
 
     const modalityMap = new Map(modalities.map(m => [m.id, m]));
+    const batchMap = new Map(batches.map(b => [b.id, b]));
 
     const athleteIds = Array.from(new Set(registrations.map(r => r.athleteId)));
     const athletesData = await Promise.all(athleteIds.map(id => storage.getAthlete(id)));
     const athleteMap = new Map(athletesData.filter(Boolean).map(a => [a!.id, a!]));
 
+    const orderIds = Array.from(new Set(registrations.map(r => r.orderId)));
+    const ordersData = await Promise.all(orderIds.map(id => storage.getOrder(id)));
+    const orderMap = new Map(ordersData.filter(Boolean).map(o => [o!.id, o!]));
+
     const enrichedRegistrations = registrations.map(reg => {
       const modality = modalityMap.get(reg.modalityId);
       const athlete = athleteMap.get(reg.athleteId);
+      const batch = batchMap.get(reg.batchId);
+      const order = orderMap.get(reg.orderId);
       
       return {
         ...reg,
@@ -160,6 +167,12 @@ router.get("/:eventId/registrations", requireAuth, async (req, res) => {
         athleteName: reg.nomeCompleto || athlete?.nome || "N/A",
         athleteEmail: athlete?.email || "N/A",
         athletePhone: athlete?.telefone || "N/A",
+        batchName: batch?.nome || "N/A",
+        orderStatus: order?.status || "N/A",
+        metodoPagamento: order?.metodoPagamento || null,
+        dataPagamento: order?.dataPagamento || null,
+        valorTotal: order?.valorTotal || "0",
+        valorDesconto: order?.valorDesconto || "0",
       };
     });
 

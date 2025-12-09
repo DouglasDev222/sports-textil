@@ -8,6 +8,12 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Table,
   TableBody,
   TableCell,
@@ -26,9 +32,20 @@ import {
   Search, 
   Download,
   ArrowLeft,
-  Settings
+  Settings,
+  Check,
+  X,
+  Clock,
+  User,
+  CreditCard,
+  Calendar,
+  Shirt,
+  Hash,
+  Phone,
+  Mail,
+  Layers
 } from "lucide-react";
-import { formatDateOnlyBrazil } from "@/lib/timezone";
+import { formatDateOnlyBrazil, formatDateTimeBrazil } from "@/lib/timezone";
 import type { Event, Modality } from "@shared/schema";
 
 interface EnrichedRegistration {
@@ -50,14 +67,13 @@ interface EnrichedRegistration {
   status: string;
   equipe: string | null;
   dataInscricao: string;
+  batchName: string;
+  orderStatus: string;
+  metodoPagamento: string | null;
+  dataPagamento: string | null;
+  valorTotal: string;
+  valorDesconto: string;
 }
-
-const statusColors: Record<string, string> = {
-  pendente: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
-  confirmada: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
-  cancelada: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
-  no_show: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200",
-};
 
 const statusLabels: Record<string, string> = {
   pendente: "Pendente",
@@ -66,11 +82,84 @@ const statusLabels: Record<string, string> = {
   no_show: "No Show",
 };
 
+const orderStatusLabels: Record<string, string> = {
+  pendente: "Pendente",
+  pago: "Pago",
+  cancelado: "Cancelado",
+  expirado: "Expirado",
+};
+
+const metodoPagamentoLabels: Record<string, string> = {
+  pix: "PIX",
+  credit_card: "Cartao de Credito",
+  boleto: "Boleto",
+  cortesia: "Cortesia",
+};
+
+function formatCPF(cpf: string | null): string {
+  if (!cpf) return "-";
+  const cleaned = cpf.replace(/\D/g, "");
+  if (cleaned.length !== 11) return cpf;
+  return cleaned.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
+}
+
+function StatusIcon({ status }: { status: string }) {
+  switch (status) {
+    case "confirmada":
+      return (
+        <div className="flex items-center justify-center w-6 h-6 rounded-full bg-green-100 dark:bg-green-900" title="Confirmada">
+          <Check className="h-4 w-4 text-green-600 dark:text-green-400" />
+        </div>
+      );
+    case "cancelada":
+      return (
+        <div className="flex items-center justify-center w-6 h-6 rounded-full bg-red-100 dark:bg-red-900" title="Cancelada">
+          <X className="h-4 w-4 text-red-600 dark:text-red-400" />
+        </div>
+      );
+    case "pendente":
+      return (
+        <div className="flex items-center justify-center w-6 h-6 rounded-full bg-yellow-100 dark:bg-yellow-900" title="Pendente">
+          <Clock className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+        </div>
+      );
+    case "no_show":
+      return (
+        <div className="flex items-center justify-center w-6 h-6 rounded-full bg-gray-100 dark:bg-gray-800" title="No Show">
+          <X className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+        </div>
+      );
+    default:
+      return <span>{status}</span>;
+  }
+}
+
+function formatCurrency(value: string | number | null | undefined): string {
+  if (value === null || value === undefined || value === "") {
+    return "R$ 0,00";
+  }
+  let num: number;
+  if (typeof value === "string") {
+    const normalized = value.replace(",", ".");
+    num = parseFloat(normalized);
+  } else {
+    num = value;
+  }
+  if (isNaN(num)) {
+    return "R$ 0,00";
+  }
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }).format(num);
+}
+
 export default function AdminEventInscritosPage() {
   const { id } = useParams<{ id: string }>();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("todos");
   const [modalityFilter, setModalityFilter] = useState<string>("todos");
+  const [selectedRegistration, setSelectedRegistration] = useState<EnrichedRegistration | null>(null);
 
   const { data: eventData, isLoading: eventLoading } = useQuery<{ success: boolean; data: Event }>({
     queryKey: ["/api/admin/events", id],
@@ -281,10 +370,11 @@ export default function AdminEventInscritosPage() {
                       <TableHead>Numero</TableHead>
                       <TableHead>Nome</TableHead>
                       <TableHead>CPF</TableHead>
+                      <TableHead>Nascimento</TableHead>
                       <TableHead>Modalidade</TableHead>
                       <TableHead>Sexo</TableHead>
                       <TableHead>Camisa</TableHead>
-                      <TableHead>Status</TableHead>
+                      <TableHead className="text-center">Status</TableHead>
                       <TableHead>Data</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -295,12 +385,21 @@ export default function AdminEventInscritosPage() {
                           #{reg.numeroInscricao}
                         </TableCell>
                         <TableCell>
-                          <div>
-                            <p className="font-medium">{reg.nomeCompleto || reg.athleteName}</p>
+                          <button
+                            onClick={() => setSelectedRegistration(reg)}
+                            className="text-left hover:underline focus:outline-none focus:underline"
+                            data-testid={`button-view-inscrito-${reg.id}`}
+                          >
+                            <p className="font-medium text-primary">{reg.nomeCompleto || reg.athleteName}</p>
                             <p className="text-xs text-muted-foreground">{reg.athleteEmail}</p>
-                          </div>
+                          </button>
                         </TableCell>
-                        <TableCell>{reg.cpf || "-"}</TableCell>
+                        <TableCell className="font-mono text-sm">
+                          {formatCPF(reg.cpf)}
+                        </TableCell>
+                        <TableCell>
+                          {reg.dataNascimento ? formatDateOnlyBrazil(reg.dataNascimento) : "-"}
+                        </TableCell>
                         <TableCell>
                           <Badge variant="outline">{reg.modalityName}</Badge>
                         </TableCell>
@@ -308,13 +407,8 @@ export default function AdminEventInscritosPage() {
                           {reg.sexo || "-"}
                         </TableCell>
                         <TableCell>{reg.tamanhoCamisa || "-"}</TableCell>
-                        <TableCell>
-                          <Badge 
-                            variant="secondary" 
-                            className={statusColors[reg.status]}
-                          >
-                            {statusLabels[reg.status] || reg.status}
-                          </Badge>
+                        <TableCell className="text-center">
+                          <StatusIcon status={reg.status} />
                         </TableCell>
                         <TableCell>
                           {formatDateOnlyBrazil(reg.dataInscricao)}
@@ -328,6 +422,148 @@ export default function AdminEventInscritosPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={!!selectedRegistration} onOpenChange={(open) => !open && setSelectedRegistration(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <User className="h-5 w-5" />
+              Detalhes da Inscricao
+            </DialogTitle>
+          </DialogHeader>
+          
+          {selectedRegistration && (
+            <div className="space-y-6">
+              <div className="flex items-center gap-4">
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold">
+                    {selectedRegistration.nomeCompleto || selectedRegistration.athleteName}
+                  </h3>
+                  <p className="text-sm text-muted-foreground flex items-center gap-1">
+                    <Hash className="h-3 w-3" />
+                    Inscricao #{selectedRegistration.numeroInscricao}
+                  </p>
+                </div>
+                <StatusIcon status={selectedRegistration.status} />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">CPF</p>
+                  <p className="font-mono">{formatCPF(selectedRegistration.cpf)}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Data de Nascimento</p>
+                  <p className="flex items-center gap-1">
+                    <Calendar className="h-3 w-3 text-muted-foreground" />
+                    {selectedRegistration.dataNascimento 
+                      ? formatDateOnlyBrazil(selectedRegistration.dataNascimento) 
+                      : "-"}
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Telefone</p>
+                  <p className="flex items-center gap-1">
+                    <Phone className="h-3 w-3 text-muted-foreground" />
+                    {selectedRegistration.athletePhone || "-"}
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Email</p>
+                  <p className="flex items-center gap-1 text-sm truncate">
+                    <Mail className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                    {selectedRegistration.athleteEmail || "-"}
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Sexo</p>
+                  <p className="capitalize">{selectedRegistration.sexo || "-"}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Camisa</p>
+                  <p className="flex items-center gap-1">
+                    <Shirt className="h-3 w-3 text-muted-foreground" />
+                    {selectedRegistration.tamanhoCamisa || "-"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="border-t pt-4">
+                <h4 className="font-medium mb-3 flex items-center gap-2">
+                  <CreditCard className="h-4 w-4" />
+                  Informacoes da Inscricao
+                </h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Modalidade</p>
+                    <Badge variant="outline">{selectedRegistration.modalityName}</Badge>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Lote</p>
+                    <p className="flex items-center gap-1">
+                      <Layers className="h-3 w-3 text-muted-foreground" />
+                      {selectedRegistration.batchName}
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Valor da Inscricao</p>
+                    <p className="font-semibold">{formatCurrency(selectedRegistration.valorUnitario)}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Taxa de Servico</p>
+                    <p>{formatCurrency(selectedRegistration.taxaComodidade)}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Data da Inscricao</p>
+                    <p>{formatDateTimeBrazil(selectedRegistration.dataInscricao)}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Equipe</p>
+                    <p>{selectedRegistration.equipe || "-"}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-t pt-4">
+                <h4 className="font-medium mb-3 flex items-center gap-2">
+                  <CreditCard className="h-4 w-4" />
+                  Pagamento
+                </h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Status do Pedido</p>
+                    <Badge 
+                      variant={selectedRegistration.orderStatus === "pago" ? "default" : "secondary"}
+                    >
+                      {orderStatusLabels[selectedRegistration.orderStatus] || selectedRegistration.orderStatus}
+                    </Badge>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Forma de Pagamento</p>
+                    <p>
+                      {selectedRegistration.metodoPagamento 
+                        ? metodoPagamentoLabels[selectedRegistration.metodoPagamento] || selectedRegistration.metodoPagamento
+                        : "-"}
+                    </p>
+                  </div>
+                  {selectedRegistration.dataPagamento && (
+                    <div className="space-y-1 col-span-2">
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide">Data do Pagamento</p>
+                      <p>{formatDateTimeBrazil(selectedRegistration.dataPagamento)}</p>
+                    </div>
+                  )}
+                  {parseFloat(selectedRegistration.valorDesconto) > 0 && (
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide">Desconto</p>
+                      <p className="text-green-600">{formatCurrency(selectedRegistration.valorDesconto)}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </AdminLayout>
   );
 }
