@@ -25,7 +25,7 @@ export default function InscricaoParticipantePage() {
   };
 
   const handleParaOutro = () => {
-    console.log("Inscricao para outra pessoa - em desenvolvimento");
+    console.log("Inscrição para outra pessoa - em desenvolvimento");
   };
 
   const handleVoltar = () => {
@@ -74,10 +74,10 @@ export default function InscricaoParticipantePage() {
             Voltar
           </Button>
           <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-2">
-            Nova Inscricao
+            Nova Inscrição
           </h1>
           <p className="text-muted-foreground">
-            Para quem voce esta fazendo esta inscricao?
+            Para quem você está fazendo esta inscrição?
           </p>
         </div>
 
@@ -96,7 +96,7 @@ export default function InscricaoParticipantePage() {
                   <div className="flex-1">
                     <CardTitle className="text-lg">Para mim</CardTitle>
                     <CardDescription>
-                      Inscricao para {athlete.nome}
+                      Inscrição para {athlete.nome}
                     </CardDescription>
                   </div>
                 </div>

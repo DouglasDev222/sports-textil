@@ -115,8 +115,8 @@ export default function InscricaoPagamentoPage() {
       });
     } else {
       toast({
-        title: "Cupom invalido",
-        description: "O cupom informado nao existe ou expirou.",
+        title: "Cupom inválido",
+        description: "O cupom informado não existe ou expirou.",
         variant: "destructive",
       });
     }
@@ -133,7 +133,7 @@ export default function InscricaoPagamentoPage() {
     setTimeout(() => {
       toast({
         title: "Pagamento realizado!",
-        description: "Sua inscricao foi confirmada com sucesso.",
+        description: "Sua inscrição foi confirmada com sucesso.",
       });
       setProcessandoPagamento(false);
       if (orderData?.registrations[0]?.id) {
@@ -178,9 +178,9 @@ export default function InscricaoPagamentoPage() {
         <Header />
         <div className="max-w-2xl mx-auto px-4 py-8 md:py-12 text-center">
           <AlertCircle className="h-16 w-16 mx-auto text-destructive mb-4" />
-          <h1 className="text-2xl font-bold mb-2">Pedido nao encontrado</h1>
+          <h1 className="text-2xl font-bold mb-2">Pedido não encontrado</h1>
           <p className="text-muted-foreground mb-6">
-            Nao foi possivel identificar o pedido para pagamento.
+            Não foi possível identificar o pedido para pagamento.
           </p>
           <Button onClick={() => setLocation(`/evento/${slug}`)}>
             Voltar para o evento
@@ -198,7 +198,7 @@ export default function InscricaoPagamentoPage() {
           <AlertCircle className="h-16 w-16 mx-auto text-destructive mb-4" />
           <h1 className="text-2xl font-bold mb-2">Erro ao carregar pedido</h1>
           <p className="text-muted-foreground mb-6">
-            Nao foi possivel carregar os dados do pedido.
+            Não foi possível carregar os dados do pedido.
           </p>
           <Button onClick={() => setLocation(`/evento/${slug}`)}>
             Voltar para o evento
@@ -214,12 +214,12 @@ export default function InscricaoPagamentoPage() {
         <Header />
         <div className="max-w-2xl mx-auto px-4 py-8 md:py-12 text-center">
           <CheckCircle2 className="h-16 w-16 mx-auto text-green-600 mb-4" />
-          <h1 className="text-2xl font-bold mb-2">Pedido ja pago</h1>
+          <h1 className="text-2xl font-bold mb-2">Pedido já pago</h1>
           <p className="text-muted-foreground mb-6">
-            Este pedido ja foi pago e sua inscricao esta confirmada.
+            Este pedido já foi pago e sua inscrição está confirmada.
           </p>
           <Button onClick={() => setLocation("/minhas-inscricoes")}>
-            Ver minhas inscricoes
+            Ver minhas inscrições
           </Button>
         </div>
       </div>
@@ -251,7 +251,7 @@ export default function InscricaoPagamentoPage() {
             Pagamento
           </h1>
           <p className="text-muted-foreground">
-            Finalize sua inscricao para {orderData.evento?.nome}
+            Finalize sua inscrição para {orderData.evento?.nome}
           </p>
         </div>
 
@@ -344,7 +344,7 @@ export default function InscricaoPagamentoPage() {
                       </div>
                     )}
                     <div className="flex items-center justify-between gap-2 py-2 border-b flex-wrap">
-                      <span className="text-sm text-muted-foreground">Valor da Inscricao</span>
+                      <span className="text-sm text-muted-foreground">Valor da Inscrição</span>
                       <span className="font-medium text-foreground">
                         R$ {registration.valorUnitario.toFixed(2).replace('.', ',')}
                       </span>
@@ -388,10 +388,10 @@ export default function InscricaoPagamentoPage() {
             <CardContent>
               <div className="space-y-3">
                 <Badge variant="secondary" className="text-sm">
-                  Pagamento via PIX ou Cartao de Credito
+                  Pagamento via PIX ou Cartão de Crédito
                 </Badge>
                 <p className="text-sm text-muted-foreground">
-                  Voce sera redirecionado para finalizar o pagamento de forma segura.
+                  Você será redirecionado para finalizar o pagamento de forma segura.
                 </p>
               </div>
             </CardContent>

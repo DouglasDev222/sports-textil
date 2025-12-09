@@ -71,7 +71,7 @@ export default function AdminEventsPage() {
     onError: (error: any) => {
       toast({
         title: "Erro ao atualizar status",
-        description: error?.message || "Nao foi possivel alterar o status do evento.",
+        description: error?.message || "Não foi possível alterar o status do evento.",
         variant: "destructive",
       });
     },
@@ -160,7 +160,7 @@ export default function AdminEventsPage() {
                     <TableHead>Data</TableHead>
                     <TableHead>Vagas</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Acoes</TableHead>
+                    <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>

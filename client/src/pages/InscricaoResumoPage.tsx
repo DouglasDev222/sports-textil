@@ -82,8 +82,8 @@ export default function InscricaoResumoPage() {
         
         if (isGratuita) {
           toast({
-            title: "Inscricao confirmada!",
-            description: `Sua inscricao #${result.data.registration.numeroInscricao} foi realizada com sucesso.`,
+            title: "Inscrição confirmada!",
+            description: `Sua inscrição #${result.data.registration.numeroInscricao} foi realizada com sucesso.`,
           });
           setLocation(`/inscricao/${result.data.registration.id}?sucesso=1`);
         } else {
@@ -91,16 +91,16 @@ export default function InscricaoResumoPage() {
         }
       } else {
         toast({
-          title: "Erro na inscricao",
-          description: result.error || "Nao foi possivel realizar a inscricao.",
+          title: "Erro na inscrição",
+          description: result.error || "Não foi possível realizar a inscrição.",
           variant: "destructive"
         });
       }
     },
     onError: (error: any) => {
       toast({
-        title: "Erro na inscricao",
-        description: error.message || "Nao foi possivel realizar a inscricao.",
+        title: "Erro na inscrição",
+        description: error.message || "Não foi possível realizar a inscrição.",
         variant: "destructive"
       });
     }
@@ -157,7 +157,7 @@ export default function InscricaoResumoPage() {
           <AlertCircle className="h-16 w-16 mx-auto text-destructive mb-4" />
           <h1 className="text-2xl font-bold mb-2">Erro ao carregar dados</h1>
           <p className="text-muted-foreground mb-6">
-            Nao foi possivel carregar as informacoes do evento.
+            Não foi possível carregar as informações do evento.
           </p>
           <Button onClick={() => setLocation(`/evento/${slug}`)}>
             Voltar para o evento
@@ -176,7 +176,7 @@ export default function InscricaoResumoPage() {
         <Header />
         <div className="max-w-2xl mx-auto px-4 py-8 md:py-12 text-center">
           <AlertCircle className="h-16 w-16 mx-auto text-destructive mb-4" />
-          <h1 className="text-2xl font-bold mb-2">Modalidade nao encontrada</h1>
+          <h1 className="text-2xl font-bold mb-2">Modalidade não encontrada</h1>
           <p className="text-muted-foreground mb-6">
             Selecione uma modalidade para continuar.
           </p>
@@ -219,10 +219,10 @@ export default function InscricaoResumoPage() {
 
         <div className="mb-8">
           <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-2">
-            Resumo da Inscricao
+            Resumo da Inscrição
           </h1>
           <p className="text-muted-foreground">
-            Confira os dados da sua inscricao
+            Confira os dados da sua inscrição
           </p>
         </div>
 
@@ -325,7 +325,7 @@ export default function InscricaoResumoPage() {
               {isGratuita ? (
                 <p className="text-lg md:text-xl font-bold text-green-600 dark:text-green-400 flex items-center gap-2">
                   <CheckCircle className="h-5 w-5" />
-                  Inscricao Gratuita
+                  Inscrição Gratuita
                 </p>
               ) : (
                 <>
@@ -351,7 +351,7 @@ export default function InscricaoResumoPage() {
                   Processando...
                 </>
               ) : isGratuita ? (
-                "Confirmar Inscricao"
+                "Confirmar Inscrição"
               ) : (
                 "Ir para Pagamento"
               )}

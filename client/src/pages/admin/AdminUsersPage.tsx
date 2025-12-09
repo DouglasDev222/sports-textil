@@ -57,7 +57,7 @@ import { Plus, Pencil, Trash2, Loader2, UserCog } from "lucide-react";
 import type { AdminUser, Organizer } from "@shared/schema";
 
 const createUserSchema = z.object({
-  email: z.string().email("Email invalido"),
+  email: z.string().email("Email inválido"),
   password: z.string().min(6, "Senha deve ter pelo menos 6 caracteres"),
   nome: z.string().min(2, "Nome deve ter pelo menos 2 caracteres"),
   role: z.enum(["admin", "organizador"]),
@@ -73,7 +73,7 @@ const createUserSchema = z.object({
 });
 
 const updateUserSchema = z.object({
-  email: z.string().email("Email invalido"),
+  email: z.string().email("Email inválido"),
   nome: z.string().min(2, "Nome deve ter pelo menos 2 caracteres"),
   role: z.enum(["admin", "organizador"]),
   status: z.enum(["ativo", "inativo", "bloqueado"]),
@@ -169,13 +169,13 @@ export default function AdminUsersPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
-      toast({ title: "Usuario criado com sucesso" });
+      toast({ title: "Usuário criado com sucesso" });
       setIsCreateOpen(false);
       createForm.reset();
     },
     onError: (error: Error) => {
       toast({
-        title: "Erro ao criar usuario",
+        title: "Erro ao criar usuário",
         description: error.message || "Tente novamente",
         variant: "destructive",
       });
@@ -195,13 +195,13 @@ export default function AdminUsersPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
-      toast({ title: "Usuario atualizado com sucesso" });
+      toast({ title: "Usuário atualizado com sucesso" });
       setEditingUser(null);
       editForm.reset();
     },
     onError: (error: Error) => {
       toast({
-        title: "Erro ao atualizar usuario",
+        title: "Erro ao atualizar usuário",
         description: error.message || "Tente novamente",
         variant: "destructive",
       });
@@ -214,12 +214,12 @@ export default function AdminUsersPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
-      toast({ title: "Usuario excluido com sucesso" });
+      toast({ title: "Usuário excluído com sucesso" });
       setDeletingUser(null);
     },
     onError: (error: Error) => {
       toast({
-        title: "Erro ao excluir usuario",
+        title: "Erro ao excluir usuário",
         description: error.message || "Tente novamente",
         variant: "destructive",
       });
@@ -254,14 +254,14 @@ export default function AdminUsersPage() {
   if (currentUser?.role !== "superadmin") {
     return (
       <AdminLayout 
-        title="Usuarios" 
-        breadcrumbs={[{ label: "Usuarios" }]}
+        title="Usuários" 
+        breadcrumbs={[{ label: "Usuários" }]}
       >
         <div className="flex flex-col items-center justify-center py-12">
           <UserCog className="h-12 w-12 text-muted-foreground mb-4" />
           <h2 className="text-xl font-semibold mb-2">Acesso Restrito</h2>
           <p className="text-muted-foreground text-center">
-            Apenas superadmins podem gerenciar usuarios do sistema.
+            Apenas superadmins podem gerenciar usuários do sistema.
           </p>
         </div>
       </AdminLayout>
@@ -270,26 +270,26 @@ export default function AdminUsersPage() {
 
   return (
     <AdminLayout 
-      title="Usuarios" 
-      breadcrumbs={[{ label: "Usuarios" }]}
+      title="Usuários" 
+      breadcrumbs={[{ label: "Usuários" }]}
     >
       <div className="space-y-6">
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">Usuarios</h1>
+            <h1 className="text-2xl font-bold tracking-tight">Usuários</h1>
             <p className="text-muted-foreground">
-              Gerencie os usuarios administrativos do sistema
+              Gerencie os usuários administrativos do sistema
             </p>
           </div>
           <Button onClick={() => setIsCreateOpen(true)} data-testid="button-create-user">
             <Plus className="mr-2 h-4 w-4" />
-            Novo Usuario
+            Novo Usuário
           </Button>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>Lista de Usuarios</CardTitle>
+            <CardTitle>Lista de Usuários</CardTitle>
           </CardHeader>
           <CardContent>
             {usersLoading ? (
@@ -300,7 +300,7 @@ export default function AdminUsersPage() {
               </div>
             ) : users.length === 0 ? (
               <p className="text-center py-8 text-muted-foreground">
-                Nenhum usuario cadastrado
+                Nenhum usuário cadastrado
               </p>
             ) : (
               <Table>
@@ -311,7 +311,7 @@ export default function AdminUsersPage() {
                     <TableHead>Perfil</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Organizador</TableHead>
-                    <TableHead className="text-right">Acoes</TableHead>
+                    <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -366,9 +366,9 @@ export default function AdminUsersPage() {
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Novo Usuario</DialogTitle>
+            <DialogTitle>Novo Usuário</DialogTitle>
             <DialogDescription>
-              Preencha os dados do novo usuario administrativo
+              Preencha os dados do novo usuário administrativo
             </DialogDescription>
           </DialogHeader>
           <Form {...createForm}>
@@ -476,9 +476,9 @@ export default function AdminUsersPage() {
       <Dialog open={!!editingUser} onOpenChange={() => setEditingUser(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Editar Usuario</DialogTitle>
+            <DialogTitle>Editar Usuário</DialogTitle>
             <DialogDescription>
-              Atualize os dados do usuario
+              Atualize os dados do usuário
             </DialogDescription>
           </DialogHeader>
           <Form {...editForm}>
@@ -608,10 +608,10 @@ export default function AdminUsersPage() {
       <AlertDialog open={!!deletingUser} onOpenChange={() => setDeletingUser(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Confirmar exclusao</AlertDialogTitle>
+            <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja excluir o usuario "{deletingUser?.nome}"?
-              Esta acao nao pode ser desfeita.
+              Tem certeza que deseja excluir o usuário "{deletingUser?.nome}"?
+              Esta ação não pode ser desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
