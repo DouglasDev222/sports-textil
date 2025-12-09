@@ -93,13 +93,24 @@ router.post("/", requireAuth, requireRole("superadmin", "admin"), async (req, re
       });
     }
 
-    const currentBatches = await storage.getBatchesByEvent(eventId);
-    const nextOrder = currentBatches.length > 0 
-      ? Math.max(...currentBatches.map(b => b.ordem)) + 1 
-      : 0;
+    const maxOrdem = await storage.getMaxBatchOrder(eventId);
+    const nextOrder = maxOrdem + 1;
 
     const willBeAtivo = validation.data.ativo ?? false;
     const willBeStatus = validation.data.status ?? 'future';
+
+    const ordemToUse = validation.data.ordem ?? nextOrder;
+
+    const ordemExists = await storage.checkBatchOrderExists(eventId, ordemToUse);
+    if (ordemExists) {
+      return res.status(400).json({
+        success: false,
+        error: { 
+          code: "ORDER_INDEX_ALREADY_EXISTS", 
+          message: "Ja existe um lote usando essa ordem. Altere a ordem dos demais ou utilize outro numero." 
+        }
+      });
+    }
 
     const activeBatchValidation = await validateSingleActiveBatch(eventId, willBeStatus, willBeAtivo);
     if (!activeBatchValidation.valid) {
@@ -116,7 +127,7 @@ router.post("/", requireAuth, requireRole("superadmin", "admin"), async (req, re
       dataTermino: localToBrazilUTCOptional(validation.data.dataTermino),
       ativo: willBeAtivo,
       status: willBeStatus,
-      ordem: validation.data.ordem ?? nextOrder
+      ordem: ordemToUse
     });
 
     res.status(201).json({ success: true, data: formatBatchForResponse(batch) });
@@ -163,6 +174,19 @@ router.patch("/:id", requireAuth, requireRole("superadmin", "admin"), async (req
         success: false,
         error: { code: "MULTIPLE_ACTIVE_BATCHES", message: activeBatchValidation.error }
       });
+    }
+
+    if (validation.data.ordem !== undefined) {
+      const ordemExists = await storage.checkBatchOrderExists(eventId, validation.data.ordem, req.params.id);
+      if (ordemExists) {
+        return res.status(400).json({
+          success: false,
+          error: { 
+            code: "ORDER_INDEX_ALREADY_EXISTS", 
+            message: "Ja existe um lote usando essa ordem. Altere a ordem dos demais ou utilize outro numero." 
+          }
+        });
+      }
     }
 
     const updateData: Record<string, unknown> = { ...validation.data };

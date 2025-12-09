@@ -61,6 +61,8 @@ export interface IStorage {
   getBatch(id: string): Promise<RegistrationBatch | undefined>;
   getBatchesByEvent(eventId: string): Promise<RegistrationBatch[]>;
   getActiveBatch(eventId: string): Promise<RegistrationBatch | undefined>;
+  getMaxBatchOrder(eventId: string): Promise<number>;
+  checkBatchOrderExists(eventId: string, ordem: number, excludeBatchId?: string): Promise<boolean>;
   createBatch(batch: InsertRegistrationBatch): Promise<RegistrationBatch>;
   updateBatch(id: string, batch: Partial<InsertRegistrationBatch>): Promise<RegistrationBatch | undefined>;
   deleteBatch(id: string): Promise<boolean>;
@@ -302,7 +304,29 @@ export class DbStorage implements IStorage {
   }
 
   async getBatchesByEvent(eventId: string): Promise<RegistrationBatch[]> {
-    return db.select().from(registrationBatches).where(eq(registrationBatches.eventId, eventId));
+    return db.select().from(registrationBatches)
+      .where(eq(registrationBatches.eventId, eventId))
+      .orderBy(registrationBatches.ordem);
+  }
+
+  async getMaxBatchOrder(eventId: string): Promise<number> {
+    const result = await db.select({ maxOrdem: max(registrationBatches.ordem) })
+      .from(registrationBatches)
+      .where(eq(registrationBatches.eventId, eventId));
+    return result[0]?.maxOrdem ?? 0;
+  }
+
+  async checkBatchOrderExists(eventId: string, ordem: number, excludeBatchId?: string): Promise<boolean> {
+    const batches = await db.select().from(registrationBatches)
+      .where(and(
+        eq(registrationBatches.eventId, eventId),
+        eq(registrationBatches.ordem, ordem)
+      ));
+    
+    if (excludeBatchId) {
+      return batches.some(b => b.id !== excludeBatchId);
+    }
+    return batches.length > 0;
   }
 
   async getActiveBatch(eventId: string): Promise<RegistrationBatch | undefined> {

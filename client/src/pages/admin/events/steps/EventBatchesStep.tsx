@@ -33,7 +33,10 @@ export function EventBatchesStep({ formData, updateFormData }: EventBatchesStepP
   const [currentBatch, setCurrentBatch] = useState<Partial<RegistrationBatch>>(emptyBatch);
 
   const openNewBatchDialog = () => {
-    setCurrentBatch({ ...emptyBatch, ordem: formData.batches.length });
+    const maxOrdem = formData.batches.length > 0 
+      ? Math.max(...formData.batches.map(b => b.ordem ?? 0)) 
+      : 0;
+    setCurrentBatch({ ...emptyBatch, ordem: maxOrdem + 1 });
     setEditingBatchIndex(null);
     setBatchDialogOpen(true);
   };
@@ -180,17 +183,35 @@ export function EventBatchesStep({ formData, updateFormData }: EventBatchesStepP
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="batch-quantidade">Quantidade Maxima</Label>
-                  <Input
-                    id="batch-quantidade"
-                    type="number"
-                    min="1"
-                    value={currentBatch.quantidadeMaxima || ""}
-                    onChange={(e) => updateCurrentBatch("quantidadeMaxima", e.target.value ? parseInt(e.target.value) : undefined)}
-                    placeholder="Deixe vazio para sem limite"
-                    data-testid="input-batch-quantity"
-                  />
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="batch-quantidade">Quantidade Maxima</Label>
+                    <Input
+                      id="batch-quantidade"
+                      type="number"
+                      min="1"
+                      value={currentBatch.quantidadeMaxima || ""}
+                      onChange={(e) => updateCurrentBatch("quantidadeMaxima", e.target.value ? parseInt(e.target.value) : undefined)}
+                      placeholder="Deixe vazio para sem limite"
+                      data-testid="input-batch-quantity"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="batch-ordem">Ordem de Ativacao</Label>
+                    <Input
+                      id="batch-ordem"
+                      type="number"
+                      min="1"
+                      value={currentBatch.ordem ?? ""}
+                      onChange={(e) => updateCurrentBatch("ordem", e.target.value ? parseInt(e.target.value) : undefined)}
+                      placeholder="Ordem do lote"
+                      data-testid="input-batch-order"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Define a ordem de ativacao dos lotes. Lotes com ordem menor sao ativados primeiro.
+                    </p>
+                  </div>
                 </div>
 
                 <div className="flex items-center justify-between">
@@ -241,6 +262,9 @@ export function EventBatchesStep({ formData, updateFormData }: EventBatchesStepP
                   data-testid={`card-batch-${index}`}
                 >
                   <div className="flex items-center gap-3">
+                    <Badge variant="outline" className="text-xs font-mono">
+                      #{batch.ordem ?? index + 1}
+                    </Badge>
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="font-medium">{batch.nome}</span>
