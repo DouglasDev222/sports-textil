@@ -245,6 +245,26 @@ export function EventBasicInfoStep({ formData, updateFormData }: EventBasicInfoS
       </div>
 
       <Card>
+        <CardContent className="pt-6">
+          <div className="flex items-center justify-between gap-4">
+            <div className="space-y-0.5">
+              <Label htmlFor="permitirMultiplasModalidades">Permitir Multiplas Modalidades por Atleta</Label>
+              <p className="text-xs text-muted-foreground">
+                Quando ativado, o atleta pode se inscrever em mais de uma modalidade no mesmo evento. 
+                Ainda nao podera repetir a mesma modalidade.
+              </p>
+            </div>
+            <Switch
+              id="permitirMultiplasModalidades"
+              checked={formData.event.permitirMultiplasModalidades ?? false}
+              onCheckedChange={(checked) => updateEvent("permitirMultiplasModalidades", checked)}
+              data-testid="switch-allow-multiple-modalities"
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
         <CardHeader className="flex flex-row items-center gap-2 space-y-0">
           <Image className="h-5 w-5" />
           <div>

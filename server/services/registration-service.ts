@@ -56,7 +56,7 @@ export async function registerForEventAtomic(
     await client.query('BEGIN');
     
     const eventResult = await client.query(
-      `SELECT id, limite_vagas_total, vagas_ocupadas 
+      `SELECT id, limite_vagas_total, vagas_ocupadas, permitir_multiplas_modalidades 
        FROM events 
        WHERE id = $1 
        FOR UPDATE`,
@@ -75,6 +75,7 @@ export async function registerForEventAtomic(
     const event = eventResult.rows[0];
     const limiteVagas = event.limite_vagas_total;
     const vagasOcupadas = event.vagas_ocupadas;
+    const permitirMultiplasModalidades = event.permitir_multiplas_modalidades;
     
     if (vagasOcupadas >= limiteVagas) {
       await client.query('ROLLBACK');
@@ -83,6 +84,42 @@ export async function registerForEventAtomic(
         error: 'Inscricoes esgotadas para este evento',
         errorCode: 'VAGAS_ESGOTADAS'
       };
+    }
+    
+    if (!permitirMultiplasModalidades) {
+      const existingRegistration = await client.query(
+        `SELECT id FROM registrations 
+         WHERE event_id = $1 AND athlete_id = $2 
+         AND status != 'cancelada'
+         LIMIT 1`,
+        [registrationData.eventId, registrationData.athleteId]
+      );
+      
+      if (existingRegistration.rows.length > 0) {
+        await client.query('ROLLBACK');
+        return {
+          success: false,
+          error: 'Voce ja possui inscricao neste evento',
+          errorCode: 'JA_INSCRITO'
+        };
+      }
+    } else {
+      const existingModalityRegistration = await client.query(
+        `SELECT id FROM registrations 
+         WHERE event_id = $1 AND athlete_id = $2 AND modality_id = $3
+         AND status != 'cancelada'
+         LIMIT 1`,
+        [registrationData.eventId, registrationData.athleteId, registrationData.modalityId]
+      );
+      
+      if (existingModalityRegistration.rows.length > 0) {
+        await client.query('ROLLBACK');
+        return {
+          success: false,
+          error: 'Voce ja possui inscricao nesta modalidade',
+          errorCode: 'JA_INSCRITO'
+        };
+      }
     }
     
     const orderResult = await client.query(
@@ -163,7 +200,7 @@ export async function registerForEventAtomic(
     if (e.code === '23505') {
       return {
         success: false,
-        error: 'Voce ja possui inscricao neste evento',
+        error: 'Voce ja possui inscricao nesta modalidade',
         errorCode: 'JA_INSCRITO'
       };
     }

@@ -67,6 +67,7 @@ export const events = pgTable("events", {
   informacoesRetiradaKit: text("informacoes_retirada_kit"),
   imagemPercursoUrl: text("imagem_percurso_url"),
   idadeMinimaEvento: integer("idade_minima_evento").default(18).notNull(),
+  permitirMultiplasModalidades: boolean("permitir_multiplas_modalidades").default(false).notNull(),
   dataCriacao: timestamp("data_criacao", { withTimezone: true }).defaultNow().notNull(),
 });
 
@@ -187,9 +188,7 @@ export const registrations = pgTable("registrations", {
   dataNascimento: date("data_nascimento"),
   sexo: varchar("sexo", { length: 20 }),
   dataInscricao: timestamp("data_inscricao", { withTimezone: true }).defaultNow().notNull(),
-}, (table) => [
-  unique("unique_event_athlete").on(table.eventId, table.athleteId)
-]);
+});
 
 export const documentAcceptances = pgTable("document_acceptances", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
