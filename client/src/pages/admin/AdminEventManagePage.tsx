@@ -1,11 +1,33 @@
+import { useState } from "react";
 import { useParams, Link } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Table,
   TableBody,
@@ -28,7 +50,9 @@ import {
   Clock,
   AlertTriangle
 } from "lucide-react";
-import { formatDateOnlyBrazil, formatDateTimeBrazil } from "@/lib/timezone";
+import { formatDateOnlyBrazil, formatDateTimeBrazil, formatForInput } from "@/lib/timezone";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Event } from "@shared/schema";
 
 interface ShirtGridItem {
@@ -87,8 +111,24 @@ interface EventStats {
   activeBatchId: string | null;
 }
 
+interface BatchEditForm {
+  id: string;
+  nome: string;
+  dataInicio: string;
+  dataTermino: string | null;
+  quantidadeMaxima: number | null;
+  ativo: boolean;
+}
+
 export default function AdminEventManagePage() {
   const { id } = useParams<{ id: string }>();
+  const { toast } = useToast();
+  
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingBatch, setEditingBatch] = useState<BatchEditForm | null>(null);
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  const [pendingActivation, setPendingActivation] = useState<{ batchId: string; activeBatchName: string } | null>(null);
+  const [isActivating, setIsActivating] = useState(false);
 
   const { data: eventData, isLoading: eventLoading } = useQuery<{ success: boolean; data: Event }>({
     queryKey: ["/api/admin/events", id],
@@ -102,6 +142,151 @@ export default function AdminEventManagePage() {
   const stats = statsData?.data;
 
   const isLoading = eventLoading || statsLoading;
+
+  const updateBatchMutation = useMutation({
+    mutationFn: async (data: { batchId: string; updates: Partial<BatchEditForm> }) => {
+      const response = await apiRequest("PATCH", `/api/admin/events/${id}/batches/${data.batchId}`, data.updates);
+      const result = await response.json();
+      if (!result.success) {
+        throw new Error(result.error?.message || "Erro ao atualizar lote");
+      }
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/events", id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/events", id, "stats"] });
+      setEditDialogOpen(false);
+      setEditingBatch(null);
+      toast({ title: "Lote atualizado com sucesso" });
+    },
+    onError: (error: Error) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/events", id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/events", id, "stats"] });
+      toast({ title: "Erro ao atualizar lote", description: error.message, variant: "destructive" });
+    }
+  });
+
+  const openEditDialog = (batch: BatchInfo) => {
+    setEditingBatch({
+      id: batch.id,
+      nome: batch.nome,
+      dataInicio: formatForInput(batch.dataInicio),
+      dataTermino: batch.dataTermino ? formatForInput(batch.dataTermino) : null,
+      quantidadeMaxima: batch.quantidadeMaxima,
+      ativo: batch.ativo
+    });
+    setEditDialogOpen(true);
+  };
+
+  const handleSaveBatch = async () => {
+    if (!editingBatch) return;
+    
+    const willBeActive = editingBatch.ativo;
+    
+    if (willBeActive) {
+      setIsActivating(true);
+      try {
+        const freshStats = await queryClient.fetchQuery<{ success: boolean; data: EventStats }>({
+          queryKey: ["/api/admin/events", id, "stats"],
+          staleTime: 0
+        });
+        
+        const activeBatches = freshStats?.data.batches.filter(b => b.ativo && b.id !== editingBatch.id);
+        if (activeBatches && activeBatches.length > 0) {
+          setIsActivating(false);
+          setPendingActivation({ 
+            batchId: editingBatch.id, 
+            activeBatchName: activeBatches[0].nome 
+          });
+          setConfirmDialogOpen(true);
+          return;
+        }
+        
+        const patchResponse = await apiRequest("PATCH", `/api/admin/events/${id}/batches/${editingBatch.id}`, {
+          nome: editingBatch.nome,
+          dataInicio: editingBatch.dataInicio,
+          dataTermino: editingBatch.dataTermino,
+          quantidadeMaxima: editingBatch.quantidadeMaxima
+        });
+        const patchResult = await patchResponse.json();
+        if (!patchResult.success) {
+          throw new Error(patchResult.error?.message || "Erro ao atualizar lote");
+        }
+        
+        const activateResponse = await apiRequest("POST", `/api/admin/events/${id}/batches/${editingBatch.id}/activate`, {
+          deactivateOthers: true
+        });
+        const activateResult = await activateResponse.json();
+        if (!activateResult.success) {
+          throw new Error(activateResult.error?.message || "Erro ao ativar lote");
+        }
+        
+        queryClient.invalidateQueries({ queryKey: ["/api/admin/events", id] });
+        queryClient.invalidateQueries({ queryKey: ["/api/admin/events", id, "stats"] });
+        setEditDialogOpen(false);
+        setEditingBatch(null);
+        toast({ title: "Lote atualizado e ativado com sucesso" });
+      } catch (error) {
+        queryClient.invalidateQueries({ queryKey: ["/api/admin/events", id] });
+        queryClient.invalidateQueries({ queryKey: ["/api/admin/events", id, "stats"] });
+        toast({ title: "Erro ao processar lote", description: (error as Error).message, variant: "destructive" });
+      } finally {
+        setIsActivating(false);
+      }
+      return;
+    }
+    
+    updateBatchMutation.mutate({
+      batchId: editingBatch.id,
+      updates: {
+        nome: editingBatch.nome,
+        dataInicio: editingBatch.dataInicio,
+        dataTermino: editingBatch.dataTermino,
+        quantidadeMaxima: editingBatch.quantidadeMaxima,
+        ativo: editingBatch.ativo
+      }
+    });
+  };
+
+  const handleConfirmActivation = async () => {
+    if (!pendingActivation || !editingBatch) return;
+    
+    setIsActivating(true);
+    try {
+      const patchResponse = await apiRequest("PATCH", `/api/admin/events/${id}/batches/${editingBatch.id}`, {
+        nome: editingBatch.nome,
+        dataInicio: editingBatch.dataInicio,
+        dataTermino: editingBatch.dataTermino,
+        quantidadeMaxima: editingBatch.quantidadeMaxima
+      });
+      const patchResult = await patchResponse.json();
+      if (!patchResult.success) {
+        throw new Error(patchResult.error?.message || "Erro ao atualizar lote");
+      }
+      
+      const activateResponse = await apiRequest("POST", `/api/admin/events/${id}/batches/${editingBatch.id}/activate`, {
+        deactivateOthers: true
+      });
+      const activateResult = await activateResponse.json();
+      if (!activateResult.success) {
+        throw new Error(activateResult.error?.message || "Erro ao ativar lote");
+      }
+      
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/events", id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/events", id, "stats"] });
+      setConfirmDialogOpen(false);
+      setEditDialogOpen(false);
+      setPendingActivation(null);
+      setEditingBatch(null);
+      toast({ title: "Lote atualizado e ativado com sucesso" });
+    } catch (error) {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/events", id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/events", id, "stats"] });
+      toast({ title: "Erro ao processar lote", description: (error as Error).message, variant: "destructive" });
+    } finally {
+      setIsActivating(false);
+    }
+  };
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("pt-BR", {
@@ -440,10 +625,20 @@ export default function AdminEventManagePage() {
                             )}
                             <span className="font-medium">{batch.nome}</span>
                           </div>
-                          <span className="font-semibold">
-                            {batch.quantidadeUtilizada}
-                            {batch.quantidadeMaxima && `/${batch.quantidadeMaxima}`}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold">
+                              {batch.quantidadeUtilizada}
+                              {batch.quantidadeMaxima && `/${batch.quantidadeMaxima}`}
+                            </span>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => openEditDialog(batch)}
+                              data-testid={`button-edit-batch-${batch.id}`}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </div>
                         
                         <div className="flex flex-wrap gap-1 mt-2">
@@ -511,6 +706,127 @@ export default function AdminEventManagePage() {
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Lote</DialogTitle>
+            <DialogDescription>
+              Altere os dados do lote de inscricao
+            </DialogDescription>
+          </DialogHeader>
+          
+          {editingBatch && (
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="batch-nome">Nome do Lote</Label>
+                <Input
+                  id="batch-nome"
+                  value={editingBatch.nome}
+                  onChange={(e) => setEditingBatch({ ...editingBatch, nome: e.target.value })}
+                  data-testid="input-edit-batch-name"
+                />
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="batch-inicio">Data de Inicio</Label>
+                  <Input
+                    id="batch-inicio"
+                    type="datetime-local"
+                    value={editingBatch.dataInicio}
+                    onChange={(e) => setEditingBatch({ ...editingBatch, dataInicio: e.target.value })}
+                    data-testid="input-edit-batch-start"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="batch-termino">Data de Termino</Label>
+                  <Input
+                    id="batch-termino"
+                    type="datetime-local"
+                    value={editingBatch.dataTermino || ""}
+                    onChange={(e) => setEditingBatch({ ...editingBatch, dataTermino: e.target.value || null })}
+                    data-testid="input-edit-batch-end"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="batch-quantidade">Quantidade Maxima (opcional)</Label>
+                <Input
+                  id="batch-quantidade"
+                  type="number"
+                  min={0}
+                  value={editingBatch.quantidadeMaxima ?? ""}
+                  onChange={(e) => setEditingBatch({ 
+                    ...editingBatch, 
+                    quantidadeMaxima: e.target.value ? parseInt(e.target.value) : null 
+                  })}
+                  placeholder="Sem limite"
+                  data-testid="input-edit-batch-quantity"
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>Lote Ativo</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Ative ou desative este lote para inscricoes
+                  </p>
+                </div>
+                <Switch
+                  checked={editingBatch.ativo}
+                  onCheckedChange={(checked) => setEditingBatch({ ...editingBatch, ativo: checked })}
+                  data-testid="switch-edit-batch-active"
+                />
+              </div>
+            </div>
+          )}
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button 
+              onClick={handleSaveBatch} 
+              disabled={updateBatchMutation.isPending || isActivating}
+              data-testid="button-save-batch"
+            >
+              {updateBatchMutation.isPending || isActivating ? "Salvando..." : "Salvar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={confirmDialogOpen} onOpenChange={(open) => {
+        setConfirmDialogOpen(open);
+        if (!open) {
+          setPendingActivation(null);
+        }
+      }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar Ativacao de Lote</AlertDialogTitle>
+            <AlertDialogDescription>
+              Existe um lote ativo ({pendingActivation?.activeBatchName}). 
+              Ao ativar este lote, o lote atual sera automaticamente desativado.
+              Deseja continuar?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isActivating}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleConfirmActivation}
+              disabled={isActivating}
+              data-testid="button-confirm-activate"
+            >
+              {isActivating ? "Ativando..." : "Sim, ativar este lote"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AdminLayout>
   );
 }

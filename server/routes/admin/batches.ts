@@ -208,6 +208,64 @@ router.patch("/:id", requireAuth, requireRole("superadmin", "admin"), async (req
   }
 });
 
+router.post("/:id/activate", requireAuth, requireRole("superadmin", "admin"), async (req, res) => {
+  try {
+    const eventId = req.params.eventId;
+    const batchId = req.params.id;
+    const { deactivateOthers } = req.body;
+    
+    const event = await storage.getEvent(eventId);
+    if (!event) {
+      return res.status(404).json({
+        success: false,
+        error: { code: "NOT_FOUND", message: "Evento nao encontrado" }
+      });
+    }
+
+    const batch = await storage.getBatch(batchId);
+    if (!batch || batch.eventId !== eventId) {
+      return res.status(404).json({
+        success: false,
+        error: { code: "NOT_FOUND", message: "Lote nao encontrado" }
+      });
+    }
+
+    const existingBatches = await storage.getBatchesByEvent(eventId);
+    const activeBatches = existingBatches.filter(b => 
+      b.ativo === true && b.id !== batchId
+    );
+
+    if (activeBatches.length > 0 && !deactivateOthers) {
+      return res.status(409).json({
+        success: false,
+        error: { 
+          code: "ACTIVE_BATCH_EXISTS", 
+          message: "Existe um lote ativo",
+          activeBatch: {
+            id: activeBatches[0].id,
+            nome: activeBatches[0].nome
+          }
+        }
+      });
+    }
+
+    if (deactivateOthers && activeBatches.length > 0) {
+      for (const activeBatch of activeBatches) {
+        await storage.updateBatch(activeBatch.id, { ativo: false });
+      }
+    }
+
+    const updated = await storage.updateBatch(batchId, { ativo: true });
+    res.json({ success: true, data: formatBatchForResponse(updated) });
+  } catch (error) {
+    console.error("Activate batch error:", error);
+    res.status(500).json({
+      success: false,
+      error: { code: "INTERNAL_ERROR", message: "Erro interno do servidor" }
+    });
+  }
+});
+
 router.delete("/:id", requireAuth, requireRole("superadmin", "admin"), async (req, res) => {
   try {
     const eventId = req.params.eventId;

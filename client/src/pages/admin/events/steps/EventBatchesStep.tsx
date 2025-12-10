@@ -5,6 +5,16 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Pencil, Trash2, Info } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -31,6 +41,8 @@ export function EventBatchesStep({ formData, updateFormData }: EventBatchesStepP
   const [batchDialogOpen, setBatchDialogOpen] = useState(false);
   const [editingBatchIndex, setEditingBatchIndex] = useState<number | null>(null);
   const [currentBatch, setCurrentBatch] = useState<Partial<RegistrationBatch>>(emptyBatch);
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  const [conflictingBatch, setConflictingBatch] = useState<{ index: number; nome: string } | null>(null);
 
   const openNewBatchDialog = () => {
     const maxOrdem = formData.batches.length > 0 
@@ -47,8 +59,41 @@ export function EventBatchesStep({ formData, updateFormData }: EventBatchesStepP
     setBatchDialogOpen(true);
   };
 
-  const handleSaveBatch = () => {
+  const checkAndSaveBatch = () => {
+    const isActivating = currentBatch.ativo === true;
+    const wasInactive = editingBatchIndex !== null 
+      ? !formData.batches[editingBatchIndex].ativo 
+      : true;
+    
+    if (isActivating && wasInactive) {
+      const activeBatchIndex = formData.batches.findIndex(
+        (b, idx) => b.ativo && idx !== editingBatchIndex
+      );
+      
+      if (activeBatchIndex >= 0) {
+        setConflictingBatch({
+          index: activeBatchIndex,
+          nome: formData.batches[activeBatchIndex].nome || `Lote ${activeBatchIndex + 1}`
+        });
+        setConfirmDialogOpen(true);
+        return;
+      }
+    }
+    
+    handleSaveBatch(false);
+  };
+
+  const handleSaveBatch = (deactivateOthers: boolean = false) => {
     const newBatches = [...formData.batches];
+    
+    if (deactivateOthers && currentBatch.ativo) {
+      newBatches.forEach((batch, idx) => {
+        if (idx !== editingBatchIndex && batch.ativo) {
+          newBatches[idx] = { ...batch, ativo: false };
+        }
+      });
+    }
+    
     if (editingBatchIndex !== null) {
       newBatches[editingBatchIndex] = currentBatch;
     } else {
@@ -56,6 +101,8 @@ export function EventBatchesStep({ formData, updateFormData }: EventBatchesStepP
     }
     updateFormData({ batches: newBatches });
     setBatchDialogOpen(false);
+    setConfirmDialogOpen(false);
+    setConflictingBatch(null);
   };
 
   const handleDeleteBatch = (index: number) => {
@@ -234,7 +281,7 @@ export function EventBatchesStep({ formData, updateFormData }: EventBatchesStepP
                   <Button variant="outline">Cancelar</Button>
                 </DialogClose>
                 <Button 
-                  onClick={handleSaveBatch}
+                  onClick={checkAndSaveBatch}
                   disabled={!currentBatch.nome || !currentBatch.dataInicio}
                   data-testid="button-save-batch"
                 >
@@ -366,6 +413,35 @@ export function EventBatchesStep({ formData, updateFormData }: EventBatchesStepP
           </CardContent>
         </Card>
       )}
+
+      <AlertDialog open={confirmDialogOpen} onOpenChange={(open) => {
+        setConfirmDialogOpen(open);
+        if (!open) {
+          setConflictingBatch(null);
+        }
+      }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar Ativacao de Lote</AlertDialogTitle>
+            <AlertDialogDescription>
+              Existe um lote ativo ({conflictingBatch?.nome}). 
+              Ao ativar este lote, o lote atual sera automaticamente desativado.
+              Deseja continuar?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={() => handleSaveBatch(true)}
+              data-testid="button-confirm-activate-batch"
+            >
+              Sim, ativar este lote
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
