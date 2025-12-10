@@ -25,9 +25,10 @@ import {
   Shirt,
   Layers,
   Check,
-  Clock
+  Clock,
+  AlertTriangle
 } from "lucide-react";
-import { formatDateOnlyBrazil } from "@/lib/timezone";
+import { formatDateOnlyBrazil, formatDateTimeBrazil } from "@/lib/timezone";
 import type { Event } from "@shared/schema";
 
 interface ShirtGridItem {
@@ -36,6 +37,12 @@ interface ShirtGridItem {
   quantidadeTotal: number;
   quantidadeDisponivel: number;
   consumo: number;
+}
+
+interface BatchPriceInfo {
+  modalityId: string;
+  modalityName: string;
+  valor: string;
 }
 
 interface BatchInfo {
@@ -47,6 +54,8 @@ interface BatchInfo {
   quantidadeUtilizada: number;
   ativo: boolean;
   isVigente: boolean;
+  isExpirado: boolean;
+  precos: BatchPriceInfo[];
 }
 
 interface EventStats {
@@ -414,21 +423,29 @@ export default function AdminEventManagePage() {
                   {stats.batches.map((batch) => (
                     <div 
                       key={batch.id} 
-                      className={`p-3 rounded-md border ${batch.isVigente ? 'border-primary bg-primary/5' : ''}`}
+                      className={`p-3 rounded-md border ${batch.isVigente ? 'border-primary bg-primary/5' : batch.isExpirado ? 'border-destructive/50 bg-destructive/5' : ''}`}
                       data-testid={`batch-info-${batch.id}`}
                     >
                       <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                          {batch.isVigente ? (
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {batch.isExpirado ? (
+                            <AlertTriangle className="h-4 w-4 text-destructive" />
+                          ) : batch.isVigente ? (
                             <Check className="h-4 w-4 text-primary" />
                           ) : batch.ativo ? (
                             <Clock className="h-4 w-4 text-muted-foreground" />
                           ) : null}
-                          <span className="font-medium">{batch.nome}</span>
+                          <span className="font-medium">
+                            {batch.nome}
+                            {batch.isExpirado && " (Expirado)"}
+                          </span>
+                          {batch.isExpirado && (
+                            <Badge variant="destructive">Expirado</Badge>
+                          )}
                           {batch.isVigente && (
                             <Badge variant="default">Vigente</Badge>
                           )}
-                          {!batch.ativo && (
+                          {!batch.ativo && !batch.isExpirado && (
                             <Badge variant="secondary">Inativo</Badge>
                           )}
                         </div>
@@ -438,9 +455,25 @@ export default function AdminEventManagePage() {
                         </span>
                       </div>
                       <p className="text-xs text-muted-foreground mt-1">
-                        {formatDateOnlyBrazil(batch.dataInicio)}
-                        {batch.dataTermino && ` - ${formatDateOnlyBrazil(batch.dataTermino)}`}
+                        {formatDateTimeBrazil(batch.dataInicio)}
+                        {batch.dataTermino && ` - ${formatDateTimeBrazil(batch.dataTermino)}`}
                       </p>
+                      {batch.precos && batch.precos.length > 0 && (
+                        <div className="mt-2 pt-2 border-t border-border/50">
+                          <p className="text-xs font-medium text-muted-foreground mb-1">Valores por modalidade:</p>
+                          <div className="flex flex-wrap gap-2">
+                            {batch.precos.map((preco) => (
+                              <Badge 
+                                key={preco.modalityId} 
+                                variant="outline" 
+                                className="text-xs"
+                              >
+                                {preco.modalityName}: R$ {parseFloat(preco.valor).toFixed(2).replace('.', ',')}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

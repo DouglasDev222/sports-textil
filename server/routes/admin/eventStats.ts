@@ -24,12 +24,13 @@ router.get("/:eventId/stats", requireAuth, async (req, res) => {
       });
     }
 
-    const [registrations, modalities, orders, batches, shirtSizes] = await Promise.all([
+    const [registrations, modalities, orders, batches, shirtSizes, prices] = await Promise.all([
       storage.getRegistrationsByEvent(eventId),
       storage.getModalitiesByEvent(eventId),
       storage.getOrdersByEvent(eventId),
       storage.getBatchesByEvent(eventId),
-      storage.getShirtSizesByEvent(eventId)
+      storage.getShirtSizesByEvent(eventId),
+      storage.getPricesByEvent(eventId)
     ]);
 
     const confirmedRegistrations = registrations.filter(r => r.status === "confirmada");
@@ -74,16 +75,32 @@ router.get("/:eventId/stats", requireAuth, async (req, res) => {
       (!b.quantidadeMaxima || b.quantidadeUtilizada < b.quantidadeMaxima)
     );
 
-    const batchesInfo = batches.map(batch => ({
-      id: batch.id,
-      nome: batch.nome,
-      dataInicio: batch.dataInicio,
-      dataTermino: batch.dataTermino,
-      quantidadeMaxima: batch.quantidadeMaxima,
-      quantidadeUtilizada: batch.quantidadeUtilizada,
-      ativo: batch.ativo,
-      isVigente: activeBatch?.id === batch.id
-    }));
+    const modalityMap = new Map(modalities.map(m => [m.id, m]));
+
+    const batchesInfo = batches.map(batch => {
+      const batchPrices = prices.filter(p => p.batchId === batch.id);
+      const pricesWithModalityName = batchPrices.map(p => ({
+        modalityId: p.modalityId,
+        modalityName: modalityMap.get(p.modalityId)?.nome || 'N/A',
+        valor: p.valor
+      }));
+      
+      const dataTerminoDate = batch.dataTermino ? new Date(batch.dataTermino) : null;
+      const isExpirado = dataTerminoDate ? dataTerminoDate < now : false;
+      
+      return {
+        id: batch.id,
+        nome: batch.nome,
+        dataInicio: batch.dataInicio,
+        dataTermino: batch.dataTermino,
+        quantidadeMaxima: batch.quantidadeMaxima,
+        quantidadeUtilizada: batch.quantidadeUtilizada,
+        ativo: batch.ativo,
+        isVigente: activeBatch?.id === batch.id,
+        isExpirado,
+        precos: pricesWithModalityName
+      };
+    });
 
     res.json({
       success: true,
