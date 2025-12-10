@@ -89,6 +89,48 @@ router.get("/events/:slug/registration-info", async (req, res) => {
         vagasModalidade = mod.limiteVagas - modalityRegistrations.length;
       }
 
+      // CRITICAL BUSINESS RULE: Check if paid modality has valid price
+      const isPaidModality = mod.tipoAcesso !== "gratuita";
+      let inscricaoBloqueada = false;
+      let motivoBloqueio: string | null = null;
+      
+      if (isPaidModality) {
+        // For paid modalities, require a valid price from the active batch
+        if (!activeBatch) {
+          inscricaoBloqueada = true;
+          motivoBloqueio = "Nenhum lote ativo disponível no momento.";
+        } else if (!modalityPrice) {
+          inscricaoBloqueada = true;
+          motivoBloqueio = "Nenhum preço configurado para esta modalidade no lote atual.";
+        } else {
+          const priceValue = parseFloat(modalityPrice.valor);
+          if (isNaN(priceValue) || priceValue <= 0) {
+            inscricaoBloqueada = true;
+            motivoBloqueio = "Preço inválido configurado para esta modalidade.";
+          }
+        }
+      }
+
+      // For paid modalities without valid price, show null instead of 0
+      // This prevents the UI from showing R$ 0,00 for paid modalities
+      let precoExibicao: number | null;
+      if (isPaidModality) {
+        // For paid modalities, only show price if it's valid (exists and > 0)
+        if (modalityPrice) {
+          const priceValue = parseFloat(modalityPrice.valor);
+          if (!isNaN(priceValue) && priceValue > 0) {
+            precoExibicao = priceValue;
+          } else {
+            precoExibicao = null; // Invalid price - show null, not 0
+          }
+        } else {
+          precoExibicao = null; // No price configured - show null, not 0
+        }
+      } else {
+        // For free modalities, 0 is valid
+        precoExibicao = modalityPrice ? parseFloat(modalityPrice.valor) : 0;
+      }
+
       return {
         id: mod.id,
         nome: mod.nome,
@@ -97,12 +139,14 @@ router.get("/events/:slug/registration-info", async (req, res) => {
         horarioLargada: mod.horarioLargada,
         descricao: mod.descricao,
         tipoAcesso: mod.tipoAcesso,
-        preco: modalityPrice ? parseFloat(modalityPrice.valor) : 0,
+        preco: precoExibicao,
         taxaComodidade: parseFloat(mod.taxaComodidade) || 0,
         limiteVagas: mod.limiteVagas,
         vagasDisponiveis: vagasModalidade,
         idadeMinima: mod.idadeMinima ?? event.idadeMinimaEvento,
-        ordem: mod.ordem
+        ordem: mod.ordem,
+        inscricaoBloqueada,
+        motivoBloqueio
       };
     }).sort((a, b) => a.ordem - b.ordem);
 
@@ -194,11 +238,36 @@ router.post("/", async (req, res) => {
     }
 
     const price = await storage.getPrice(modalityId, activeBatch.id);
-    const valorInscricao = price ? parseFloat(price.valor) : 0;
     const taxaComodidade = parseFloat(modality.taxaComodidade) || 0;
+    
+    // CRITICAL BUSINESS RULE: Paid modalities MUST have a valid price
+    // NEVER allow registration with price 0 for paid modalities
+    const isPaidModality = modality.tipoAcesso !== "gratuita";
+    
+    if (isPaidModality) {
+      if (!price || price.valor === null || price.valor === undefined) {
+        return res.status(400).json({ 
+          success: false, 
+          error: "Nenhum lote válido disponível para esta modalidade no momento.",
+          errorCode: "NO_VALID_BATCH_FOR_PAID_MODALITY"
+        });
+      }
+      const priceValue = parseFloat(price.valor);
+      if (isNaN(priceValue) || priceValue <= 0) {
+        return res.status(400).json({ 
+          success: false, 
+          error: "Nenhum lote válido disponível para esta modalidade no momento.",
+          errorCode: "NO_VALID_BATCH_FOR_PAID_MODALITY"
+        });
+      }
+    }
+    
+    const valorInscricao = price ? parseFloat(price.valor) : 0;
     const valorTotal = valorInscricao + taxaComodidade;
 
-    const isGratuita = modality.tipoAcesso === "gratuita" || valorTotal === 0;
+    // isGratuita can ONLY be true if the modality type is explicitly "gratuita"
+    // Never derive gratuita status from price being 0 (that was the bug!)
+    const isGratuita = modality.tipoAcesso === "gratuita";
 
     const orderNumber = await storage.getNextOrderNumber();
     const registrationNumber = await storage.getNextRegistrationNumber();
@@ -236,8 +305,13 @@ router.post("/", async (req, res) => {
     if (!result.success) {
       const statusCode = result.errorCode === 'EVENT_NOT_FOUND' ? 404 :
                          result.errorCode === 'VAGAS_ESGOTADAS' ? 409 :
-                         result.errorCode === 'JA_INSCRITO' ? 409 : 500;
-      return res.status(statusCode).json({ success: false, error: result.error });
+                         result.errorCode === 'JA_INSCRITO' ? 409 :
+                         result.errorCode === 'NO_VALID_BATCH_FOR_PAID_MODALITY' ? 400 : 500;
+      return res.status(statusCode).json({ 
+        success: false, 
+        error: result.error,
+        errorCode: result.errorCode
+      });
     }
 
     res.status(201).json({

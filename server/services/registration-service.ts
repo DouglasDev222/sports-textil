@@ -42,6 +42,7 @@ export type RegistrationErrorCode =
   | 'VAGAS_ESGOTADAS'
   | 'JA_INSCRITO'
   | 'ALREADY_REGISTERED'
+  | 'NO_VALID_BATCH_FOR_PAID_MODALITY'
   | 'INTERNAL_ERROR';
 
 export interface AtomicRegistrationResult {
@@ -149,7 +150,7 @@ export async function registerForEventAtomic(
 
     // 2. LOCK MODALITY - Check modality capacity (optional limit)
     const modalityResult = await client.query(
-      `SELECT id, limite_vagas, vagas_ocupadas, nome
+      `SELECT id, limite_vagas, vagas_ocupadas, nome, tipo_acesso
        FROM modalities 
        WHERE id = $1 
        FOR UPDATE`,
@@ -166,6 +167,7 @@ export async function registerForEventAtomic(
     }
     
     const modality = modalityResult.rows[0];
+    const isPaidModality = modality.tipo_acesso !== 'gratuita';
     
     if (modality.limite_vagas !== null && modality.vagas_ocupadas >= modality.limite_vagas) {
       await client.query('ROLLBACK');
@@ -228,7 +230,32 @@ export async function registerForEventAtomic(
       }
 
       batchId = batch.id;
-      valorUnitario = batch.valor || registrationData.valorUnitario;
+      
+      // CRITICAL BUSINESS RULE: Paid modalities MUST have a valid price from the batch
+      // Never allow a paid modality to proceed with price = 0 due to missing price configuration
+      if (isPaidModality) {
+        if (batch.valor === null || batch.valor === undefined) {
+          await client.query('ROLLBACK');
+          return {
+            success: false,
+            error: 'Nenhum lote valido disponivel para esta modalidade no momento.',
+            errorCode: 'NO_VALID_BATCH_FOR_PAID_MODALITY'
+          };
+        }
+        const priceValue = parseFloat(batch.valor);
+        if (isNaN(priceValue) || priceValue <= 0) {
+          await client.query('ROLLBACK');
+          return {
+            success: false,
+            error: 'Nenhum lote valido disponivel para esta modalidade no momento.',
+            errorCode: 'NO_VALID_BATCH_FOR_PAID_MODALITY'
+          };
+        }
+        valorUnitario = batch.valor;
+      } else {
+        // For free modalities, price can be 0
+        valorUnitario = batch.valor || '0';
+      }
       break;
     }
 
