@@ -186,7 +186,8 @@ export default function InscricaoModalidadePage() {
     }
   };
 
-  const formatPrice = (value: number) => {
+  const formatPrice = (value: number | null | undefined) => {
+    if (value === null || value === undefined) return "Preço indisponível";
     if (value === 0) return "Gratuito";
     return `R$ ${value.toFixed(2).replace('.', ',')}`;
   };
@@ -228,7 +229,10 @@ export default function InscricaoModalidadePage() {
               <RadioGroup value={modalidadeSelecionada} onValueChange={setModalidadeSelecionada}>
                 <div className="space-y-2">
                   {modalities.map((modality, idx) => {
-                    const isUnavailable = modality.vagasDisponiveis !== null && modality.vagasDisponiveis <= 0;
+                    const isSoldOut = modality.vagasDisponiveis !== null && modality.vagasDisponiveis <= 0;
+                    const isBlocked = (modality as any).inscricaoBloqueada === true;
+                    const blockReason = (modality as any).motivoBloqueio;
+                    const isUnavailable = isSoldOut || isBlocked;
                     
                     return (
                       <div
@@ -253,8 +257,11 @@ export default function InscricaoModalidadePage() {
                               <div className="flex items-center gap-2 flex-wrap">
                                 <span className="font-medium text-foreground">{modality.nome}</span>
                                 {getTipoAcessoBadge(modality.tipoAcesso)}
-                                {isUnavailable && (
+                                {isSoldOut && (
                                   <Badge variant="destructive">Esgotado</Badge>
+                                )}
+                                {isBlocked && !isSoldOut && (
+                                  <Badge variant="destructive">Indisponível</Badge>
                                 )}
                               </div>
                               <Badge variant="secondary" className="font-semibold">
@@ -264,8 +271,11 @@ export default function InscricaoModalidadePage() {
                             <div className="flex flex-wrap gap-2 text-xs text-muted-foreground mt-1">
                               <span>{modality.distancia} {modality.unidadeDistancia}</span>
                               <span>Largada: {modality.horarioLargada}</span>
-                              {modality.vagasDisponiveis !== null && !isUnavailable && (
+                              {modality.vagasDisponiveis !== null && !isSoldOut && (
                                 <span>{modality.vagasDisponiveis} vagas</span>
+                              )}
+                              {isBlocked && blockReason && (
+                                <span className="text-destructive">{blockReason}</span>
                               )}
                             </div>
                           </Label>
