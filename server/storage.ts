@@ -334,7 +334,7 @@ export class DbStorage implements IStorage {
     const allBatches = await db.select().from(registrationBatches)
       .where(and(
         eq(registrationBatches.eventId, eventId),
-        eq(registrationBatches.ativo, true),
+        eq(registrationBatches.status, 'active'),
         lte(registrationBatches.dataInicio, now)
       ));
     

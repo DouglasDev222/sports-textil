@@ -71,7 +71,7 @@ async function closeBatchAndActivateNext(
   eventId: string
 ): Promise<{ nextBatchActivated: boolean; nextBatchId: string | null }> {
   await client.query(
-    `UPDATE registration_batches SET ativo = false, status = 'closed' WHERE id = $1`,
+    `UPDATE registration_batches SET status = 'closed' WHERE id = $1`,
     [currentBatchId]
   );
 
@@ -102,7 +102,7 @@ async function closeBatchAndActivateNext(
         console.log(`[registration-service] Lote candidato ${candidate.id} já está cheio, fechando...`);
         await client.query(
           `UPDATE registration_batches 
-           SET ativo = false, status = 'closed' 
+           SET status = 'closed' 
            WHERE id = $1`,
           [candidate.id]
         );
@@ -120,7 +120,7 @@ async function closeBatchAndActivateNext(
           console.log(`[registration-service] Lote candidato ${candidate.id} já expirou, fechando...`);
           await client.query(
             `UPDATE registration_batches 
-             SET ativo = false, status = 'closed' 
+             SET status = 'closed' 
              WHERE id = $1`,
             [candidate.id]
           );
@@ -147,7 +147,7 @@ async function closeBatchAndActivateNext(
       // This batch is valid and can start - activate it
       await client.query(
         `UPDATE registration_batches 
-         SET ativo = true, status = 'active'
+         SET status = 'active'
          WHERE id = $1`,
         [candidate.id]
       );
@@ -258,7 +258,6 @@ export async function registerForEventAtomic(
          FROM registration_batches rb
          LEFT JOIN prices p ON p.batch_id = rb.id AND p.modality_id = $2
          WHERE rb.event_id = $1 
-           AND rb.ativo = true
            AND rb.status = 'active'
          ORDER BY rb.ordem ASC
          LIMIT 1
@@ -572,7 +571,7 @@ export async function getAvailableSpots(eventId: string): Promise<{
     const batchResult = await client.query(
       `SELECT id, nome, quantidade_maxima, quantidade_utilizada 
        FROM registration_batches 
-       WHERE event_id = $1 AND ativo = true
+       WHERE event_id = $1 AND status = 'active'
        ORDER BY ordem ASC
        LIMIT 1`,
       [eventId]

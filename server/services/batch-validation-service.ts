@@ -85,7 +85,7 @@ export async function recalculateBatchesForEvent(eventId: string): Promise<Batch
       `SELECT id, nome, data_inicio, data_termino, quantidade_maxima, quantidade_utilizada, ordem, status
        FROM registration_batches
        WHERE event_id = $1 
-         AND (status = 'active' OR ativo = true)
+         AND status = 'active'
        ORDER BY ordem ASC
        FOR UPDATE`,
       [eventId]
@@ -118,7 +118,7 @@ export async function recalculateBatchesForEvent(eventId: string): Promise<Batch
         // Close this batch
         await client.query(
           `UPDATE registration_batches 
-           SET ativo = false, status = 'closed' 
+           SET status = 'closed' 
            WHERE id = $1`,
           [batch.id]
         );
@@ -143,7 +143,7 @@ export async function recalculateBatchesForEvent(eventId: string): Promise<Batch
             console.log(`Lote candidato ${candidate.id} (${candidate.nome}) já está cheio, fechando...`);
             await client.query(
               `UPDATE registration_batches 
-               SET ativo = false, status = 'closed' 
+               SET status = 'closed' 
                WHERE id = $1`,
               [candidate.id]
             );
@@ -162,7 +162,7 @@ export async function recalculateBatchesForEvent(eventId: string): Promise<Batch
               console.log(`Lote candidato ${candidate.id} (${candidate.nome}) já expirou, fechando...`);
               await client.query(
                 `UPDATE registration_batches 
-                 SET ativo = false, status = 'closed' 
+                 SET status = 'closed' 
                  WHERE id = $1`,
                 [candidate.id]
               );
@@ -190,7 +190,7 @@ export async function recalculateBatchesForEvent(eventId: string): Promise<Batch
           // This batch is valid and can start - activate it
           await client.query(
             `UPDATE registration_batches 
-             SET ativo = true, status = 'active'
+             SET status = 'active'
              WHERE id = $1`,
             [candidate.id]
           );
@@ -205,7 +205,6 @@ export async function recalculateBatchesForEvent(eventId: string): Promise<Batch
     const currentActiveBatch = await client.query(
       `SELECT id FROM registration_batches
        WHERE event_id = $1 
-         AND ativo = true 
          AND status = 'active'
          AND (quantidade_maxima IS NULL OR quantidade_utilizada < quantidade_maxima)
        ORDER BY ordem ASC
@@ -303,7 +302,6 @@ export async function getModalitiesAvailability(eventId: string): Promise<{
         p.valor as batch_price
        FROM modalities m
        LEFT JOIN registration_batches rb ON rb.event_id = m.event_id 
-         AND rb.ativo = true 
          AND rb.status = 'active'
          AND (rb.modality_id IS NULL OR rb.modality_id = m.id)
          AND (rb.quantidade_maxima IS NULL OR rb.quantidade_utilizada < rb.quantidade_maxima)
@@ -453,7 +451,6 @@ export async function checkEventCanAcceptRegistrations(eventId: string): Promise
     const activeBatch = await client.query(
       `SELECT id FROM registration_batches
        WHERE event_id = $1 
-         AND ativo = true 
          AND status = 'active'
          AND (quantidade_maxima IS NULL OR quantidade_utilizada < quantidade_maxima)
        LIMIT 1`,
