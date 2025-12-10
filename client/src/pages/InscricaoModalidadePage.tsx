@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ChevronLeft, ShieldCheck, AlertCircle, Loader2, CheckCircle } from "lucide-react";
+import { ChevronLeft, ShieldCheck, AlertCircle, Loader2, CheckCircle, XCircle } from "lucide-react";
 import Header from "@/components/Header";
 import { useAthleteAuth } from "@/contexts/AthleteAuthContext";
 
@@ -27,6 +27,10 @@ interface ModalityInfo {
   vagasDisponiveis: number | null;
   idadeMinima: number | null;
   ordem: number;
+  isSoldOut?: boolean;
+  isAvailable?: boolean;
+  inscricaoBloqueada?: boolean;
+  motivoBloqueio?: string;
 }
 
 interface ShirtSize {
@@ -41,6 +45,7 @@ interface RegistrationInfo {
     nome: string;
     slug: string;
     entregaCamisaNoKit: boolean;
+    status?: string;
   };
   modalities: ModalityInfo[];
   activeBatch: {
@@ -51,6 +56,7 @@ interface RegistrationInfo {
     byModality: boolean;
     data: ShirtSize[] | { modalityId: string; sizes: ShirtSize[] }[];
   };
+  eventSoldOut?: boolean;
 }
 
 export default function InscricaoModalidadePage() {
@@ -144,7 +150,8 @@ export default function InscricaoModalidadePage() {
     );
   }
 
-  const { modalities, shirtSizes, activeBatch } = data.data;
+  const { modalities, shirtSizes, activeBatch, eventSoldOut } = data.data;
+  const isEventSoldOut = eventSoldOut || data.data?.event?.status === 'esgotado';
   const selectedModality = modalities.find(m => m.id === modalidadeSelecionada);
   
   let availableSizes: ShirtSize[] = [];
@@ -167,7 +174,8 @@ export default function InscricaoModalidadePage() {
   
   const podeAvancar = modalidadeSelecionada && 
     (!requiresShirtSize || tamanhoSelecionado) && 
-    (!requiresCode || codigoComprovacao.trim() !== "");
+    (!requiresCode || codigoComprovacao.trim() !== "") &&
+    !isEventSoldOut;
 
   const getTipoAcessoBadge = (tipoAcesso: string) => {
     switch (tipoAcesso) {
@@ -220,6 +228,15 @@ export default function InscricaoModalidadePage() {
           )}
         </div>
 
+        {isEventSoldOut && (
+          <Alert variant="destructive" className="mb-6">
+            <XCircle className="h-4 w-4" />
+            <AlertDescription>
+              Este evento está com todas as vagas esgotadas. Não é possível realizar novas inscrições no momento.
+            </AlertDescription>
+          </Alert>
+        )}
+
         <div className="space-y-6">
           <Card>
             <CardHeader>
@@ -229,10 +246,11 @@ export default function InscricaoModalidadePage() {
               <RadioGroup value={modalidadeSelecionada} onValueChange={setModalidadeSelecionada}>
                 <div className="space-y-2">
                   {modalities.map((modality, idx) => {
-                    const isSoldOut = modality.vagasDisponiveis !== null && modality.vagasDisponiveis <= 0;
-                    const isBlocked = (modality as any).inscricaoBloqueada === true;
-                    const blockReason = (modality as any).motivoBloqueio;
-                    const isUnavailable = isSoldOut || isBlocked;
+                    const isSoldOut = modality.isSoldOut || (modality.vagasDisponiveis !== null && modality.vagasDisponiveis <= 0);
+                    const isBlocked = modality.inscricaoBloqueada === true;
+                    const blockReason = modality.motivoBloqueio;
+                    const isEventSoldOut = data?.data?.eventSoldOut || data?.data?.event?.status === 'esgotado';
+                    const isUnavailable = isSoldOut || isBlocked || isEventSoldOut;
                     
                     return (
                       <div

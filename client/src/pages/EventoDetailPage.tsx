@@ -6,16 +6,22 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Calendar, MapPin, Clock, Award, Info, FileText, Download, Package, Map, AlertCircle } from "lucide-react";
+import { Calendar, MapPin, Clock, Award, Info, FileText, Download, Package, Map, AlertCircle, XCircle } from "lucide-react";
 import heroImage from '@assets/generated_images/Marathon_runners_landscape_hero_b439e181.png';
 import { formatDateOnlyLong } from "@/lib/timezone";
 import type { Event, Modality, RegistrationBatch, Price, Attachment } from "@shared/schema";
 
+interface ModalityWithAvailability extends Modality {
+  isAvailable?: boolean;
+  isSoldOut?: boolean;
+}
+
 interface EventWithDetails extends Event {
-  modalities: Modality[];
+  modalities: ModalityWithAvailability[];
   activeBatch: RegistrationBatch | null;
   prices: Price[];
   attachments: Attachment[];
+  eventSoldOut?: boolean;
 }
 
 export default function EventoDetailPage() {
@@ -98,6 +104,7 @@ export default function EventoDetailPage() {
 
   const modalities = event.modalities || [];
   const attachments = event.attachments || [];
+  const eventSoldOut = event.eventSoldOut || event.status === 'esgotado';
 
   return (
     <div className="min-h-screen bg-background">
@@ -113,9 +120,17 @@ export default function EventoDetailPage() {
         <div className="absolute inset-0 z-20 flex items-end">
           <div className="w-full px-4 md:px-6 pb-8 md:pb-12">
             <div className="max-w-5xl mx-auto">
-              <h1 className="text-3xl md:text-5xl font-bold text-white mb-4">
-                {event.nome}
-              </h1>
+              <div className="flex flex-wrap items-center gap-3 mb-4">
+                <h1 className="text-3xl md:text-5xl font-bold text-white">
+                  {event.nome}
+                </h1>
+                {eventSoldOut && (
+                  <Badge variant="destructive" className="text-sm px-3 py-1">
+                    <XCircle className="h-4 w-4 mr-1" />
+                    Esgotado
+                  </Badge>
+                )}
+              </div>
               <div className="flex flex-wrap gap-2">
                 {modalities.map((mod) => (
                   <Badge key={mod.id} variant="secondary" className="text-sm">
@@ -225,37 +240,51 @@ export default function EventoDetailPage() {
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <Award className="h-5 w-5" />
-                      Modalidades Disponíveis
+                      Modalidades {eventSoldOut ? '' : 'Disponíveis'}
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
                     {modalities.length > 0 ? (
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {modalities.map((mod) => (
-                          <div key={mod.id} className="p-4 border rounded-md space-y-2">
-                            <div className="flex items-center justify-between">
-                              <Badge variant="secondary" className="text-base">
-                                {mod.distancia} {mod.unidadeDistancia}
-                              </Badge>
-                              <span className="font-semibold">{getPrice(mod.id)}</span>
-                            </div>
-                            <p className="font-medium">{mod.nome}</p>
-                            <p className="text-sm text-muted-foreground">
-                              Largada: {mod.horarioLargada}
-                            </p>
-                            {mod.descricao && (
-                              <p className="text-sm text-muted-foreground">{mod.descricao}</p>
-                            )}
-                            <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-                              {mod.limiteVagas && (
-                                <span>Limite: {mod.limiteVagas} vagas</span>
+                        {modalities.map((mod) => {
+                          const isSoldOut = eventSoldOut || mod.isSoldOut;
+                          return (
+                            <div 
+                              key={mod.id} 
+                              className={`p-4 border rounded-md space-y-2 ${isSoldOut ? 'opacity-60 bg-muted/30' : ''}`}
+                            >
+                              <div className="flex items-center justify-between gap-2 flex-wrap">
+                                <Badge variant="secondary" className="text-base">
+                                  {mod.distancia} {mod.unidadeDistancia}
+                                </Badge>
+                                <div className="flex items-center gap-2">
+                                  {isSoldOut ? (
+                                    <Badge variant="destructive" className="text-xs">
+                                      Esgotado
+                                    </Badge>
+                                  ) : (
+                                    <span className="font-semibold">{getPrice(mod.id)}</span>
+                                  )}
+                                </div>
+                              </div>
+                              <p className="font-medium">{mod.nome}</p>
+                              <p className="text-sm text-muted-foreground">
+                                Largada: {mod.horarioLargada}
+                              </p>
+                              {mod.descricao && (
+                                <p className="text-sm text-muted-foreground">{mod.descricao}</p>
                               )}
-                              {(mod.idadeMinima !== null && mod.idadeMinima !== undefined) || event.idadeMinimaEvento ? (
-                                <span>Idade mínima: {mod.idadeMinima ?? event.idadeMinimaEvento} anos</span>
-                              ) : null}
+                              <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                                {mod.limiteVagas && (
+                                  <span>Limite: {mod.limiteVagas} vagas</span>
+                                )}
+                                {(mod.idadeMinima !== null && mod.idadeMinima !== undefined) || event.idadeMinimaEvento ? (
+                                  <span>Idade mínima: {mod.idadeMinima ?? event.idadeMinimaEvento} anos</span>
+                                ) : null}
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     ) : (
                       <p className="text-center py-8 text-muted-foreground">
@@ -346,22 +375,46 @@ export default function EventoDetailPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
+                  {eventSoldOut && (
+                    <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 rounded-md">
+                      <p className="text-sm font-medium text-destructive flex items-center gap-2">
+                        <XCircle className="h-4 w-4" />
+                        Evento Esgotado
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Todas as vagas foram preenchidas
+                      </p>
+                    </div>
+                  )}
                   <div className="space-y-3 mb-6">
-                    {modalities.map((mod) => (
-                      <div key={mod.id} className="flex items-center justify-between py-2 border-b last:border-b-0">
-                        <span className="text-sm text-muted-foreground">{mod.nome}</span>
-                        <span className="font-semibold text-foreground">{getPrice(mod.id)}</span>
-                      </div>
-                    ))}
+                    {modalities.map((mod) => {
+                      const isSoldOut = eventSoldOut || mod.isSoldOut;
+                      return (
+                        <div 
+                          key={mod.id} 
+                          className={`flex items-center justify-between py-2 border-b last:border-b-0 gap-2 ${isSoldOut ? 'opacity-60' : ''}`}
+                        >
+                          <span className="text-sm text-muted-foreground">{mod.nome}</span>
+                          {isSoldOut ? (
+                            <Badge variant="destructive" className="text-xs">
+                              Esgotado
+                            </Badge>
+                          ) : (
+                            <span className="font-semibold text-foreground">{getPrice(mod.id)}</span>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                   <Button
                     variant="secondary"
                     size="lg"
                     className="w-full font-semibold"
                     onClick={handleInscricao}
+                    disabled={eventSoldOut}
                     data-testid="button-inscricao"
                   >
-                    Inscrever-se Agora
+                    {eventSoldOut ? 'Inscrições Encerradas' : 'Inscrever-se Agora'}
                   </Button>
                 </CardContent>
               </Card>
@@ -377,9 +430,10 @@ export default function EventoDetailPage() {
             size="lg"
             className="w-full font-semibold"
             onClick={handleInscricao}
+            disabled={eventSoldOut}
             data-testid="button-inscricao-mobile"
           >
-            Inscrever-se Agora
+            {eventSoldOut ? 'Inscrições Encerradas' : 'Inscrever-se Agora'}
           </Button>
         </div>
       </div>

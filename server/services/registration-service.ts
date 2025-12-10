@@ -32,6 +32,7 @@ export interface OrderData {
 
 export type RegistrationErrorCode = 
   | 'EVENT_FULL'
+  | 'EVENT_SOLD_OUT'
   | 'MODALITY_FULL'
   | 'LOT_FULL'
   | 'LOT_SOLD_OUT_OR_CHANGED'
@@ -82,28 +83,76 @@ async function closeBatchAndActivateNext(
   if (currentBatchOrder.rows.length > 0) {
     const currentOrder = currentBatchOrder.rows[0].ordem;
     
-    const nextBatchSelect = await client.query(
-      `SELECT id FROM registration_batches
+    // Get all future batches to find the first valid one
+    const candidateBatches = await client.query(
+      `SELECT id, nome, data_inicio, data_termino, quantidade_maxima, quantidade_utilizada
+       FROM registration_batches
        WHERE event_id = $1 
          AND ordem > $2
          AND status = 'future'
        ORDER BY ordem ASC
-       LIMIT 1
        FOR UPDATE`,
       [eventId, currentOrder]
     );
 
-    if (nextBatchSelect.rows.length > 0) {
-      const nextBatchId = nextBatchSelect.rows[0].id;
+    // Find the first valid candidate batch
+    for (const candidate of candidateBatches.rows) {
+      // Check if candidate batch is already full - close it permanently
+      if (candidate.quantidade_maxima !== null && candidate.quantidade_utilizada >= candidate.quantidade_maxima) {
+        console.log(`[registration-service] Lote candidato ${candidate.id} já está cheio, fechando...`);
+        await client.query(
+          `UPDATE registration_batches 
+           SET ativo = false, status = 'closed' 
+           WHERE id = $1`,
+          [candidate.id]
+        );
+        continue;
+      }
       
+      // Check if candidate batch is already expired - close it permanently
+      if (candidate.data_termino) {
+        const candidateExpired = await client.query(
+          `SELECT ($1::timestamptz AT TIME ZONE 'America/Sao_Paulo') < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Sao_Paulo') as expired`,
+          [candidate.data_termino]
+        );
+        
+        if (candidateExpired.rows[0]?.expired) {
+          console.log(`[registration-service] Lote candidato ${candidate.id} já expirou, fechando...`);
+          await client.query(
+            `UPDATE registration_batches 
+             SET ativo = false, status = 'closed' 
+             WHERE id = $1`,
+            [candidate.id]
+          );
+          continue;
+        }
+      }
+      
+      // Check if candidate batch start date has arrived (São Paulo timezone)
+      // If start date is in the future, we cannot activate it yet
+      if (candidate.data_inicio) {
+        const canStart = await client.query(
+          `SELECT ($1::timestamptz AT TIME ZONE 'America/Sao_Paulo') <= (CURRENT_TIMESTAMP AT TIME ZONE 'America/Sao_Paulo') as can_start`,
+          [candidate.data_inicio]
+        );
+        
+        if (!canStart.rows[0]?.can_start) {
+          console.log(`[registration-service] Lote candidato ${candidate.id} (${candidate.nome}) ainda não iniciou, aguardando...`);
+          // Don't close this batch - it will be activated when its start time arrives
+          // Stop searching as this is the next batch in order
+          break;
+        }
+      }
+      
+      // This batch is valid and can start - activate it
       await client.query(
         `UPDATE registration_batches 
          SET ativo = true, status = 'active'
          WHERE id = $1`,
-        [nextBatchId]
+        [candidate.id]
       );
-
-      return { nextBatchActivated: true, nextBatchId };
+      console.log(`[registration-service] Lote ${candidate.id} ativado como próximo lote`);
+      return { nextBatchActivated: true, nextBatchId: candidate.id };
     }
   }
   
@@ -119,9 +168,9 @@ export async function registerForEventAtomic(
   try {
     await client.query('BEGIN');
     
-    // 1. LOCK EVENT - Check event capacity first (hard cap)
+    // 1. LOCK EVENT - Check event status and capacity first (hard cap)
     const eventResult = await client.query(
-      `SELECT id, limite_vagas_total, vagas_ocupadas, permitir_multiplas_modalidades 
+      `SELECT id, status, limite_vagas_total, vagas_ocupadas, permitir_multiplas_modalidades 
        FROM events 
        WHERE id = $1 
        FOR UPDATE`,
@@ -139,7 +188,22 @@ export async function registerForEventAtomic(
     
     const event = eventResult.rows[0];
     
+    // Check if event is sold out by status
+    if (event.status === 'esgotado') {
+      await client.query('ROLLBACK');
+      return {
+        success: false,
+        error: 'Inscricoes encerradas - evento esgotado.',
+        errorCode: 'EVENT_SOLD_OUT'
+      };
+    }
+    
     if (event.vagas_ocupadas >= event.limite_vagas_total) {
+      // Mark event as sold out
+      await client.query(
+        `UPDATE events SET status = 'esgotado' WHERE id = $1`,
+        [registrationData.eventId]
+      );
       await client.query('ROLLBACK');
       return {
         success: false,
@@ -188,11 +252,9 @@ export async function registerForEventAtomic(
     while (batchSwitchAttempts < maxBatchSwitchAttempts) {
       batchSwitchAttempts++;
 
-      // Query active batch - date restrictions are not applied here because
-      // the ativo=true and status='active' flags are the authoritative source of truth.
-      // Automatic batch switching ignores dates to ensure seamless registration flow.
+      // Query active batch with date termino for expiration check
       const batchResult = await client.query(
-        `SELECT rb.id, rb.quantidade_maxima, rb.quantidade_utilizada, p.valor
+        `SELECT rb.id, rb.quantidade_maxima, rb.quantidade_utilizada, rb.data_termino, p.valor
          FROM registration_batches rb
          LEFT JOIN prices p ON p.batch_id = rb.id AND p.modality_id = $2
          WHERE rb.event_id = $1 
@@ -215,6 +277,30 @@ export async function registerForEventAtomic(
 
       const batch = batchResult.rows[0];
       
+      // Check if batch is expired by date (São Paulo timezone)
+      if (batch.data_termino) {
+        const batchExpired = await client.query(
+          `SELECT ($1::timestamptz AT TIME ZONE 'America/Sao_Paulo') < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Sao_Paulo') as expired`,
+          [batch.data_termino]
+        );
+        
+        if (batchExpired.rows[0]?.expired) {
+          console.log(`[registration-service] Lote ${batch.id} expirou durante transação, ativando próximo...`);
+          const { nextBatchActivated } = await closeBatchAndActivateNext(client, batch.id, registrationData.eventId);
+          
+          if (!nextBatchActivated) {
+            await client.query('ROLLBACK');
+            return {
+              success: false,
+              error: 'Inscricoes encerradas - lote expirado e nao ha proximo lote disponivel.',
+              errorCode: 'LOTE_ESGOTADO_E_SEM_PROXIMO'
+            };
+          }
+          continue;
+        }
+      }
+      
+      // Check if batch is full by capacity
       if (batch.quantidade_maxima !== null && batch.quantidade_utilizada >= batch.quantidade_maxima) {
         const { nextBatchActivated } = await closeBatchAndActivateNext(client, batch.id, registrationData.eventId);
         

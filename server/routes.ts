@@ -4,6 +4,7 @@ import express from "express";
 import path from "path";
 import { storage } from "./storage";
 import { utcToBrazilLocal } from "./utils/timezone";
+import { recalculateBatchesForEvent, getModalitiesAvailability } from "./services/batch-validation-service";
 
 import authRoutes from "./routes/admin/auth";
 import usersRoutes from "./routes/admin/users";
@@ -56,7 +57,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/events", async (req, res) => {
     try {
       const events = await storage.getEvents();
-      const publicEvents = events.filter(e => e.status === "publicado");
+      // Show published and sold-out events (sold out events should still be visible)
+      const publicEvents = events.filter(e => e.status === "publicado" || e.status === "esgotado");
       res.json({ success: true, data: publicEvents.map(formatEventForResponse) });
     } catch (error) {
       console.error("Get public events error:", error);
@@ -70,11 +72,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/events/:slug", async (req, res) => {
     try {
       const event = await storage.getEventBySlug(req.params.slug);
-      if (!event || event.status !== "publicado") {
+      // Allow viewing published and sold-out events
+      if (!event || (event.status !== "publicado" && event.status !== "esgotado")) {
         return res.status(404).json({
           success: false,
           error: { code: "NOT_FOUND", message: "Evento nao encontrado" }
         });
+      }
+
+      // IMPORTANT: Recalculate batches before returning event data
+      // This ensures batch status is up-to-date (expired batches closed, next activated, etc.)
+      try {
+        await recalculateBatchesForEvent(event.id);
+      } catch (batchError) {
+        console.error("Error recalculating batches:", batchError);
+        // Continue even if batch recalculation fails
+      }
+
+      // Get modalities availability (includes sold out status)
+      let modalitiesAvailability;
+      try {
+        modalitiesAvailability = await getModalitiesAvailability(event.id);
+      } catch (availError) {
+        console.error("Error getting modalities availability:", availError);
+        modalitiesAvailability = null;
       }
 
       const [modalities, batches, prices, attachments] = await Promise.all([
@@ -84,13 +105,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         storage.getAttachmentsByEvent(event.id)
       ]);
 
-      const activeBatch = batches.find(b => b.ativo);
+      // Refresh event status after recalculation
+      const updatedEvent = await storage.getEventBySlug(req.params.slug);
+      const currentEvent = updatedEvent || event;
+
+      const activeBatch = batches.find(b => b.ativo && b.status === 'active');
+
+      // Add availability info to modalities
+      const modalitiesWithAvailability = modalities.map(mod => {
+        const availInfo = modalitiesAvailability?.modalities?.find(m => m.id === mod.id);
+        return {
+          ...mod,
+          isAvailable: availInfo?.isAvailable ?? true,
+          isSoldOut: availInfo?.isSoldOut ?? false
+        };
+      });
 
       res.json({
         success: true,
         data: {
-          ...formatEventForResponse(event),
-          modalities,
+          ...formatEventForResponse(currentEvent),
+          eventSoldOut: modalitiesAvailability?.eventSoldOut ?? (currentEvent.status === 'esgotado'),
+          modalities: modalitiesWithAvailability,
           activeBatch: activeBatch ? formatBatchForResponse(activeBatch) : null,
           prices: prices.filter(p => p.batchId === activeBatch?.id),
           attachments

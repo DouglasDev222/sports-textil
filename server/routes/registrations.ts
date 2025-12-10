@@ -2,6 +2,7 @@ import { Router } from "express";
 import { storage } from "../storage";
 import { z } from "zod";
 import { registerForEventAtomic } from "../services/registration-service";
+import { checkEventCanAcceptRegistrations, recalculateBatchesForEvent, getModalitiesAvailability } from "../services/batch-validation-service";
 
 const router = Router();
 
@@ -21,19 +22,75 @@ router.get("/events/:slug/registration-info", async (req, res) => {
       return res.status(404).json({ success: false, error: "Evento não encontrado" });
     }
 
-    if (event.status !== "publicado") {
+    // IMPORTANT: Recalculate batches before checking event status
+    // This ensures we have up-to-date info about batch expiration and event sold out status
+    try {
+      await recalculateBatchesForEvent(event.id);
+    } catch (batchError) {
+      console.error("Error recalculating batches:", batchError);
+    }
+
+    // Refresh event after batch recalculation
+    const updatedEvent = await storage.getEventBySlug(slug);
+    const currentEvent = updatedEvent || event;
+
+    // Check if event is sold out
+    if (currentEvent.status === "esgotado") {
+      // Get modalities availability for display (all will be sold out)
+      const modalitiesAvailability = await getModalitiesAvailability(currentEvent.id);
+      
+      return res.status(200).json({ 
+        success: true, 
+        data: {
+          event: {
+            id: currentEvent.id,
+            nome: currentEvent.nome,
+            slug: currentEvent.slug,
+            descricao: currentEvent.descricao,
+            dataEvento: currentEvent.dataEvento,
+            endereco: currentEvent.endereco,
+            cidade: currentEvent.cidade,
+            estado: currentEvent.estado,
+            limiteVagasTotal: currentEvent.limiteVagasTotal,
+            vagasRestantes: 0,
+            entregaCamisaNoKit: currentEvent.entregaCamisaNoKit,
+            idadeMinimaEvento: currentEvent.idadeMinimaEvento
+          },
+          eventSoldOut: true,
+          soldOutMessage: "Inscrições encerradas - evento esgotado.",
+          modalities: modalitiesAvailability.modalities.map(m => ({
+            id: m.id,
+            nome: m.nome,
+            tipoAcesso: m.tipoAcesso,
+            preco: null,
+            taxaComodidade: 0,
+            limiteVagas: m.limiteVagas,
+            vagasDisponiveis: 0,
+            inscricaoBloqueada: true,
+            motivoBloqueio: "Evento esgotado",
+            isSoldOut: true,
+            isAvailable: false
+          })),
+          activeBatch: null,
+          shirtSizes: { byModality: false, data: [] },
+          attachments: []
+        }
+      });
+    }
+
+    if (currentEvent.status !== "publicado") {
       return res.status(400).json({ success: false, error: "Evento não disponível para inscrições" });
     }
 
     const now = new Date();
-    const abertura = new Date(event.aberturaInscricoes);
-    const encerramento = new Date(event.encerramentoInscricoes);
+    const abertura = new Date(currentEvent.aberturaInscricoes);
+    const encerramento = new Date(currentEvent.encerramentoInscricoes);
 
     if (now < abertura) {
       return res.status(400).json({ 
         success: false, 
         error: "Inscrições ainda não abertas",
-        aberturaInscricoes: event.aberturaInscricoes
+        aberturaInscricoes: currentEvent.aberturaInscricoes
       });
     }
 
@@ -44,13 +101,22 @@ router.get("/events/:slug/registration-info", async (req, res) => {
       });
     }
 
-    const modalities = await storage.getModalitiesByEvent(event.id);
-    const activeBatch = await storage.getActiveBatch(event.id);
-    const allPrices = await storage.getPricesByEvent(event.id);
-    const attachments = await storage.getAttachmentsByEvent(event.id);
+    // Get modalities availability
+    let modalitiesAvailability;
+    try {
+      modalitiesAvailability = await getModalitiesAvailability(currentEvent.id);
+    } catch (availError) {
+      console.error("Error getting modalities availability:", availError);
+      modalitiesAvailability = null;
+    }
+
+    const modalities = await storage.getModalitiesByEvent(currentEvent.id);
+    const activeBatch = await storage.getActiveBatch(currentEvent.id);
+    const allPrices = await storage.getPricesByEvent(currentEvent.id);
+    const attachments = await storage.getAttachmentsByEvent(currentEvent.id);
 
     let shirtSizes;
-    if (event.usarGradePorModalidade) {
+    if (currentEvent.usarGradePorModalidade) {
       const allSizes: { modalityId: string; sizes: any[] }[] = [];
       for (const mod of modalities) {
         const sizes = await storage.getShirtSizesByModality(mod.id);
@@ -65,7 +131,7 @@ router.get("/events/:slug/registration-info", async (req, res) => {
       }
       shirtSizes = { byModality: true, data: allSizes };
     } else {
-      const sizes = await storage.getShirtSizesByEvent(event.id);
+      const sizes = await storage.getShirtSizesByEvent(currentEvent.id);
       shirtSizes = { 
         byModality: false, 
         data: sizes.map(s => ({
@@ -76,9 +142,9 @@ router.get("/events/:slug/registration-info", async (req, res) => {
       };
     }
 
-    const currentRegistrations = await storage.getRegistrationsByEvent(event.id);
+    const currentRegistrations = await storage.getRegistrationsByEvent(currentEvent.id);
     const confirmedRegistrations = currentRegistrations.filter(r => r.status === "confirmada");
-    const vagasRestantes = event.limiteVagasTotal - confirmedRegistrations.length;
+    const vagasRestantes = currentEvent.limiteVagasTotal - confirmedRegistrations.length;
 
     const modalitiesWithInfo = modalities.map(mod => {
       const modalityRegistrations = confirmedRegistrations.filter(r => r.modalityId === mod.id);
@@ -94,7 +160,15 @@ router.get("/events/:slug/registration-info", async (req, res) => {
       let inscricaoBloqueada = false;
       let motivoBloqueio: string | null = null;
       
-      if (isPaidModality) {
+      // Get availability info from the validation service
+      const availInfo = modalitiesAvailability?.modalities?.find(m => m.id === mod.id);
+      const isSoldOut = availInfo?.isSoldOut ?? (vagasModalidade !== null && vagasModalidade <= 0);
+      const isAvailable = availInfo?.isAvailable ?? !isSoldOut;
+      
+      if (isSoldOut) {
+        inscricaoBloqueada = true;
+        motivoBloqueio = "Modalidade esgotada";
+      } else if (isPaidModality) {
         // For paid modalities, require a valid price from the active batch
         if (!activeBatch) {
           inscricaoBloqueada = true;
@@ -143,10 +217,12 @@ router.get("/events/:slug/registration-info", async (req, res) => {
         taxaComodidade: parseFloat(mod.taxaComodidade) || 0,
         limiteVagas: mod.limiteVagas,
         vagasDisponiveis: vagasModalidade,
-        idadeMinima: mod.idadeMinima ?? event.idadeMinimaEvento,
+        idadeMinima: mod.idadeMinima ?? currentEvent.idadeMinimaEvento,
         ordem: mod.ordem,
         inscricaoBloqueada,
-        motivoBloqueio
+        motivoBloqueio,
+        isSoldOut,
+        isAvailable
       };
     }).sort((a, b) => a.ordem - b.ordem);
 
@@ -154,19 +230,20 @@ router.get("/events/:slug/registration-info", async (req, res) => {
       success: true,
       data: {
         event: {
-          id: event.id,
-          nome: event.nome,
-          slug: event.slug,
-          descricao: event.descricao,
-          dataEvento: event.dataEvento,
-          endereco: event.endereco,
-          cidade: event.cidade,
-          estado: event.estado,
-          limiteVagasTotal: event.limiteVagasTotal,
+          id: currentEvent.id,
+          nome: currentEvent.nome,
+          slug: currentEvent.slug,
+          descricao: currentEvent.descricao,
+          dataEvento: currentEvent.dataEvento,
+          endereco: currentEvent.endereco,
+          cidade: currentEvent.cidade,
+          estado: currentEvent.estado,
+          limiteVagasTotal: currentEvent.limiteVagasTotal,
           vagasRestantes,
-          entregaCamisaNoKit: event.entregaCamisaNoKit,
-          idadeMinimaEvento: event.idadeMinimaEvento
+          entregaCamisaNoKit: currentEvent.entregaCamisaNoKit,
+          idadeMinimaEvento: currentEvent.idadeMinimaEvento
         },
+        eventSoldOut: modalitiesAvailability?.eventSoldOut ?? false,
         modalities: modalitiesWithInfo,
         activeBatch: activeBatch ? {
           id: activeBatch.id,
@@ -208,9 +285,32 @@ router.post("/", async (req, res) => {
     const { eventId, modalityId, tamanhoCamisa, equipe } = parsed.data;
     const athleteId = sessionAthleteId;
 
+    // IMPORTANT: Check if event can accept registrations BEFORE proceeding
+    // This recalculates batches and checks event status (sold out, closed, etc.)
+    const canAcceptResult = await checkEventCanAcceptRegistrations(eventId);
+    if (!canAcceptResult.canAccept) {
+      const statusCode = canAcceptResult.errorCode === 'EVENT_NOT_FOUND' ? 404 :
+                         canAcceptResult.errorCode === 'EVENT_SOLD_OUT' ? 409 :
+                         canAcceptResult.errorCode === 'EVENT_FULL' ? 409 : 400;
+      return res.status(statusCode).json({ 
+        success: false, 
+        error: canAcceptResult.reason,
+        errorCode: canAcceptResult.errorCode
+      });
+    }
+
     const event = await storage.getEvent(eventId);
     if (!event) {
       return res.status(404).json({ success: false, error: "Evento não encontrado" });
+    }
+
+    // Double check event status after batch recalculation
+    if (event.status === "esgotado") {
+      return res.status(409).json({ 
+        success: false, 
+        error: "Inscrições encerradas - evento esgotado.",
+        errorCode: "EVENT_SOLD_OUT"
+      });
     }
 
     if (event.status !== "publicado") {
