@@ -55,6 +55,7 @@ interface BatchInfo {
   ativo: boolean;
   isVigente: boolean;
   isExpirado: boolean;
+  isLotado: boolean;
   precos: BatchPriceInfo[];
 }
 
@@ -420,62 +421,70 @@ export default function AdminEventManagePage() {
             <CardContent>
               {stats?.batches && stats.batches.length > 0 ? (
                 <div className="space-y-3">
-                  {stats.batches.map((batch) => (
-                    <div 
-                      key={batch.id} 
-                      className={`p-3 rounded-md border ${batch.isVigente ? 'border-primary bg-primary/5' : batch.isExpirado ? 'border-destructive/50 bg-destructive/5' : ''}`}
-                      data-testid={`batch-info-${batch.id}`}
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          {batch.isExpirado ? (
-                            <AlertTriangle className="h-4 w-4 text-destructive" />
-                          ) : batch.isVigente ? (
-                            <Check className="h-4 w-4 text-primary" />
-                          ) : batch.ativo ? (
-                            <Clock className="h-4 w-4 text-muted-foreground" />
-                          ) : null}
-                          <span className="font-medium">
-                            {batch.nome}
-                            {batch.isExpirado && " (Expirado)"}
-                          </span>
-                          {batch.isExpirado && (
-                            <Badge variant="destructive">Expirado</Badge>
-                          )}
-                          {batch.isVigente && (
-                            <Badge variant="default">Vigente</Badge>
-                          )}
-                          {!batch.ativo && !batch.isExpirado && (
-                            <Badge variant="secondary">Inativo</Badge>
-                          )}
-                        </div>
-                        <span className="font-semibold">
-                          {batch.quantidadeUtilizada}
-                          {batch.quantidadeMaxima && `/${batch.quantidadeMaxima}`}
-                        </span>
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {formatDateTimeBrazil(batch.dataInicio)}
-                        {batch.dataTermino && ` - ${formatDateTimeBrazil(batch.dataTermino)}`}
-                      </p>
-                      {batch.precos && batch.precos.length > 0 && (
-                        <div className="mt-2 pt-2 border-t border-border/50">
-                          <p className="text-xs font-medium text-muted-foreground mb-1">Valores por modalidade:</p>
-                          <div className="flex flex-wrap gap-2">
-                            {batch.precos.map((preco) => (
-                              <Badge 
-                                key={preco.modalityId} 
-                                variant="outline" 
-                                className="text-xs"
-                              >
-                                {preco.modalityName}: R$ {parseFloat(preco.valor).toFixed(2).replace('.', ',')}
-                              </Badge>
-                            ))}
+                  {stats.batches.map((batch) => {
+                    const hasProblems = batch.isExpirado || batch.isLotado || !batch.ativo;
+                    return (
+                      <div 
+                        key={batch.id} 
+                        className={`p-3 rounded-md border ${batch.isVigente ? 'border-primary bg-primary/5' : hasProblems ? 'border-muted-foreground/30' : ''}`}
+                        data-testid={`batch-info-${batch.id}`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            {batch.isVigente ? (
+                              <Check className="h-4 w-4 text-primary" />
+                            ) : hasProblems ? (
+                              <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+                            ) : (
+                              <Clock className="h-4 w-4 text-muted-foreground" />
+                            )}
+                            <span className="font-medium">{batch.nome}</span>
                           </div>
+                          <span className="font-semibold">
+                            {batch.quantidadeUtilizada}
+                            {batch.quantidadeMaxima && `/${batch.quantidadeMaxima}`}
+                          </span>
                         </div>
-                      )}
-                    </div>
-                  ))}
+                        
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {batch.isVigente && (
+                            <Badge variant="default" className="text-xs">Vigente</Badge>
+                          )}
+                          {batch.isExpirado && (
+                            <Badge variant="destructive" className="text-xs">Expirado</Badge>
+                          )}
+                          {!batch.ativo && (
+                            <Badge variant="secondary" className="text-xs">Inativo</Badge>
+                          )}
+                          {batch.isLotado && (
+                            <Badge variant="outline" className="text-xs border-orange-500 text-orange-600 dark:text-orange-400">Lotado</Badge>
+                          )}
+                        </div>
+                        
+                        <p className="text-xs text-muted-foreground mt-2">
+                          {formatDateTimeBrazil(batch.dataInicio)}
+                          {batch.dataTermino && ` - ${formatDateTimeBrazil(batch.dataTermino)}`}
+                        </p>
+                        
+                        {batch.precos && batch.precos.length > 0 && (
+                          <div className="mt-2 pt-2 border-t border-border/50">
+                            <p className="text-xs font-medium text-muted-foreground mb-1">Valores:</p>
+                            <div className="flex flex-wrap gap-1">
+                              {batch.precos.map((preco) => (
+                                <Badge 
+                                  key={preco.modalityId} 
+                                  variant="outline" 
+                                  className="text-xs"
+                                >
+                                  {preco.modalityName}: R$ {parseFloat(preco.valor).toFixed(2).replace('.', ',')}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               ) : (
                 <p className="text-muted-foreground text-center py-4">

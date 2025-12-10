@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { storage } from "../../storage";
 import { requireAuth, checkEventOwnership } from "../../middleware/auth";
+import { utcToBrazilLocal } from "../../utils/timezone";
 
 const router = Router({ mergeParams: true });
 
@@ -87,17 +88,19 @@ router.get("/:eventId/stats", requireAuth, async (req, res) => {
       
       const dataTerminoDate = batch.dataTermino ? new Date(batch.dataTermino) : null;
       const isExpirado = dataTerminoDate ? dataTerminoDate < now : false;
+      const isLotado = batch.quantidadeMaxima ? batch.quantidadeUtilizada >= batch.quantidadeMaxima : false;
       
       return {
         id: batch.id,
         nome: batch.nome,
-        dataInicio: batch.dataInicio,
-        dataTermino: batch.dataTermino,
+        dataInicio: utcToBrazilLocal(batch.dataInicio),
+        dataTermino: batch.dataTermino ? utcToBrazilLocal(batch.dataTermino) : null,
         quantidadeMaxima: batch.quantidadeMaxima,
         quantidadeUtilizada: batch.quantidadeUtilizada,
         ativo: batch.ativo,
         isVigente: activeBatch?.id === batch.id,
         isExpirado,
+        isLotado,
         precos: pricesWithModalityName
       };
     });
