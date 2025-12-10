@@ -70,7 +70,7 @@ router.get("/:eventId/stats", requireAuth, async (req, res) => {
 
     const now = new Date();
     const activeBatch = batches.find(b => 
-      b.ativo && 
+      b.status === 'active' && 
       new Date(b.dataInicio) <= now &&
       (!b.dataTermino || new Date(b.dataTermino) > now) &&
       (!b.quantidadeMaxima || b.quantidadeUtilizada < b.quantidadeMaxima)
@@ -98,6 +98,7 @@ router.get("/:eventId/stats", requireAuth, async (req, res) => {
         quantidadeMaxima: batch.quantidadeMaxima,
         quantidadeUtilizada: batch.quantidadeUtilizada,
         ativo: batch.ativo,
+        status: batch.status,
         isVigente: activeBatch?.id === batch.id,
         isExpirado,
         isLotado,

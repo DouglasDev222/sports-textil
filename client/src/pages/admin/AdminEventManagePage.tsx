@@ -9,7 +9,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
@@ -48,7 +47,12 @@ import {
   Layers,
   Check,
   Clock,
-  AlertTriangle
+  AlertTriangle,
+  Play,
+  XCircle,
+  RotateCcw,
+  Eye,
+  EyeOff
 } from "lucide-react";
 import { formatDateOnlyBrazil, formatDateTimeBrazil, formatForInput } from "@/lib/timezone";
 import { useToast } from "@/hooks/use-toast";
@@ -77,6 +81,7 @@ interface BatchInfo {
   quantidadeMaxima: number | null;
   quantidadeUtilizada: number;
   ativo: boolean;
+  status: 'active' | 'closed' | 'future';
   isVigente: boolean;
   isExpirado: boolean;
   isLotado: boolean;
@@ -117,7 +122,6 @@ interface BatchEditForm {
   dataInicio: string;
   dataTermino: string | null;
   quantidadeMaxima: number | null;
-  ativo: boolean;
 }
 
 export default function AdminEventManagePage() {
@@ -128,7 +132,6 @@ export default function AdminEventManagePage() {
   const [editingBatch, setEditingBatch] = useState<BatchEditForm | null>(null);
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [pendingActivation, setPendingActivation] = useState<{ batchId: string; activeBatchName: string } | null>(null);
-  const [isActivating, setIsActivating] = useState(false);
 
   const { data: eventData, isLoading: eventLoading } = useQuery<{ success: boolean; data: Event }>({
     queryKey: ["/api/admin/events", id],
@@ -166,14 +169,136 @@ export default function AdminEventManagePage() {
     }
   });
 
+  const closeBatchMutation = useMutation({
+    mutationFn: async (batchId: string) => {
+      const response = await apiRequest("POST", `/api/admin/events/${id}/batches/${batchId}/close`);
+      const result = await response.json();
+      if (!result.success) {
+        throw new Error(result.error?.message || "Erro ao fechar lote");
+      }
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/events", id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/events", id, "stats"] });
+      toast({ title: "Lote fechado com sucesso" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erro ao fechar lote", description: error.message, variant: "destructive" });
+    }
+  });
+
+  const setFutureBatchMutation = useMutation({
+    mutationFn: async (batchId: string) => {
+      const response = await apiRequest("POST", `/api/admin/events/${id}/batches/${batchId}/set-future`);
+      const result = await response.json();
+      if (!result.success) {
+        throw new Error(result.error?.message || "Erro ao marcar lote como futuro");
+      }
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/events", id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/events", id, "stats"] });
+      toast({ title: "Lote marcado como futuro" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erro ao marcar lote como futuro", description: error.message, variant: "destructive" });
+    }
+  });
+
+  const toggleVisibilityMutation = useMutation({
+    mutationFn: async (data: { batchId: string; ativo: boolean }) => {
+      const response = await apiRequest("PATCH", `/api/admin/events/${id}/batches/${data.batchId}/visibility`, { ativo: data.ativo });
+      const result = await response.json();
+      if (!result.success) {
+        throw new Error(result.error?.message || "Erro ao alterar visibilidade");
+      }
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/events", id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/events", id, "stats"] });
+      toast({ title: "Visibilidade alterada com sucesso" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erro ao alterar visibilidade", description: error.message, variant: "destructive" });
+    }
+  });
+
+  const activateBatchMutation = useMutation({
+    mutationFn: async (data: { batchId: string; closeOthers: boolean }) => {
+      const response = await apiRequest("POST", `/api/admin/events/${id}/batches/${data.batchId}/activate`, { closeOthers: data.closeOthers });
+      const result = await response.json();
+      if (!result.success) {
+        if (result.error?.code === "ACTIVE_BATCH_EXISTS") {
+          throw { isConflict: true, activeBatches: result.error.activeBatches };
+        }
+        throw new Error(result.error?.message || "Erro ao ativar lote");
+      }
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/events", id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/events", id, "stats"] });
+      toast({ title: "Lote ativado com sucesso" });
+    },
+    onError: (error: any) => {
+      if (error.isConflict) {
+        return;
+      }
+      toast({ title: "Erro ao ativar lote", description: error.message, variant: "destructive" });
+    }
+  });
+
+  const handleActivateBatch = async (batchId: string) => {
+    try {
+      await activateBatchMutation.mutateAsync({ batchId, closeOthers: false });
+    } catch (error: any) {
+      if (error.isConflict) {
+        const activeBatchName = error.activeBatches?.[0]?.nome || 'outro lote';
+        setPendingActivation({ batchId, activeBatchName });
+        setConfirmDialogOpen(true);
+      }
+    }
+  };
+
+  const handleConfirmActivateBatch = async () => {
+    if (!pendingActivation) return;
+    try {
+      await activateBatchMutation.mutateAsync({ batchId: pendingActivation.batchId, closeOthers: true });
+      setConfirmDialogOpen(false);
+      setPendingActivation(null);
+    } catch (error: any) {
+      toast({ title: "Erro ao ativar lote", description: error.message, variant: "destructive" });
+    }
+  };
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'active': return 'Ativo';
+      case 'closed': return 'Fechado';
+      case 'future': return 'Futuro';
+      default: return status;
+    }
+  };
+
+  const getStatusVariant = (status: string): "default" | "secondary" | "destructive" | "outline" => {
+    switch (status) {
+      case 'active': return 'default';
+      case 'closed': return 'destructive';
+      case 'future': return 'secondary';
+      default: return 'outline';
+    }
+  };
+
   const openEditDialog = (batch: BatchInfo) => {
     setEditingBatch({
       id: batch.id,
       nome: batch.nome,
       dataInicio: formatForInput(batch.dataInicio),
       dataTermino: batch.dataTermino ? formatForInput(batch.dataTermino) : null,
-      quantidadeMaxima: batch.quantidadeMaxima,
-      ativo: batch.ativo
+      quantidadeMaxima: batch.quantidadeMaxima
     });
     setEditDialogOpen(true);
   };
@@ -181,111 +306,15 @@ export default function AdminEventManagePage() {
   const handleSaveBatch = async () => {
     if (!editingBatch) return;
     
-    const willBeActive = editingBatch.ativo;
-    
-    if (willBeActive) {
-      setIsActivating(true);
-      try {
-        const freshStats = await queryClient.fetchQuery<{ success: boolean; data: EventStats }>({
-          queryKey: ["/api/admin/events", id, "stats"],
-          staleTime: 0
-        });
-        
-        const activeBatches = freshStats?.data.batches.filter(b => b.ativo && b.id !== editingBatch.id);
-        if (activeBatches && activeBatches.length > 0) {
-          setIsActivating(false);
-          setPendingActivation({ 
-            batchId: editingBatch.id, 
-            activeBatchName: activeBatches[0].nome 
-          });
-          setConfirmDialogOpen(true);
-          return;
-        }
-        
-        const patchResponse = await apiRequest("PATCH", `/api/admin/events/${id}/batches/${editingBatch.id}`, {
-          nome: editingBatch.nome,
-          dataInicio: editingBatch.dataInicio,
-          dataTermino: editingBatch.dataTermino,
-          quantidadeMaxima: editingBatch.quantidadeMaxima
-        });
-        const patchResult = await patchResponse.json();
-        if (!patchResult.success) {
-          throw new Error(patchResult.error?.message || "Erro ao atualizar lote");
-        }
-        
-        const activateResponse = await apiRequest("POST", `/api/admin/events/${id}/batches/${editingBatch.id}/activate`, {
-          deactivateOthers: true
-        });
-        const activateResult = await activateResponse.json();
-        if (!activateResult.success) {
-          throw new Error(activateResult.error?.message || "Erro ao ativar lote");
-        }
-        
-        queryClient.invalidateQueries({ queryKey: ["/api/admin/events", id] });
-        queryClient.invalidateQueries({ queryKey: ["/api/admin/events", id, "stats"] });
-        setEditDialogOpen(false);
-        setEditingBatch(null);
-        toast({ title: "Lote atualizado e ativado com sucesso" });
-      } catch (error) {
-        queryClient.invalidateQueries({ queryKey: ["/api/admin/events", id] });
-        queryClient.invalidateQueries({ queryKey: ["/api/admin/events", id, "stats"] });
-        toast({ title: "Erro ao processar lote", description: (error as Error).message, variant: "destructive" });
-      } finally {
-        setIsActivating(false);
-      }
-      return;
-    }
-    
     updateBatchMutation.mutate({
       batchId: editingBatch.id,
       updates: {
         nome: editingBatch.nome,
         dataInicio: editingBatch.dataInicio,
         dataTermino: editingBatch.dataTermino,
-        quantidadeMaxima: editingBatch.quantidadeMaxima,
-        ativo: editingBatch.ativo
+        quantidadeMaxima: editingBatch.quantidadeMaxima
       }
     });
-  };
-
-  const handleConfirmActivation = async () => {
-    if (!pendingActivation || !editingBatch) return;
-    
-    setIsActivating(true);
-    try {
-      const patchResponse = await apiRequest("PATCH", `/api/admin/events/${id}/batches/${editingBatch.id}`, {
-        nome: editingBatch.nome,
-        dataInicio: editingBatch.dataInicio,
-        dataTermino: editingBatch.dataTermino,
-        quantidadeMaxima: editingBatch.quantidadeMaxima
-      });
-      const patchResult = await patchResponse.json();
-      if (!patchResult.success) {
-        throw new Error(patchResult.error?.message || "Erro ao atualizar lote");
-      }
-      
-      const activateResponse = await apiRequest("POST", `/api/admin/events/${id}/batches/${editingBatch.id}/activate`, {
-        deactivateOthers: true
-      });
-      const activateResult = await activateResponse.json();
-      if (!activateResult.success) {
-        throw new Error(activateResult.error?.message || "Erro ao ativar lote");
-      }
-      
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/events", id] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/events", id, "stats"] });
-      setConfirmDialogOpen(false);
-      setEditDialogOpen(false);
-      setPendingActivation(null);
-      setEditingBatch(null);
-      toast({ title: "Lote atualizado e ativado com sucesso" });
-    } catch (error) {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/events", id] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/events", id, "stats"] });
-      toast({ title: "Erro ao processar lote", description: (error as Error).message, variant: "destructive" });
-    } finally {
-      setIsActivating(false);
-    }
   };
 
   const formatCurrency = (value: number) => {
@@ -607,19 +636,19 @@ export default function AdminEventManagePage() {
               {stats?.batches && stats.batches.length > 0 ? (
                 <div className="space-y-3">
                   {stats.batches.map((batch) => {
-                    const hasProblems = batch.isExpirado || batch.isLotado || !batch.ativo;
+                    const hasProblems = batch.isExpirado || batch.isLotado || batch.status === 'closed';
                     return (
                       <div 
                         key={batch.id} 
-                        className={`p-3 rounded-md border ${batch.isVigente ? 'border-primary bg-primary/5' : hasProblems ? 'border-muted-foreground/30' : ''}`}
+                        className={`p-3 rounded-md border ${batch.status === 'active' ? 'border-primary bg-primary/5' : hasProblems ? 'border-muted-foreground/30' : ''}`}
                         data-testid={`batch-info-${batch.id}`}
                       >
-                        <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
                           <div className="flex items-center gap-2">
-                            {batch.isVigente ? (
+                            {batch.status === 'active' ? (
                               <Check className="h-4 w-4 text-primary" />
-                            ) : hasProblems ? (
-                              <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+                            ) : batch.status === 'closed' ? (
+                              <XCircle className="h-4 w-4 text-muted-foreground" />
                             ) : (
                               <Clock className="h-4 w-4 text-muted-foreground" />
                             )}
@@ -642,14 +671,22 @@ export default function AdminEventManagePage() {
                         </div>
                         
                         <div className="flex flex-wrap gap-1 mt-2">
-                          {batch.isVigente && (
-                            <Badge variant="default" className="text-xs">Vigente</Badge>
+                          <Badge variant={getStatusVariant(batch.status)} className="text-xs">
+                            Status: {getStatusLabel(batch.status)}
+                          </Badge>
+                          {batch.ativo ? (
+                            <Badge variant="outline" className="text-xs border-green-500 text-green-600 dark:text-green-400">
+                              <Eye className="h-3 w-3 mr-1" />
+                              Visivel
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-xs">
+                              <EyeOff className="h-3 w-3 mr-1" />
+                              Oculto
+                            </Badge>
                           )}
                           {batch.isExpirado && (
                             <Badge variant="destructive" className="text-xs">Expirado</Badge>
-                          )}
-                          {!batch.ativo && (
-                            <Badge variant="secondary" className="text-xs">Inativo</Badge>
                           )}
                           {batch.isLotado && (
                             <Badge variant="outline" className="text-xs border-orange-500 text-orange-600 dark:text-orange-400">Lotado</Badge>
@@ -660,6 +697,64 @@ export default function AdminEventManagePage() {
                           {formatDateTimeBrazil(batch.dataInicio)}
                           {batch.dataTermino && ` - ${formatDateTimeBrazil(batch.dataTermino)}`}
                         </p>
+                        
+                        <div className="flex flex-wrap gap-2 mt-3 pt-2 border-t border-border/50">
+                          {batch.status !== 'active' && (
+                            <Button
+                              variant="default"
+                              size="sm"
+                              onClick={() => handleActivateBatch(batch.id)}
+                              disabled={activateBatchMutation.isPending}
+                              data-testid={`button-activate-batch-${batch.id}`}
+                            >
+                              <Play className="h-3 w-3 mr-1" />
+                              Ativar
+                            </Button>
+                          )}
+                          {batch.status === 'active' && (
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => closeBatchMutation.mutate(batch.id)}
+                              disabled={closeBatchMutation.isPending}
+                              data-testid={`button-close-batch-${batch.id}`}
+                            >
+                              <XCircle className="h-3 w-3 mr-1" />
+                              Fechar
+                            </Button>
+                          )}
+                          {batch.status === 'closed' && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setFutureBatchMutation.mutate(batch.id)}
+                              disabled={setFutureBatchMutation.isPending}
+                              data-testid={`button-set-future-batch-${batch.id}`}
+                            >
+                              <RotateCcw className="h-3 w-3 mr-1" />
+                              Marcar Futuro
+                            </Button>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => toggleVisibilityMutation.mutate({ batchId: batch.id, ativo: !batch.ativo })}
+                            disabled={toggleVisibilityMutation.isPending}
+                            data-testid={`button-toggle-visibility-${batch.id}`}
+                          >
+                            {batch.ativo ? (
+                              <>
+                                <EyeOff className="h-3 w-3 mr-1" />
+                                Ocultar
+                              </>
+                            ) : (
+                              <>
+                                <Eye className="h-3 w-3 mr-1" />
+                                Mostrar
+                              </>
+                            )}
+                          </Button>
+                        </div>
                         
                         {batch.precos && batch.precos.length > 0 && (
                           <div className="mt-2 pt-2 border-t border-border/50">
@@ -767,19 +862,6 @@ export default function AdminEventManagePage() {
                 />
               </div>
 
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>Lote Ativo</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Ative ou desative este lote para inscricoes
-                  </p>
-                </div>
-                <Switch
-                  checked={editingBatch.ativo}
-                  onCheckedChange={(checked) => setEditingBatch({ ...editingBatch, ativo: checked })}
-                  data-testid="switch-edit-batch-active"
-                />
-              </div>
             </div>
           )}
           
@@ -789,10 +871,10 @@ export default function AdminEventManagePage() {
             </Button>
             <Button 
               onClick={handleSaveBatch} 
-              disabled={updateBatchMutation.isPending || isActivating}
+              disabled={updateBatchMutation.isPending}
               data-testid="button-save-batch"
             >
-              {updateBatchMutation.isPending || isActivating ? "Salvando..." : "Salvar"}
+              {updateBatchMutation.isPending ? "Salvando..." : "Salvar"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -808,21 +890,21 @@ export default function AdminEventManagePage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Confirmar Ativacao de Lote</AlertDialogTitle>
             <AlertDialogDescription>
-              Existe um lote ativo ({pendingActivation?.activeBatchName}). 
-              Ao ativar este lote, o lote atual sera automaticamente desativado.
+              Existe um lote com status ativo ({pendingActivation?.activeBatchName}). 
+              Ao ativar este lote, o lote atual sera fechado automaticamente (status = closed).
               Deseja continuar?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isActivating}>
+            <AlertDialogCancel disabled={activateBatchMutation.isPending}>
               Cancelar
             </AlertDialogCancel>
             <AlertDialogAction 
-              onClick={handleConfirmActivation}
-              disabled={isActivating}
+              onClick={handleConfirmActivateBatch}
+              disabled={activateBatchMutation.isPending}
               data-testid="button-confirm-activate"
             >
-              {isActivating ? "Ativando..." : "Sim, ativar este lote"}
+              {activateBatchMutation.isPending ? "Ativando..." : "Sim, ativar este lote"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

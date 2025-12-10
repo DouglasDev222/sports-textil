@@ -14,7 +14,7 @@ function formatBatchForResponse(batch: any) {
   };
 }
 
-const batchSchema = z.object({
+const batchCreateSchema = z.object({
   nome: z.string().min(2, "Nome deve ter pelo menos 2 caracteres"),
   dataInicio: z.string().refine(val => !isNaN(Date.parse(val)), "Data de inicio invalida"),
   dataTermino: z.string().refine(val => !isNaN(Date.parse(val)), "Data de termino invalida").optional().nullable(),
@@ -24,20 +24,29 @@ const batchSchema = z.object({
   ordem: z.number().int().optional()
 });
 
-async function validateSingleActiveBatch(eventId: string, newStatus: string | undefined, newAtivo: boolean | undefined, excludeBatchId?: string): Promise<{ valid: boolean; error?: string }> {
-  if (newStatus !== 'active' && newAtivo !== true) {
+const batchUpdateSchema = z.object({
+  nome: z.string().min(2, "Nome deve ter pelo menos 2 caracteres").optional(),
+  dataInicio: z.string().refine(val => !isNaN(Date.parse(val)), "Data de inicio invalida").optional(),
+  dataTermino: z.string().refine(val => !isNaN(Date.parse(val)), "Data de termino invalida").optional().nullable(),
+  quantidadeMaxima: z.number().int().positive().optional().nullable(),
+  ordem: z.number().int().optional()
+});
+
+async function validateSingleActiveBatch(eventId: string, newStatus: string | undefined, excludeBatchId?: string): Promise<{ valid: boolean; error?: string; activeBatches?: any[] }> {
+  if (newStatus !== 'active') {
     return { valid: true };
   }
   
   const existingBatches = await storage.getBatchesByEvent(eventId);
   const activeBatches = existingBatches.filter(b => 
-    b.status === 'active' && b.ativo === true && b.id !== excludeBatchId
+    b.status === 'active' && b.id !== excludeBatchId
   );
   
   if (activeBatches.length > 0) {
     return { 
       valid: false, 
-      error: "Somente um lote pode estar ativo ao mesmo tempo. Desative o lote atual antes de ativar outro." 
+      error: "Somente um lote pode estar com status 'active' ao mesmo tempo.",
+      activeBatches
     };
   }
   
@@ -85,7 +94,7 @@ router.post("/", requireAuth, requireRole("superadmin", "admin"), async (req, re
       });
     }
 
-    const validation = batchSchema.safeParse(req.body);
+    const validation = batchCreateSchema.safeParse(req.body);
     if (!validation.success) {
       return res.status(400).json({
         success: false,
@@ -112,7 +121,7 @@ router.post("/", requireAuth, requireRole("superadmin", "admin"), async (req, re
       });
     }
 
-    const activeBatchValidation = await validateSingleActiveBatch(eventId, willBeStatus, willBeAtivo);
+    const activeBatchValidation = await validateSingleActiveBatch(eventId, willBeStatus);
     if (!activeBatchValidation.valid) {
       return res.status(400).json({
         success: false,
@@ -159,20 +168,11 @@ router.patch("/:id", requireAuth, requireRole("superadmin", "admin"), async (req
       });
     }
 
-    const updateSchema = batchSchema.partial();
-    const validation = updateSchema.safeParse(req.body);
+    const validation = batchUpdateSchema.safeParse(req.body);
     if (!validation.success) {
       return res.status(400).json({
         success: false,
         error: { code: "VALIDATION_ERROR", message: validation.error.errors[0].message }
-      });
-    }
-
-    const activeBatchValidation = await validateSingleActiveBatch(eventId, validation.data.status, validation.data.ativo, req.params.id);
-    if (!activeBatchValidation.valid) {
-      return res.status(400).json({
-        success: false,
-        error: { code: "MULTIPLE_ACTIVE_BATCHES", message: activeBatchValidation.error }
       });
     }
 
@@ -212,7 +212,7 @@ router.post("/:id/activate", requireAuth, requireRole("superadmin", "admin"), as
   try {
     const eventId = req.params.eventId;
     const batchId = req.params.id;
-    const { deactivateOthers } = req.body;
+    const { closeOthers } = req.body;
     
     const event = await storage.getEvent(eventId);
     if (!event) {
@@ -232,33 +232,148 @@ router.post("/:id/activate", requireAuth, requireRole("superadmin", "admin"), as
 
     const existingBatches = await storage.getBatchesByEvent(eventId);
     const activeBatches = existingBatches.filter(b => 
-      b.ativo === true && b.id !== batchId
+      b.status === 'active' && b.id !== batchId
     );
 
-    if (activeBatches.length > 0 && !deactivateOthers) {
+    if (activeBatches.length > 0 && !closeOthers) {
       return res.status(409).json({
         success: false,
         error: { 
           code: "ACTIVE_BATCH_EXISTS", 
-          message: "Existe um lote ativo",
-          activeBatch: {
-            id: activeBatches[0].id,
-            nome: activeBatches[0].nome
-          }
+          message: "Existe um lote com status 'active'. Confirme para fechar os outros lotes.",
+          activeBatches: activeBatches.map(b => ({
+            id: b.id,
+            nome: b.nome,
+            status: b.status
+          }))
         }
       });
     }
 
-    if (deactivateOthers && activeBatches.length > 0) {
+    if (closeOthers && activeBatches.length > 0) {
       for (const activeBatch of activeBatches) {
-        await storage.updateBatch(activeBatch.id, { ativo: false });
+        await storage.updateBatch(activeBatch.id, { status: 'closed' });
       }
     }
 
-    const updated = await storage.updateBatch(batchId, { ativo: true });
+    const updated = await storage.updateBatch(batchId, { status: 'active', ativo: true });
     res.json({ success: true, data: formatBatchForResponse(updated) });
   } catch (error) {
     console.error("Activate batch error:", error);
+    res.status(500).json({
+      success: false,
+      error: { code: "INTERNAL_ERROR", message: "Erro interno do servidor" }
+    });
+  }
+});
+
+router.post("/:id/close", requireAuth, requireRole("superadmin", "admin"), async (req, res) => {
+  try {
+    const eventId = req.params.eventId;
+    const batchId = req.params.id;
+    
+    const event = await storage.getEvent(eventId);
+    if (!event) {
+      return res.status(404).json({
+        success: false,
+        error: { code: "NOT_FOUND", message: "Evento nao encontrado" }
+      });
+    }
+
+    const batch = await storage.getBatch(batchId);
+    if (!batch || batch.eventId !== eventId) {
+      return res.status(404).json({
+        success: false,
+        error: { code: "NOT_FOUND", message: "Lote nao encontrado" }
+      });
+    }
+
+    const updated = await storage.updateBatch(batchId, { status: 'closed' });
+    res.json({ success: true, data: formatBatchForResponse(updated) });
+  } catch (error) {
+    console.error("Close batch error:", error);
+    res.status(500).json({
+      success: false,
+      error: { code: "INTERNAL_ERROR", message: "Erro interno do servidor" }
+    });
+  }
+});
+
+router.post("/:id/set-future", requireAuth, requireRole("superadmin", "admin"), async (req, res) => {
+  try {
+    const eventId = req.params.eventId;
+    const batchId = req.params.id;
+    
+    const event = await storage.getEvent(eventId);
+    if (!event) {
+      return res.status(404).json({
+        success: false,
+        error: { code: "NOT_FOUND", message: "Evento nao encontrado" }
+      });
+    }
+
+    const batch = await storage.getBatch(batchId);
+    if (!batch || batch.eventId !== eventId) {
+      return res.status(404).json({
+        success: false,
+        error: { code: "NOT_FOUND", message: "Lote nao encontrado" }
+      });
+    }
+
+    if (batch.status === 'active') {
+      return res.status(400).json({
+        success: false,
+        error: { 
+          code: "CANNOT_SET_FUTURE_ACTIVE", 
+          message: "Nao e possivel marcar um lote ativo como futuro. Feche-o primeiro ou ative outro lote." 
+        }
+      });
+    }
+
+    const updated = await storage.updateBatch(batchId, { status: 'future' });
+    res.json({ success: true, data: formatBatchForResponse(updated) });
+  } catch (error) {
+    console.error("Set future batch error:", error);
+    res.status(500).json({
+      success: false,
+      error: { code: "INTERNAL_ERROR", message: "Erro interno do servidor" }
+    });
+  }
+});
+
+router.patch("/:id/visibility", requireAuth, requireRole("superadmin", "admin"), async (req, res) => {
+  try {
+    const eventId = req.params.eventId;
+    const batchId = req.params.id;
+    const { ativo } = req.body;
+    
+    if (typeof ativo !== 'boolean') {
+      return res.status(400).json({
+        success: false,
+        error: { code: "VALIDATION_ERROR", message: "Campo 'ativo' deve ser um booleano" }
+      });
+    }
+    
+    const event = await storage.getEvent(eventId);
+    if (!event) {
+      return res.status(404).json({
+        success: false,
+        error: { code: "NOT_FOUND", message: "Evento nao encontrado" }
+      });
+    }
+
+    const batch = await storage.getBatch(batchId);
+    if (!batch || batch.eventId !== eventId) {
+      return res.status(404).json({
+        success: false,
+        error: { code: "NOT_FOUND", message: "Lote nao encontrado" }
+      });
+    }
+
+    const updated = await storage.updateBatch(batchId, { ativo });
+    res.json({ success: true, data: formatBatchForResponse(updated) });
+  } catch (error) {
+    console.error("Update visibility error:", error);
     res.status(500).json({
       success: false,
       error: { code: "INTERNAL_ERROR", message: "Erro interno do servidor" }

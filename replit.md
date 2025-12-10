@@ -22,6 +22,7 @@ Preferred communication style: Simple, everyday language.
 - **Database Schema:** Includes tables for `admin_users`, `organizers`, `events`, `modalities`, `registrations`, `athletes`, `orders`, and more, with defined relationships.
 - **User Roles:** `superadmin`, `admin`, `organizador` with role-based permissions.
 - **Business Rules:** Mandatory event capacity (`limiteVagasTotal`), optional modality capacity (`limiteVagas`), order-based checkout supporting multiple registrations, payment at order level, batch auto-switching, and atomic shirt inventory decrement.
+- **Batch Status System:** Registration batches use `status` field ('active'/'closed'/'future') for business logic and `ativo` boolean for visibility. Only one batch can have status='active' per event. Status changes are enforced through dedicated routes (/activate, /close, /set-future), not the generic PATCH endpoint. See `docs/lotes-status-e-visibilidade.md` for details.
 - **Development Infrastructure:** In-memory storage fallback for development, HMR via Vite, separate build outputs for client and server.
 
 ### Timezone Handling
