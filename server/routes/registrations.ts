@@ -406,6 +406,7 @@ router.post("/", async (req, res) => {
       const statusCode = result.errorCode === 'EVENT_NOT_FOUND' ? 404 :
                          result.errorCode === 'VAGAS_ESGOTADAS' ? 409 :
                          result.errorCode === 'JA_INSCRITO' ? 409 :
+                         result.errorCode === 'SHIRT_SIZE_SOLD_OUT' ? 409 :
                          result.errorCode === 'NO_VALID_BATCH_FOR_PAID_MODALITY' ? 400 : 500;
       return res.status(statusCode).json({ 
         success: false, 

@@ -90,19 +90,27 @@ export default function InscricaoModalidadePage() {
   };
 
   const handleContinuar = () => {
-    if (modalidadeSelecionada && tamanhoSelecionado) {
-      const modality = data?.data?.modalities.find(m => m.id === modalidadeSelecionada);
-      
-      if (!modality) return;
-      
-      if (modality.tipoAcesso === "voucher" && !codigoComprovacao) {
-        return;
-      }
-      
-      const url = `/evento/${slug}/inscricao/resumo?modalidade=${encodeURIComponent(modalidadeSelecionada)}&tamanho=${encodeURIComponent(tamanhoSelecionado)}${codigoComprovacao ? `&codigo=${encodeURIComponent(codigoComprovacao)}` : ''}`;
-      
-      setLocation(url);
+    if (!modalidadeSelecionada) return;
+    
+    const modality = data?.data?.modalities.find(m => m.id === modalidadeSelecionada);
+    if (!modality) return;
+    
+    if (modality.tipoAcesso === "voucher" && !codigoComprovacao) {
+      return;
     }
+    
+    // Build URL - tamanho is optional if no shirt sizes are available
+    const params = new URLSearchParams();
+    params.set('modalidade', modalidadeSelecionada);
+    if (tamanhoSelecionado) {
+      params.set('tamanho', tamanhoSelecionado);
+    }
+    if (codigoComprovacao) {
+      params.set('codigo', codigoComprovacao);
+    }
+    
+    const url = `/evento/${slug}/inscricao/resumo?${params.toString()}`;
+    setLocation(url);
   };
 
   if (authLoading || isLoading) {

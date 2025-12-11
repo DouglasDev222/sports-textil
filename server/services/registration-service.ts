@@ -44,6 +44,7 @@ export type RegistrationErrorCode =
   | 'JA_INSCRITO'
   | 'ALREADY_REGISTERED'
   | 'NO_VALID_BATCH_FOR_PAID_MODALITY'
+  | 'SHIRT_SIZE_SOLD_OUT'
   | 'INTERNAL_ERROR';
 
 export interface AtomicRegistrationResult {
@@ -458,6 +459,55 @@ export async function registerForEventAtomic(
       [batchId]
     );
 
+    // 7.1. DECREMENT SHIRT SIZE QUANTITY IF SELECTED (with stock check)
+    if (registrationData.tamanhoCamisa) {
+      // Check if event uses modality-specific shirt sizes
+      const eventResult2 = await client.query(
+        `SELECT usar_grade_por_modalidade FROM events WHERE id = $1`,
+        [registrationData.eventId]
+      );
+      const usarGradePorModalidade = eventResult2.rows[0]?.usar_grade_por_modalidade || false;
+      
+      let shirtSizeResult;
+      if (usarGradePorModalidade) {
+        // Lock and check modality-specific shirt size
+        shirtSizeResult = await client.query(
+          `SELECT id, quantidade_disponivel FROM shirt_sizes 
+           WHERE modality_id = $1 AND tamanho = $2 
+           FOR UPDATE`,
+          [registrationData.modalityId, registrationData.tamanhoCamisa]
+        );
+      } else {
+        // Lock and check global event shirt size
+        shirtSizeResult = await client.query(
+          `SELECT id, quantidade_disponivel FROM shirt_sizes 
+           WHERE event_id = $1 AND modality_id IS NULL AND tamanho = $2 
+           FOR UPDATE`,
+          [registrationData.eventId, registrationData.tamanhoCamisa]
+        );
+      }
+      
+      // Check if shirt size exists and has stock
+      if (shirtSizeResult.rows.length > 0) {
+        const shirtSize = shirtSizeResult.rows[0];
+        if (shirtSize.quantidade_disponivel <= 0) {
+          await client.query('ROLLBACK');
+          return {
+            success: false,
+            error: `Tamanho ${registrationData.tamanhoCamisa} esgotado. Por favor, selecione outro tamanho.`,
+            errorCode: 'SHIRT_SIZE_SOLD_OUT' as RegistrationErrorCode
+          };
+        }
+        
+        // Decrement the shirt size quantity
+        await client.query(
+          `UPDATE shirt_sizes SET quantidade_disponivel = quantidade_disponivel - 1 WHERE id = $1`,
+          [shirtSize.id]
+        );
+      }
+      // If no shirt size row exists, we allow the registration (no shirt grid configured)
+    }
+
     // 8. CHECK IF BATCH IS NOW FULL AND CLOSE IT (automatic lot switching)
     const updatedBatch = await client.query(
       `SELECT quantidade_maxima, quantidade_utilizada FROM registration_batches WHERE id = $1`,
@@ -511,7 +561,12 @@ export async function registerForEventAtomic(
   }
 }
 
-export async function decrementVagasOcupadas(eventId: string, modalityId?: string, batchId?: string): Promise<void> {
+export async function decrementVagasOcupadas(
+  eventId: string, 
+  modalityId?: string, 
+  batchId?: string,
+  tamanhoCamisa?: string | null
+): Promise<void> {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -533,6 +588,34 @@ export async function decrementVagasOcupadas(eventId: string, modalityId?: strin
         'UPDATE registration_batches SET quantidade_utilizada = GREATEST(quantidade_utilizada - 1, 0) WHERE id = $1',
         [batchId]
       );
+    }
+
+    // Increment shirt size back if it was selected
+    if (tamanhoCamisa && modalityId) {
+      // Check if event uses modality-specific shirt sizes
+      const eventResult = await client.query(
+        `SELECT usar_grade_por_modalidade FROM events WHERE id = $1`,
+        [eventId]
+      );
+      const usarGradePorModalidade = eventResult.rows[0]?.usar_grade_por_modalidade || false;
+      
+      if (usarGradePorModalidade) {
+        // Increment modality-specific shirt size
+        await client.query(
+          `UPDATE shirt_sizes 
+           SET quantidade_disponivel = quantidade_disponivel + 1 
+           WHERE modality_id = $1 AND tamanho = $2`,
+          [modalityId, tamanhoCamisa]
+        );
+      } else {
+        // Increment global event shirt size
+        await client.query(
+          `UPDATE shirt_sizes 
+           SET quantidade_disponivel = quantidade_disponivel + 1 
+           WHERE event_id = $1 AND modality_id IS NULL AND tamanho = $2`,
+          [eventId, tamanhoCamisa]
+        );
+      }
     }
 
     await client.query('COMMIT');
