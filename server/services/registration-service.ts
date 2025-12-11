@@ -460,7 +460,9 @@ export async function registerForEventAtomic(
     );
 
     // 7.1. DECREMENT SHIRT SIZE QUANTITY IF SELECTED (with stock check)
-    if (registrationData.tamanhoCamisa) {
+    // Only decrement if registration is confirmed (paid/free modality)
+    // For pending registrations, the decrement will happen when payment is confirmed
+    if (registrationData.tamanhoCamisa && registrationData.status === 'confirmada') {
       // Check if event uses modality-specific shirt sizes
       const eventResult2 = await client.query(
         `SELECT usar_grade_por_modalidade FROM events WHERE id = $1`,
@@ -684,6 +686,145 @@ export async function getAvailableSpots(eventId: string): Promise<{
       } : null
     };
 
+  } finally {
+    client.release();
+  }
+}
+
+export interface ConfirmPaymentResult {
+  success: boolean;
+  error?: string;
+  errorCode?: string;
+}
+
+export async function confirmPaymentAtomic(
+  orderId: string,
+  metodoPagamento: string
+): Promise<ConfirmPaymentResult> {
+  const client = await pool.connect();
+  
+  try {
+    await client.query('BEGIN');
+    
+    // 1. Get and lock the order
+    const orderResult = await client.query(
+      `SELECT id, event_id, status FROM orders WHERE id = $1 FOR UPDATE`,
+      [orderId]
+    );
+    
+    if (!orderResult.rows[0]) {
+      await client.query('ROLLBACK');
+      return { success: false, error: 'Pedido nao encontrado', errorCode: 'ORDER_NOT_FOUND' };
+    }
+    
+    const order = orderResult.rows[0];
+    
+    if (order.status === 'pago') {
+      await client.query('ROLLBACK');
+      return { success: false, error: 'Pedido ja foi confirmado', errorCode: 'ALREADY_PAID' };
+    }
+    
+    if (order.status === 'cancelado') {
+      await client.query('ROLLBACK');
+      return { success: false, error: 'Pedido foi cancelado', errorCode: 'ORDER_CANCELLED' };
+    }
+    
+    // 2. Update order status to paid
+    await client.query(
+      `UPDATE orders SET status = 'pago', metodo_pagamento = $1, data_pagamento = NOW() WHERE id = $2`,
+      [metodoPagamento, orderId]
+    );
+    
+    // 3. Get all registrations for this order
+    const registrationsResult = await client.query(
+      `SELECT id, event_id, modality_id, tamanho_camisa, status 
+       FROM registrations 
+       WHERE order_id = $1 
+       FOR UPDATE`,
+      [orderId]
+    );
+    
+    // 4. Check event for shirt size configuration
+    const eventResult = await client.query(
+      `SELECT usar_grade_por_modalidade FROM events WHERE id = $1`,
+      [order.event_id]
+    );
+    const usarGradePorModalidade = eventResult.rows[0]?.usar_grade_por_modalidade || false;
+    
+    // 5. First pass: validate all shirt sizes have stock (before any updates)
+    const shirtUpdates: Array<{ shirtSizeId: string; tamanho: string }> = [];
+    const registrationsToConfirm: string[] = [];
+    
+    for (const reg of registrationsResult.rows) {
+      // Skip if already confirmed
+      if (reg.status === 'confirmada') continue;
+      
+      registrationsToConfirm.push(reg.id);
+      
+      // Validate shirt size if selected
+      if (reg.tamanho_camisa) {
+        let shirtSizeResult;
+        if (usarGradePorModalidade) {
+          shirtSizeResult = await client.query(
+            `SELECT id, quantidade_disponivel FROM shirt_sizes 
+             WHERE modality_id = $1 AND tamanho = $2 
+             FOR UPDATE`,
+            [reg.modality_id, reg.tamanho_camisa]
+          );
+        } else {
+          shirtSizeResult = await client.query(
+            `SELECT id, quantidade_disponivel FROM shirt_sizes 
+             WHERE event_id = $1 AND modality_id IS NULL AND tamanho = $2 
+             FOR UPDATE`,
+            [reg.event_id, reg.tamanho_camisa]
+          );
+        }
+        
+        if (shirtSizeResult.rows.length > 0) {
+          const shirtSize = shirtSizeResult.rows[0];
+          
+          // Count how many of this size we need
+          const sameShirtCount = shirtUpdates.filter(s => s.shirtSizeId === shirtSize.id).length;
+          
+          if (shirtSize.quantidade_disponivel <= sameShirtCount) {
+            // Shirt size sold out - rollback and return error
+            await client.query('ROLLBACK');
+            return {
+              success: false,
+              error: `Tamanho ${reg.tamanho_camisa} esgotado. Por favor, entre em contato com o organizador.`,
+              errorCode: 'SHIRT_SIZE_SOLD_OUT'
+            };
+          }
+          
+          shirtUpdates.push({ shirtSizeId: shirtSize.id, tamanho: reg.tamanho_camisa });
+        }
+      }
+    }
+    
+    // 6. Second pass: apply all updates atomically (validation passed)
+    // Decrement shirt sizes
+    for (const update of shirtUpdates) {
+      await client.query(
+        `UPDATE shirt_sizes SET quantidade_disponivel = quantidade_disponivel - 1 WHERE id = $1`,
+        [update.shirtSizeId]
+      );
+    }
+    
+    // Update registration statuses
+    for (const regId of registrationsToConfirm) {
+      await client.query(
+        `UPDATE registrations SET status = 'confirmada' WHERE id = $1`,
+        [regId]
+      );
+    }
+    
+    await client.query('COMMIT');
+    return { success: true };
+    
+  } catch (e: any) {
+    await client.query('ROLLBACK');
+    console.error('Erro ao confirmar pagamento:', e);
+    return { success: false, error: 'Erro interno do servidor', errorCode: 'INTERNAL_ERROR' };
   } finally {
     client.release();
   }

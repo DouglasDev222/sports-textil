@@ -66,6 +66,8 @@ interface ShirtGridItem {
   quantidadeTotal: number;
   quantidadeDisponivel: number;
   consumo: number;
+  consumoConfirmado: number;
+  consumoPendente: number;
 }
 
 interface BatchPriceInfo {
@@ -672,7 +674,8 @@ export default function AdminEventManagePage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Tamanho</TableHead>
-                      <TableHead className="text-right">Consumo</TableHead>
+                      <TableHead className="text-right">Confirmado</TableHead>
+                      <TableHead className="text-right">Pendente</TableHead>
                       <TableHead className="text-right">Disponivel</TableHead>
                       <TableHead className="text-right">Total</TableHead>
                     </TableRow>
@@ -682,7 +685,14 @@ export default function AdminEventManagePage() {
                       <TableRow key={size.id} data-testid={`shirt-size-${size.tamanho}`}>
                         <TableCell className="font-medium">{size.tamanho}</TableCell>
                         <TableCell className="text-right">
-                          <Badge variant="secondary">{size.consumo}</Badge>
+                          <Badge variant="default">{size.consumoConfirmado || 0}</Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {(size.consumoPendente || 0) > 0 ? (
+                            <Badge variant="secondary">{size.consumoPendente}</Badge>
+                          ) : (
+                            <span className="text-muted-foreground">0</span>
+                          )}
                         </TableCell>
                         <TableCell className="text-right">
                           <Badge 

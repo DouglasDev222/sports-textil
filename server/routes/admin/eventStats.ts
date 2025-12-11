@@ -1,7 +1,9 @@
 import { Router } from "express";
+import { z } from "zod";
 import { storage } from "../../storage";
 import { requireAuth, checkEventOwnership } from "../../middleware/auth";
 import { utcToBrazilLocal } from "../../utils/timezone";
+import { confirmPaymentAtomic } from "../../services/registration-service";
 
 const router = Router({ mergeParams: true });
 
@@ -53,7 +55,14 @@ router.get("/:eventId/stats", requireAuth, async (req, res) => {
     const totalDescontos = paidOrders.reduce((sum, o) => sum + parseFloat(o.valorDesconto), 0);
     const totalTaxaComodidade = confirmedRegistrations.reduce((sum, r) => sum + parseFloat(r.taxaComodidade), 0);
 
-    const shirtSizeConsumo = confirmedRegistrations.reduce((acc, reg) => {
+    const shirtSizeConsumoConfirmado = confirmedRegistrations.reduce((acc, reg) => {
+      if (reg.tamanhoCamisa) {
+        acc[reg.tamanhoCamisa] = (acc[reg.tamanhoCamisa] || 0) + 1;
+      }
+      return acc;
+    }, {} as Record<string, number>);
+
+    const shirtSizeConsumoPendente = pendingRegistrations.reduce((acc, reg) => {
       if (reg.tamanhoCamisa) {
         acc[reg.tamanhoCamisa] = (acc[reg.tamanhoCamisa] || 0) + 1;
       }
@@ -65,7 +74,9 @@ router.get("/:eventId/stats", requireAuth, async (req, res) => {
       tamanho: size.tamanho,
       quantidadeTotal: size.quantidadeTotal,
       quantidadeDisponivel: size.quantidadeDisponivel,
-      consumo: shirtSizeConsumo[size.tamanho] || 0
+      consumoConfirmado: shirtSizeConsumoConfirmado[size.tamanho] || 0,
+      consumoPendente: shirtSizeConsumoPendente[size.tamanho] || 0,
+      consumo: shirtSizeConsumoConfirmado[size.tamanho] || 0
     }));
 
     const now = new Date();
@@ -203,6 +214,79 @@ router.get("/:eventId/registrations", requireAuth, async (req, res) => {
     });
   } catch (error) {
     console.error("Get event registrations error:", error);
+    res.status(500).json({
+      success: false,
+      error: { code: "INTERNAL_ERROR", message: "Erro interno do servidor" }
+    });
+  }
+});
+
+const confirmPaymentSchema = z.object({
+  metodoPagamento: z.string().min(1, "Metodo de pagamento obrigatorio")
+});
+
+router.post("/:eventId/orders/:orderId/confirm", requireAuth, async (req, res) => {
+  try {
+    const { eventId, orderId } = req.params;
+    
+    const event = await storage.getEvent(eventId);
+    if (!event) {
+      return res.status(404).json({
+        success: false,
+        error: { code: "NOT_FOUND", message: "Evento nao encontrado" }
+      });
+    }
+
+    const hasAccess = await checkEventOwnership(req, res, eventId, event);
+    if (!hasAccess) {
+      return res.status(403).json({
+        success: false,
+        error: { code: "FORBIDDEN", message: "Sem permissao para acessar este evento" }
+      });
+    }
+
+    const order = await storage.getOrder(orderId);
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        error: { code: "NOT_FOUND", message: "Pedido nao encontrado" }
+      });
+    }
+
+    if (order.eventId !== eventId) {
+      return res.status(400).json({
+        success: false,
+        error: { code: "INVALID_ORDER", message: "Pedido nao pertence a este evento" }
+      });
+    }
+
+    const validation = confirmPaymentSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({
+        success: false,
+        error: { code: "VALIDATION_ERROR", message: validation.error.errors[0].message }
+      });
+    }
+
+    const result = await confirmPaymentAtomic(orderId, validation.data.metodoPagamento);
+
+    if (!result.success) {
+      const statusCode = result.errorCode === 'ORDER_NOT_FOUND' ? 404 :
+                         result.errorCode === 'ALREADY_PAID' ? 409 :
+                         result.errorCode === 'ORDER_CANCELLED' ? 409 :
+                         result.errorCode === 'SHIRT_SIZE_SOLD_OUT' ? 409 : 500;
+      return res.status(statusCode).json({
+        success: false,
+        error: { code: result.errorCode, message: result.error }
+      });
+    }
+
+    res.json({
+      success: true,
+      data: { message: "Pagamento confirmado com sucesso" }
+    });
+  } catch (error) {
+    console.error("Confirm payment error:", error);
     res.status(500).json({
       success: false,
       error: { code: "INTERNAL_ERROR", message: "Erro interno do servidor" }

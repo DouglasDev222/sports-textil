@@ -657,28 +657,6 @@ export class DbStorage implements IStorage {
       throw new Error(`Idade mínima para esta modalidade é ${idadeMinima} anos. O participante terá ${age} anos na data do evento.`);
     }
 
-    if (insertRegistration.tamanhoCamisa) {
-      let shirtSize: ShirtSize | undefined;
-      
-      if (event.usarGradePorModalidade) {
-        const sizes = await this.getShirtSizesByModality(insertRegistration.modalityId);
-        shirtSize = sizes.find(s => s.tamanho === insertRegistration.tamanhoCamisa);
-      } else {
-        const sizes = await this.getShirtSizesByEvent(insertRegistration.eventId);
-        shirtSize = sizes.find(s => s.tamanho === insertRegistration.tamanhoCamisa);
-      }
-
-      if (!shirtSize) {
-        throw new Error(`Tamanho ${insertRegistration.tamanhoCamisa} não disponível para este evento/modalidade`);
-      }
-
-      if (shirtSize.quantidadeDisponivel <= 0) {
-        throw new Error(`Tamanho ${shirtSize.tamanho} esgotado`);
-      }
-
-      await this.decrementShirtSize(shirtSize.id);
-    }
-
     if (batch) {
       await db.update(registrationBatches)
         .set({ quantidadeUtilizada: batch.quantidadeUtilizada + 1 })
