@@ -82,6 +82,9 @@ export function EventBasicInfoStep({ formData, updateFormData }: EventBasicInfoS
             <SelectContent>
               <SelectItem value="rascunho">Rascunho</SelectItem>
               <SelectItem value="publicado">Publicado</SelectItem>
+              <SelectItem value="cancelado">Cancelado</SelectItem>
+              <SelectItem value="finalizado">Finalizado</SelectItem>
+              <SelectItem value="esgotado">Esgotado</SelectItem>
             </SelectContent>
           </Select>
         </div>

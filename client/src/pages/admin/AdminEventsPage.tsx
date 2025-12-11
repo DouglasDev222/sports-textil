@@ -39,6 +39,7 @@ const statusColors: Record<string, string> = {
   publicado: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
   cancelado: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
   finalizado: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200",
+  esgotado: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200",
 };
 
 const statusLabels: Record<string, string> = {
@@ -46,6 +47,7 @@ const statusLabels: Record<string, string> = {
   publicado: "Publicado",
   cancelado: "Cancelado",
   finalizado: "Finalizado",
+  esgotado: "Esgotado",
 };
 
 export default function AdminEventsPage() {
@@ -134,6 +136,7 @@ export default function AdminEventsPage() {
                   <SelectItem value="publicado">Publicado</SelectItem>
                   <SelectItem value="cancelado">Cancelado</SelectItem>
                   <SelectItem value="finalizado">Finalizado</SelectItem>
+                  <SelectItem value="esgotado">Esgotado</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -211,6 +214,11 @@ export default function AdminEventsPage() {
                             <SelectItem value="finalizado">
                               <Badge variant="secondary" className={statusColors.finalizado}>
                                 Finalizado
+                              </Badge>
+                            </SelectItem>
+                            <SelectItem value="esgotado">
+                              <Badge variant="secondary" className={statusColors.esgotado}>
+                                Esgotado
                               </Badge>
                             </SelectItem>
                           </SelectContent>
