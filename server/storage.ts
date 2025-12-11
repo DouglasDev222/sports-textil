@@ -16,7 +16,7 @@ import {
   registrationBatches, prices, attachments, eventBanners, athletes, orders,
   registrations, documentAcceptances
 } from "@shared/schema";
-import { db } from "./db";
+import { db, pool } from "./db";
 import { eq, and, isNull, lte, gt, sql, max } from "drizzle-orm";
 
 export interface IStorage {
@@ -66,6 +66,9 @@ export interface IStorage {
   createBatch(batch: InsertRegistrationBatch): Promise<RegistrationBatch>;
   updateBatch(id: string, batch: Partial<InsertRegistrationBatch>): Promise<RegistrationBatch | undefined>;
   deleteBatch(id: string): Promise<boolean>;
+  deleteBatchSafe(id: string): Promise<{ success: boolean; code?: string; message?: string }>;
+  getRegistrationsByBatch(batchId: string): Promise<Registration[]>;
+  deletePricesByBatch(batchId: string): Promise<boolean>;
 
   getPrice(modalityId: string, batchId: string): Promise<Price | undefined>;
   getPriceById(id: string): Promise<Price | undefined>;
@@ -360,6 +363,70 @@ export class DbStorage implements IStorage {
   async deleteBatch(id: string): Promise<boolean> {
     const result = await db.delete(registrationBatches).where(eq(registrationBatches.id, id)).returning();
     return result.length > 0;
+  }
+
+  async getRegistrationsByBatch(batchId: string): Promise<Registration[]> {
+    return db.select().from(registrations).where(eq(registrations.batchId, batchId));
+  }
+
+  async deletePricesByBatch(batchId: string): Promise<boolean> {
+    await db.delete(prices).where(eq(prices.batchId, batchId));
+    return true;
+  }
+
+  async deleteBatchSafe(id: string): Promise<{ success: boolean; code?: string; message?: string }> {
+    const client = await pool.connect();
+    
+    try {
+      await client.query('BEGIN');
+      
+      const registrationsResult = await client.query(
+        'SELECT id FROM registrations WHERE batch_id = $1 LIMIT 1',
+        [id]
+      );
+      
+      if (registrationsResult.rows.length > 0) {
+        await client.query('ROLLBACK');
+        return {
+          success: false,
+          code: "BATCH_HAS_REGISTRATIONS",
+          message: "Este lote possui inscricoes vinculadas e nao pode ser excluido. Feche ou oculte este lote em vez de apagar."
+        };
+      }
+
+      await client.query('DELETE FROM prices WHERE batch_id = $1', [id]);
+      
+      const deleteResult = await client.query(
+        'DELETE FROM registration_batches WHERE id = $1 RETURNING id',
+        [id]
+      );
+      
+      if (deleteResult.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return {
+          success: false,
+          code: "NOT_FOUND",
+          message: "Lote nao encontrado"
+        };
+      }
+      
+      await client.query('COMMIT');
+      return { success: true };
+      
+    } catch (error: any) {
+      await client.query('ROLLBACK');
+      
+      if (error?.code === "23503") {
+        return {
+          success: false,
+          code: "FK_CONSTRAINT_VIOLATION",
+          message: "O lote possui dependencias que impedem a exclusao. Contate o suporte."
+        };
+      }
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   async getPrice(modalityId: string, batchId: string): Promise<Price | undefined> {

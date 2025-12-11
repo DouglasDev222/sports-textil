@@ -413,20 +413,34 @@ router.delete("/:id", requireAuth, requireRole("superadmin", "admin"), async (re
       });
     }
 
-    if (batch.quantidadeUtilizada > 0) {
-      return res.status(400).json({
+    const deleteResult = await storage.deleteBatchSafe(req.params.id);
+    
+    if (!deleteResult.success) {
+      const statusCode = deleteResult.code === "BATCH_HAS_REGISTRATIONS" ? 400 : 
+                        deleteResult.code === "NOT_FOUND" ? 404 : 500;
+      return res.status(statusCode).json({
         success: false,
         error: { 
-          code: "BATCH_HAS_REGISTRATIONS", 
-          message: "Este lote possui inscricoes vinculadas e nao pode ser apagado. Considere apenas fecha-lo ou desativa-lo." 
+          code: deleteResult.code, 
+          message: deleteResult.message 
         }
       });
     }
 
-    await storage.deleteBatch(req.params.id);
     res.json({ success: true, data: { message: "Lote removido com sucesso" } });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Delete batch error:", error);
+    
+    if (error?.code === "23503") {
+      return res.status(400).json({
+        success: false,
+        error: { 
+          code: "FK_CONSTRAINT_VIOLATION", 
+          message: "O lote possui dependencias que impedem a exclusao." 
+        }
+      });
+    }
+    
     res.status(500).json({
       success: false,
       error: { code: "INTERNAL_ERROR", message: "Erro interno do servidor" }

@@ -148,6 +148,26 @@ export default function EventWizard({ mode, eventId, initialData }: EventWizardP
         }
       }
 
+      if (mode === "edit" && createdEventId) {
+        const existingBatchesResponse = await fetch(`/api/admin/events/${createdEventId}/batches`, { credentials: "include" });
+        const existingBatchesResult = await existingBatchesResponse.json();
+        const existingBatches = existingBatchesResult.data || [];
+        
+        const formBatchIds = formData.batches.filter(b => b.id).map(b => b.id);
+        const batchesToDelete = existingBatches.filter((b: any) => !formBatchIds.includes(b.id));
+        
+        for (const batchToDelete of batchesToDelete) {
+          const deleteResponse = await apiRequest("DELETE", `/api/admin/events/${createdEventId}/batches/${batchToDelete.id}`);
+          const deleteResult = await deleteResponse.json();
+          if (!deleteResult.success) {
+            if (deleteResult.error?.code === "BATCH_HAS_REGISTRATIONS") {
+              throw new Error("Este lote ja possui inscricoes vinculadas e nao pode ser excluido. Feche ou oculte o lote em vez de apaga-lo.");
+            }
+            throw new Error(deleteResult.error?.message || "Erro ao deletar lote");
+          }
+        }
+      }
+
       for (const batch of formData.batches) {
         const batchData = { ...batch, eventId: createdEventId };
         if (batch.id) {
