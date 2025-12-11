@@ -52,7 +52,8 @@ import {
   XCircle,
   RotateCcw,
   Eye,
-  EyeOff
+  EyeOff,
+  Trash2
 } from "lucide-react";
 import { formatDateOnlyBrazil, formatDateTimeBrazil, formatForInput } from "@/lib/timezone";
 import { useToast } from "@/hooks/use-toast";
@@ -132,6 +133,10 @@ export default function AdminEventManagePage() {
   const [editingBatch, setEditingBatch] = useState<BatchEditForm | null>(null);
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [pendingActivation, setPendingActivation] = useState<{ batchId: string; activeBatchName: string } | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<{ batchId: string; batchName: string } | null>(null);
+  const [publishEventDialogOpen, setPublishEventDialogOpen] = useState(false);
+  const [pendingPublish, setPendingPublish] = useState<{ batchId: string; closeOthers: boolean } | null>(null);
 
   const { data: eventData, isLoading: eventLoading } = useQuery<{ success: boolean; data: Event }>({
     queryKey: ["/api/admin/events", id],
@@ -226,9 +231,46 @@ export default function AdminEventManagePage() {
     }
   });
 
+  const deleteBatchMutation = useMutation({
+    mutationFn: async (batchId: string) => {
+      const response = await apiRequest("DELETE", `/api/admin/events/${id}/batches/${batchId}`);
+      const result = await response.json();
+      if (!result.success) {
+        if (result.error?.code === "BATCH_HAS_REGISTRATIONS") {
+          throw { hasRegistrations: true, message: result.error.message };
+        }
+        throw new Error(result.error?.message || "Erro ao excluir lote");
+      }
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/events", id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/events", id, "stats"] });
+      setDeleteDialogOpen(false);
+      setPendingDelete(null);
+      toast({ title: "Lote excluido com sucesso" });
+    },
+    onError: (error: any) => {
+      setDeleteDialogOpen(false);
+      setPendingDelete(null);
+      if (error.hasRegistrations) {
+        toast({ 
+          title: "Nao foi possivel excluir o lote", 
+          description: "Esse lote ja possui inscricoes e nao pode ser excluido. Considere apenas fecha-lo ou desativa-lo.", 
+          variant: "destructive" 
+        });
+      } else {
+        toast({ title: "Erro ao excluir lote", description: error.message, variant: "destructive" });
+      }
+    }
+  });
+
   const activateBatchMutation = useMutation({
-    mutationFn: async (data: { batchId: string; closeOthers: boolean }) => {
-      const response = await apiRequest("POST", `/api/admin/events/${id}/batches/${data.batchId}/activate`, { closeOthers: data.closeOthers });
+    mutationFn: async (data: { batchId: string; closeOthers: boolean; publishEvent?: boolean }) => {
+      const response = await apiRequest("POST", `/api/admin/events/${id}/batches/${data.batchId}/activate`, { 
+        closeOthers: data.closeOthers,
+        publishEvent: data.publishEvent
+      });
       const result = await response.json();
       if (!result.success) {
         if (result.error?.code === "ACTIVE_BATCH_EXISTS") {
@@ -238,10 +280,19 @@ export default function AdminEventManagePage() {
       }
       return result;
     },
-    onSuccess: () => {
+    onSuccess: (result, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/events", id] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/events", id, "stats"] });
-      toast({ title: "Lote ativado com sucesso" });
+      
+      if (result.eventNeedsPublish && !variables.publishEvent) {
+        setPendingPublish({ batchId: variables.batchId, closeOthers: variables.closeOthers });
+        setPublishEventDialogOpen(true);
+        toast({ title: "Lote ativado com sucesso" });
+      } else if (variables.publishEvent) {
+        toast({ title: "Lote ativado e evento publicado com sucesso" });
+      } else {
+        toast({ title: "Lote ativado com sucesso" });
+      }
     },
     onError: (error: any) => {
       if (error.isConflict) {
@@ -272,6 +323,36 @@ export default function AdminEventManagePage() {
     } catch (error: any) {
       toast({ title: "Erro ao ativar lote", description: error.message, variant: "destructive" });
     }
+  };
+
+  const handleOpenDeleteDialog = (batchId: string, batchName: string) => {
+    setPendingDelete({ batchId, batchName });
+    setDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!pendingDelete) return;
+    deleteBatchMutation.mutate(pendingDelete.batchId);
+  };
+
+  const handlePublishEvent = async () => {
+    if (!pendingPublish) return;
+    try {
+      await activateBatchMutation.mutateAsync({ 
+        batchId: pendingPublish.batchId, 
+        closeOthers: pendingPublish.closeOthers,
+        publishEvent: true 
+      });
+      setPublishEventDialogOpen(false);
+      setPendingPublish(null);
+    } catch (error: any) {
+      toast({ title: "Erro ao publicar evento", description: error.message, variant: "destructive" });
+    }
+  };
+
+  const handleSkipPublish = () => {
+    setPublishEventDialogOpen(false);
+    setPendingPublish(null);
   };
 
   const getStatusLabel = (status: string) => {
@@ -754,6 +835,17 @@ export default function AdminEventManagePage() {
                               </>
                             )}
                           </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleOpenDeleteDialog(batch.id, batch.nome)}
+                            disabled={deleteBatchMutation.isPending || batch.quantidadeUtilizada > 0}
+                            className="text-destructive hover:text-destructive"
+                            data-testid={`button-delete-batch-${batch.id}`}
+                          >
+                            <Trash2 className="h-3 w-3 mr-1" />
+                            Excluir
+                          </Button>
                         </div>
                         
                         {batch.precos && batch.precos.length > 0 && (
@@ -905,6 +997,68 @@ export default function AdminEventManagePage() {
               data-testid="button-confirm-activate"
             >
               {activateBatchMutation.isPending ? "Ativando..." : "Sim, ativar este lote"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={(open) => {
+        setDeleteDialogOpen(open);
+        if (!open) {
+          setPendingDelete(null);
+        }
+      }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar Exclusao de Lote</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir o lote "{pendingDelete?.batchName}"?
+              Esta acao nao pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteBatchMutation.isPending}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleConfirmDelete}
+              disabled={deleteBatchMutation.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-delete"
+            >
+              {deleteBatchMutation.isPending ? "Excluindo..." : "Sim, excluir lote"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={publishEventDialogOpen} onOpenChange={(open) => {
+        setPublishEventDialogOpen(open);
+        if (!open) {
+          setPendingPublish(null);
+        }
+      }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Publicar Evento?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Voce ativou um lote em um evento que ainda nao esta publicado.
+              Deseja publicar o evento para reabrir as inscricoes?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel 
+              onClick={handleSkipPublish}
+              disabled={activateBatchMutation.isPending}
+            >
+              Nao, manter como esta
+            </AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handlePublishEvent}
+              disabled={activateBatchMutation.isPending}
+              data-testid="button-confirm-publish"
+            >
+              {activateBatchMutation.isPending ? "Publicando..." : "Sim, publicar evento"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

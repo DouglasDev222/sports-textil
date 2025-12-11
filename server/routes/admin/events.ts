@@ -279,14 +279,8 @@ router.patch("/:id/status", requireAuth, requireRole("superadmin", "admin"), asy
       }
 
       const batches = await storage.getBatchesByEvent(event.id);
-      const activeBatches = batches.filter(b => b.ativo);
-      if (activeBatches.length === 0) {
-        return res.status(400).json({
-          success: false,
-          error: { code: "NO_ACTIVE_BATCHES", message: "Evento precisa ter pelo menos um lote ativo" }
-        });
-      }
-
+      const activeBatches = batches.filter(b => b.status === 'active');
+      
       const paidModalities = modalities.filter(m => m.tipoAcesso === "paga");
       const prices = await storage.getPricesByEvent(event.id);
       
@@ -298,6 +292,19 @@ router.patch("/:id/status", requireAuth, requireRole("superadmin", "admin"), asy
             error: { code: "MISSING_PRICE", message: `Modalidade "${modality.nome}" precisa ter preco definido` }
           });
         }
+      }
+      
+      const hasNoActiveBatch = activeBatches.length === 0;
+      if (hasNoActiveBatch) {
+        const updated = await storage.updateEvent(req.params.id, { status: newStatus });
+        return res.json({ 
+          success: true, 
+          data: updated,
+          warning: {
+            code: "NO_ACTIVE_BATCH",
+            message: "Este evento nao possui nenhum lote com status 'active'. Ele sera publicado, mas as inscricoes aparecerao como indisponiveis ate que um lote seja ativado."
+          }
+        });
       }
     }
 

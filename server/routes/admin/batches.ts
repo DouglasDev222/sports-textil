@@ -212,7 +212,7 @@ router.post("/:id/activate", requireAuth, requireRole("superadmin", "admin"), as
   try {
     const eventId = req.params.eventId;
     const batchId = req.params.id;
-    const { closeOthers } = req.body;
+    const { closeOthers, publishEvent } = req.body;
     
     const event = await storage.getEvent(eventId);
     if (!event) {
@@ -257,7 +257,20 @@ router.post("/:id/activate", requireAuth, requireRole("superadmin", "admin"), as
     }
 
     const updated = await storage.updateBatch(batchId, { status: 'active', ativo: true });
-    res.json({ success: true, data: formatBatchForResponse(updated) });
+    
+    const isEventNotPublished = event.status !== 'publicado';
+    const eventNeedsPublish = isEventNotPublished && (event.status === 'rascunho' || event.status === 'finalizado' || event.status === 'esgotado');
+    
+    if (eventNeedsPublish && publishEvent === true) {
+      await storage.updateEvent(eventId, { status: 'publicado' });
+    }
+    
+    res.json({ 
+      success: true, 
+      data: formatBatchForResponse(updated),
+      eventStatus: event.status,
+      eventNeedsPublish: eventNeedsPublish
+    });
   } catch (error) {
     console.error("Activate batch error:", error);
     res.status(500).json({
@@ -403,7 +416,10 @@ router.delete("/:id", requireAuth, requireRole("superadmin", "admin"), async (re
     if (batch.quantidadeUtilizada > 0) {
       return res.status(400).json({
         success: false,
-        error: { code: "HAS_REGISTRATIONS", message: "Lote possui inscricoes e nao pode ser excluido" }
+        error: { 
+          code: "BATCH_HAS_REGISTRATIONS", 
+          message: "Este lote possui inscricoes vinculadas e nao pode ser apagado. Considere apenas fecha-lo ou desativa-lo." 
+        }
       });
     }
 
