@@ -169,7 +169,13 @@ export default function AdminEventsPage() {
                 <TableBody>
                   {filteredEvents.map((event) => (
                     <TableRow key={event.id} data-testid={`row-event-${event.id}`}>
-                      <TableCell className="font-medium">{event.nome}</TableCell>
+                      <TableCell className="font-medium">
+                        <Link href={`/admin/eventos/${event.id}/gerenciar`}>
+                          <span className="hover:underline cursor-pointer text-primary" data-testid={`link-event-name-${event.id}`}>
+                            {event.nome}
+                          </span>
+                        </Link>
+                      </TableCell>
                       <TableCell>{event.cidade}, {event.estado}</TableCell>
                       <TableCell>
                         {formatDateOnlyBrazil(event.dataEvento)}
@@ -225,37 +231,42 @@ export default function AdminEventsPage() {
                         </Select>
                       </TableCell>
                       <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
+                        <div className="flex items-center justify-end gap-1">
+                          <Link href={`/admin/eventos/${event.id}/gerenciar`}>
                             <Button
                               variant="ghost"
                               size="icon"
-                              data-testid={`button-actions-${event.id}`}
+                              data-testid={`button-settings-${event.id}`}
                             >
-                              <MoreHorizontal className="h-4 w-4" />
+                              <Settings className="h-4 w-4" />
                             </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <Link href={`/admin/eventos/${event.id}`}>
-                              <DropdownMenuItem data-testid={`menu-edit-${event.id}`}>
-                                <Pencil className="mr-2 h-4 w-4" />
-                                Editar
-                              </DropdownMenuItem>
-                            </Link>
-                            <Link href={`/admin/eventos/${event.id}/inscritos`}>
-                              <DropdownMenuItem data-testid={`menu-inscritos-${event.id}`}>
-                                <Users className="mr-2 h-4 w-4" />
-                                Inscritos
-                              </DropdownMenuItem>
-                            </Link>
-                            <Link href={`/admin/eventos/${event.id}/gerenciar`}>
-                              <DropdownMenuItem data-testid={`menu-manage-${event.id}`}>
-                                <Settings className="mr-2 h-4 w-4" />
-                                Gerenciar Evento
-                              </DropdownMenuItem>
-                            </Link>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                          </Link>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                data-testid={`button-actions-${event.id}`}
+                              >
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <Link href={`/admin/eventos/${event.id}`}>
+                                <DropdownMenuItem data-testid={`menu-edit-${event.id}`}>
+                                  <Pencil className="mr-2 h-4 w-4" />
+                                  Editar
+                                </DropdownMenuItem>
+                              </Link>
+                              <Link href={`/admin/eventos/${event.id}/inscritos`}>
+                                <DropdownMenuItem data-testid={`menu-inscritos-${event.id}`}>
+                                  <Users className="mr-2 h-4 w-4" />
+                                  Inscritos
+                                </DropdownMenuItem>
+                              </Link>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
