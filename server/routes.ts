@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import express from "express";
 import path from "path";
 import { storage } from "./storage";
-import { utcToBrazilLocal } from "./utils/timezone";
+import { utcToBrazilLocal, formatBrazilDateTime } from "./utils/timezone";
 import { recalculateBatchesForEvent, getModalitiesAvailability } from "./services/batch-validation-service";
 
 import authRoutes from "./routes/admin/auth";
@@ -134,7 +134,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         registrationMessage = 'Evento esgotado - todas as vagas foram preenchidas';
       } else if (now < abertura) {
         registrationStatus = 'not_started';
-        registrationMessage = `Inscrições abrem em ${abertura.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`;
+        registrationMessage = `Inscrições abrem em ${formatBrazilDateTime(abertura)}`;
       } else if (now >= encerramento) {
         registrationStatus = 'closed';
         registrationMessage = 'Inscrições encerradas';
