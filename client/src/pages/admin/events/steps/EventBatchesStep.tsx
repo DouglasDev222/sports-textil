@@ -504,7 +504,7 @@ export function EventBatchesStep({ formData, updateFormData }: EventBatchesStepP
       )}
 
       <Dialog open={batchDialogOpen} onOpenChange={setBatchDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {editingBatchIndex !== null ? "Editar Configuracao do Lote" : "Novo Lote"}
