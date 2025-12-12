@@ -230,6 +230,32 @@ export default function EventWizard({ mode, eventId, initialData }: EventWizardP
       }
 
       // Handle shirts (both create and edit mode)
+      // First, delete removed shirts (only in edit mode)
+      if (mode === "edit" && createdEventId) {
+        const existingShirtsResponse = await fetch(`/api/admin/events/${createdEventId}/shirts`, { credentials: "include" });
+        const existingShirtsResult = await existingShirtsResponse.json();
+        
+        if (!existingShirtsResult.success) {
+          throw new Error(existingShirtsResult.error?.message || "Erro ao buscar tamanhos de camisa existentes");
+        }
+        
+        const existingShirts = existingShirtsResult.data || [];
+        const formShirtIds = formData.shirts.filter(s => s.id).map(s => s.id);
+        const shirtsToDelete = existingShirts.filter((s: any) => !formShirtIds.includes(s.id));
+        
+        for (const shirtToDelete of shirtsToDelete) {
+          const deleteResponse = await apiRequest("DELETE", `/api/admin/events/${createdEventId}/shirts/${shirtToDelete.id}`);
+          const deleteResult = await deleteResponse.json();
+          if (!deleteResult.success) {
+            if (deleteResult.error?.code === "HAS_USAGE") {
+              throw new Error(`O tamanho ${shirtToDelete.tamanho} ja foi utilizado em inscricoes e nao pode ser removido.`);
+            }
+            throw new Error(deleteResult.error?.message || "Erro ao remover tamanho de camisa");
+          }
+        }
+      }
+      
+      // Then create/update shirts
       for (const shirt of formData.shirts) {
         if (shirt.id) {
           // Update existing shirt
@@ -376,31 +402,51 @@ export default function EventWizard({ mode, eventId, initialData }: EventWizardP
             Anterior
           </Button>
 
-          {currentStep < 4 ? (
-            <Button
-              onClick={handleNext}
-              disabled={!canProceed() || isSubmitting}
-              data-testid="button-next-step"
-            >
-              Proximo
-              <ChevronRight className="ml-2 h-4 w-4" />
-            </Button>
-          ) : (
-            <Button
-              onClick={handleSubmit}
-              disabled={isSubmitting}
-              data-testid="button-submit-event"
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Salvando...
-                </>
-              ) : (
-                mode === "create" ? "Criar Evento" : "Salvar Alteracoes"
-              )}
-            </Button>
-          )}
+          <div className="flex gap-2">
+            {mode === "edit" && currentStep < 4 && (
+              <Button
+                variant="secondary"
+                onClick={handleSubmit}
+                disabled={isSubmitting}
+                data-testid="button-save-now"
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Salvando...
+                  </>
+                ) : (
+                  "Salvar Alteracoes"
+                )}
+              </Button>
+            )}
+
+            {currentStep < 4 ? (
+              <Button
+                onClick={handleNext}
+                disabled={!canProceed() || isSubmitting}
+                data-testid="button-next-step"
+              >
+                Proximo
+                <ChevronRight className="ml-2 h-4 w-4" />
+              </Button>
+            ) : (
+              <Button
+                onClick={handleSubmit}
+                disabled={isSubmitting}
+                data-testid="button-submit-event"
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Salvando...
+                  </>
+                ) : (
+                  mode === "create" ? "Criar Evento" : "Salvar Alteracoes"
+                )}
+              </Button>
+            )}
+          </div>
         </div>
       </div>
     </AdminLayout>
