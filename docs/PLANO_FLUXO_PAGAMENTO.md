@@ -46,7 +46,7 @@ Este documento detalha o plano completo para implementar o fluxo de inscrição 
 
 ## 🔴 A IMPLEMENTAR
 
-### FASE 1: Backend - Job de Expiração de Pedidos
+### ✅ FASE 1: Backend - Job de Expiração de Pedidos [CONCLUÍDA - 12/12/2024]
 
 #### Tarefa 1.1: Criar Job de Expiração
 **Arquivo:** `server/jobs/order-expiration-job.ts`
@@ -77,12 +77,18 @@ Este documento detalha o plano completo para implementar o fluxo de inscrição 
 ```
 
 **Checklist implementação:**
-- [ ] Criar arquivo `server/jobs/order-expiration-job.ts`
-- [ ] Implementar função `expireOrders()`
-- [ ] Usar transação para garantir atomicidade
-- [ ] Chamar `decrementVagasOcupadas` para cada inscrição
-- [ ] Adicionar logs detalhados
-- [ ] Registrar job no `server/index.ts` com `setInterval(60000)` (1 min)
+- [x] Criar arquivo `server/jobs/order-expiration-job.ts`
+- [x] Implementar função `expireOrders()`
+- [x] Usar transação para garantir atomicidade
+- [x] Chamar `decrementVagasOcupadas` para cada inscrição
+- [x] Adicionar logs detalhados
+- [x] Registrar job no `server/index.ts` com `setInterval(60000)` (1 min)
+
+**Detalhes da implementação:**
+- Job registrado automaticamente ao iniciar o servidor
+- Usa `FOR UPDATE SKIP LOCKED` para evitar conflitos em ambiente multi-instância
+- Retorna estatísticas: pedidos processados, vagas liberadas, erros
+- Configurável via variável de ambiente `ORDER_EXPIRATION_CHECK_INTERVAL_MS`
 
 ---
 
@@ -433,3 +439,47 @@ Em eventos com alta concorrência (ex: 1000 pessoas tentando 100 vagas):
 - Sempre ter polling como backup
 - Validar assinatura para segurança
 - Sandbox: usar cartões de teste do MP
+
+---
+
+## Histórico de Implementação
+
+### 12/12/2024 - Fase 1 Concluída
+
+**Arquivos criados:**
+- `server/jobs/order-expiration-job.ts` - Job de expiração de pedidos
+
+**Arquivos modificados:**
+- `server/index.ts` - Registro do job de expiração
+
+**Funcionalidades implementadas:**
+- Job executa a cada 1 minuto (configurável)
+- Busca pedidos com status='pendente' e dataExpiracao < NOW()
+- Para cada pedido expirado:
+  - Libera vagas do evento, modalidade e lote
+  - Devolve camisa ao estoque (se aplicável)
+  - Atualiza status do pedido para 'expirado'
+  - Atualiza status das inscrições para 'cancelada'
+- Logs detalhados para monitoramento
+- Usa `FOR UPDATE SKIP LOCKED` para evitar deadlocks
+
+---
+
+## Próximos Passos (Resumo)
+
+### Próxima implementação: FASE 3 - Atualizar Endpoint de Inscrição
+1. Modificar `POST /api/registrations` para definir `dataExpiracao = NOW() + 30 min`
+2. Retornar `dataExpiracao` na resposta para o frontend exibir contador
+
+### Depois: FASE 2 - Integração Mercado Pago
+1. Instalar SDK do Mercado Pago
+2. Criar serviço de pagamento (PIX e cartão)
+3. Criar endpoint de criação de pagamento
+4. Criar endpoint de webhook
+5. Criar job de polling (backup)
+
+### Por último: FASE 4 e 5 - Frontend e Segurança
+1. Implementar contador regressivo na tela de pagamento
+2. Exibir QR Code do PIX
+3. Tela de sucesso
+4. Validações de segurança

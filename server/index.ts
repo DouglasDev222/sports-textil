@@ -2,6 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import session from "express-session";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { startOrderExpirationJob } from "./jobs/order-expiration-job";
 
 const app = express();
 
@@ -97,5 +98,8 @@ app.use((req, res, next) => {
     reusePort: true,
   }, () => {
     log(`serving on port ${port}`);
+    
+    const expirationIntervalMs = parseInt(process.env.ORDER_EXPIRATION_CHECK_INTERVAL_MS || '60000', 10);
+    startOrderExpirationJob(expirationIntervalMs);
   });
 })();
