@@ -16,6 +16,7 @@ import InscricaoModalidadePage from "@/pages/InscricaoModalidadePage";
 import InscricaoResumoPage from "@/pages/InscricaoResumoPage";
 import InscricaoPagamentoPage from "@/pages/InscricaoPagamentoPage";
 import InscricaoDetailPage from "@/pages/InscricaoDetailPage";
+import EventoResultadosPage from "@/pages/EventoResultadosPage";
 
 import { AdminAuthProvider } from "@/contexts/AdminAuthContext";
 import AdminLoginPage from "@/pages/admin/AdminLoginPage";
@@ -50,6 +51,7 @@ function PublicRouter() {
       <Route path="/evento/:slug/inscricao/modalidade" component={InscricaoModalidadePage} />
       <Route path="/evento/:slug/inscricao/resumo" component={InscricaoResumoPage} />
       <Route path="/evento/:slug/inscricao/pagamento" component={InscricaoPagamentoPage} />
+      <Route path="/evento/:slug/resultados" component={EventoResultadosPage} />
       <Route path="/minhas-inscricoes" component={MinhasInscricoesPage} />
       <Route path="/inscricao/:id" component={InscricaoDetailPage} />
       <Route path="/minha-conta" component={MinhaContaPage} />

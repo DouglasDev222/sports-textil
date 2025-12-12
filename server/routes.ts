@@ -57,8 +57,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/events", async (req, res) => {
     try {
       const events = await storage.getEvents();
-      // Show published and sold-out events (sold out events should still be visible)
-      const publicEvents = events.filter(e => e.status === "publicado" || e.status === "esgotado");
+      // Show published, sold-out and finalized events
+      const publicEvents = events.filter(e => e.status === "publicado" || e.status === "esgotado" || e.status === "finalizado");
       res.json({ success: true, data: publicEvents.map(formatEventForResponse) });
     } catch (error) {
       console.error("Get public events error:", error);
@@ -72,8 +72,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/events/:slug", async (req, res) => {
     try {
       const event = await storage.getEventBySlug(req.params.slug);
-      // Allow viewing published and sold-out events
-      if (!event || (event.status !== "publicado" && event.status !== "esgotado")) {
+      // Allow viewing published, sold-out and finalized events
+      if (!event || (event.status !== "publicado" && event.status !== "esgotado" && event.status !== "finalizado")) {
         return res.status(404).json({
           success: false,
           error: { code: "NOT_FOUND", message: "Evento nao encontrado" }
@@ -126,10 +126,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const abertura = new Date(currentEvent.aberturaInscricoes);
       const encerramento = new Date(currentEvent.encerramentoInscricoes);
       
-      let registrationStatus: 'not_started' | 'open' | 'closed' | 'sold_out' = 'open';
+      let registrationStatus: 'not_started' | 'open' | 'closed' | 'sold_out' | 'finished' = 'open';
       let registrationMessage: string | null = null;
       
-      if (currentEvent.status === 'esgotado' || modalitiesAvailability?.eventSoldOut) {
+      if (currentEvent.status === 'finalizado') {
+        registrationStatus = 'finished';
+        registrationMessage = 'Evento finalizado - confira os resultados';
+      } else if (currentEvent.status === 'esgotado' || modalitiesAvailability?.eventSoldOut) {
         registrationStatus = 'sold_out';
         registrationMessage = 'Evento esgotado - todas as vagas foram preenchidas';
       } else if (now < abertura) {

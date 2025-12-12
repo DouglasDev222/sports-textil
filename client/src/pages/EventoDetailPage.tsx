@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Calendar, MapPin, Clock, Award, Info, FileText, Download, Package, Map, AlertCircle, XCircle, CalendarClock } from "lucide-react";
+import { Calendar, MapPin, Clock, Award, Info, FileText, Download, Package, Map, AlertCircle, XCircle, CalendarClock, Trophy, CheckCircle } from "lucide-react";
 import heroImage from '@assets/generated_images/Marathon_runners_landscape_hero_b439e181.png';
 import { formatDateOnlyLong } from "@/lib/timezone";
 import type { Event, Modality, RegistrationBatch, Price, Attachment } from "@shared/schema";
@@ -22,8 +22,9 @@ interface EventWithDetails extends Event {
   prices: Price[];
   attachments: Attachment[];
   eventSoldOut?: boolean;
-  registrationStatus?: 'not_started' | 'open' | 'closed' | 'sold_out';
+  registrationStatus?: 'not_started' | 'open' | 'closed' | 'sold_out' | 'finished';
   registrationMessage?: string | null;
+  urlResultados?: string | null;
 }
 
 export default function EventoDetailPage() {
@@ -107,7 +108,8 @@ export default function EventoDetailPage() {
   const modalities = event.modalities || [];
   const attachments = event.attachments || [];
   const eventSoldOut = event.eventSoldOut || event.status === 'esgotado';
-  const registrationStatus = event.registrationStatus || (eventSoldOut ? 'sold_out' : 'open');
+  const isFinished = event.status === 'finalizado';
+  const registrationStatus = event.registrationStatus || (isFinished ? 'finished' : eventSoldOut ? 'sold_out' : 'open');
   const registrationMessage = event.registrationMessage;
   
   const canRegister = registrationStatus === 'open';
@@ -120,6 +122,8 @@ export default function EventoDetailPage() {
         return 'Inscrições Encerradas';
       case 'sold_out':
         return 'Evento Esgotado';
+      case 'finished':
+        return 'Ver Resultados';
       default:
         return 'Inscrever-se Agora';
     }
@@ -146,6 +150,13 @@ export default function EventoDetailPage() {
           <Badge variant="destructive" className="text-sm px-3 py-1">
             <XCircle className="h-4 w-4 mr-1" />
             Esgotado
+          </Badge>
+        );
+      case 'finished':
+        return (
+          <Badge className="text-sm px-3 py-1 bg-green-600 hover:bg-green-700">
+            <CheckCircle className="h-4 w-4 mr-1" />
+            Finalizado
           </Badge>
         );
       default:
@@ -417,58 +428,83 @@ export default function EventoDetailPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {registrationMessage && (
-                    <div className={`mb-4 p-3 rounded-md ${
-                      registrationStatus === 'not_started' 
-                        ? 'bg-secondary/50 border border-secondary' 
-                        : 'bg-destructive/10 border border-destructive/20'
-                    }`}>
-                      <p className={`text-sm font-medium flex items-center gap-2 ${
-                        registrationStatus === 'not_started' ? 'text-foreground' : 'text-destructive'
-                      }`}>
-                        {registrationStatus === 'not_started' ? (
-                          <CalendarClock className="h-4 w-4" />
-                        ) : (
-                          <XCircle className="h-4 w-4" />
-                        )}
-                        {registrationStatus === 'not_started' ? 'Inscrições em Breve' : 
-                         registrationStatus === 'closed' ? 'Inscrições Encerradas' : 'Evento Esgotado'}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {registrationMessage}
-                      </p>
+                  {registrationStatus === 'finished' ? (
+                    <div className="text-center py-4">
+                      <div className="mb-4 p-4 rounded-md bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800">
+                        <Trophy className="h-12 w-12 mx-auto text-green-600 dark:text-green-400 mb-3" />
+                        <p className="text-lg font-semibold text-green-700 dark:text-green-300 mb-1">
+                          Evento Finalizado
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {registrationMessage || 'Confira os resultados oficiais'}
+                        </p>
+                      </div>
+                      <Button
+                        size="lg"
+                        className="w-full font-semibold bg-green-600 hover:bg-green-700"
+                        onClick={() => setLocation(`/evento/${event.slug}/resultados`)}
+                        data-testid="button-resultados"
+                      >
+                        <Trophy className="h-4 w-4 mr-2" />
+                        Ver Resultados
+                      </Button>
                     </div>
-                  )}
-                  <div className="space-y-3 mb-6">
-                    {modalities.map((mod) => {
-                      const isSoldOut = eventSoldOut || mod.isSoldOut;
-                      return (
-                        <div 
-                          key={mod.id} 
-                          className={`flex items-center justify-between py-2 border-b last:border-b-0 gap-2 ${isSoldOut ? 'opacity-60' : ''}`}
-                        >
-                          <span className="text-sm text-muted-foreground">{mod.nome}</span>
-                          {isSoldOut ? (
-                            <Badge variant="destructive" className="text-xs">
-                              Esgotado
-                            </Badge>
-                          ) : (
-                            <span className="font-semibold text-foreground">{getPrice(mod.id)}</span>
-                          )}
+                  ) : (
+                    <>
+                      {registrationMessage && (
+                        <div className={`mb-4 p-3 rounded-md ${
+                          registrationStatus === 'not_started' 
+                            ? 'bg-secondary/50 border border-secondary' 
+                            : 'bg-destructive/10 border border-destructive/20'
+                        }`}>
+                          <p className={`text-sm font-medium flex items-center gap-2 ${
+                            registrationStatus === 'not_started' ? 'text-foreground' : 'text-destructive'
+                          }`}>
+                            {registrationStatus === 'not_started' ? (
+                              <CalendarClock className="h-4 w-4" />
+                            ) : (
+                              <XCircle className="h-4 w-4" />
+                            )}
+                            {registrationStatus === 'not_started' ? 'Inscrições em Breve' : 
+                             registrationStatus === 'closed' ? 'Inscrições Encerradas' : 'Evento Esgotado'}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {registrationMessage}
+                          </p>
                         </div>
-                      );
-                    })}
-                  </div>
-                  <Button
-                    variant="secondary"
-                    size="lg"
-                    className="w-full font-semibold"
-                    onClick={handleInscricao}
-                    disabled={!canRegister}
-                    data-testid="button-inscricao"
-                  >
-                    {getButtonText()}
-                  </Button>
+                      )}
+                      <div className="space-y-3 mb-6">
+                        {modalities.map((mod) => {
+                          const isSoldOut = eventSoldOut || mod.isSoldOut;
+                          return (
+                            <div 
+                              key={mod.id} 
+                              className={`flex items-center justify-between py-2 border-b last:border-b-0 gap-2 ${isSoldOut ? 'opacity-60' : ''}`}
+                            >
+                              <span className="text-sm text-muted-foreground">{mod.nome}</span>
+                              {isSoldOut ? (
+                                <Badge variant="destructive" className="text-xs">
+                                  Esgotado
+                                </Badge>
+                              ) : (
+                                <span className="font-semibold text-foreground">{getPrice(mod.id)}</span>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <Button
+                        variant="secondary"
+                        size="lg"
+                        className="w-full font-semibold"
+                        onClick={handleInscricao}
+                        disabled={!canRegister}
+                        data-testid="button-inscricao"
+                      >
+                        {getButtonText()}
+                      </Button>
+                    </>
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -478,16 +514,28 @@ export default function EventoDetailPage() {
 
       <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-background border-t shadow-lg z-50">
         <div className="px-4 py-3">
-          <Button
-            variant="secondary"
-            size="lg"
-            className="w-full font-semibold"
-            onClick={handleInscricao}
-            disabled={!canRegister}
-            data-testid="button-inscricao-mobile"
-          >
-            {getButtonText()}
-          </Button>
+          {registrationStatus === 'finished' ? (
+            <Button
+              size="lg"
+              className="w-full font-semibold bg-green-600 hover:bg-green-700"
+              onClick={() => setLocation(`/evento/${event.slug}/resultados`)}
+              data-testid="button-resultados-mobile"
+            >
+              <Trophy className="h-4 w-4 mr-2" />
+              Ver Resultados
+            </Button>
+          ) : (
+            <Button
+              variant="secondary"
+              size="lg"
+              className="w-full font-semibold"
+              onClick={handleInscricao}
+              disabled={!canRegister}
+              data-testid="button-inscricao-mobile"
+            >
+              {getButtonText()}
+            </Button>
+          )}
         </div>
       </div>
     </div>
