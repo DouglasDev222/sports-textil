@@ -102,6 +102,9 @@ interface EventStats {
     total: number;
     masculino: number;
     feminino: number;
+    limiteVagas: number | null;
+    vagasOcupadas: number;
+    vagasDisponiveis: number | null;
   }>;
   faturamento: {
     total: number;
@@ -610,10 +613,22 @@ export default function AdminEventManagePage() {
                         <p className="text-sm text-muted-foreground">
                           {mod.masculino}M / {mod.feminino}F
                         </p>
+                        {mod.limiteVagas !== null && mod.limiteVagas !== undefined && (
+                          <p className="text-xs text-muted-foreground">
+                            Vagas: {mod.vagasDisponiveis}/{mod.limiteVagas} disponiveis
+                          </p>
+                        )}
                       </div>
-                      <Badge variant="secondary" className="text-lg">
-                        {mod.total}
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary" className="text-lg">
+                          {mod.total}
+                        </Badge>
+                        {mod.limiteVagas !== null && mod.limiteVagas !== undefined && mod.vagasDisponiveis !== null && mod.vagasDisponiveis <= 0 && (
+                          <Badge variant="destructive" className="text-xs">
+                            Esgotado
+                          </Badge>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>

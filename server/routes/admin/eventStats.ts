@@ -47,6 +47,9 @@ router.get("/:eventId/stats", requireAuth, async (req, res) => {
         total: modRegistrations.length,
         masculino: modRegistrations.filter(r => r.sexo === "masculino").length,
         feminino: modRegistrations.filter(r => r.sexo === "feminino").length,
+        limiteVagas: mod.limiteVagas,
+        vagasOcupadas: mod.vagasOcupadas,
+        vagasDisponiveis: mod.limiteVagas !== null ? mod.limiteVagas - mod.vagasOcupadas : null,
       };
     });
 
