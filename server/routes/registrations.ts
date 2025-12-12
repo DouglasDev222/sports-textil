@@ -3,6 +3,7 @@ import { storage } from "../storage";
 import { z } from "zod";
 import { registerForEventAtomic } from "../services/registration-service";
 import { checkEventCanAcceptRegistrations, recalculateBatchesForEvent, getModalitiesAvailability } from "../services/batch-validation-service";
+import { formatBrazilDateTime, utcToBrazilLocal } from "../utils/timezone";
 
 const router = Router();
 
@@ -94,7 +95,7 @@ router.get("/events/:slug/registration-info", async (req, res) => {
 
     if (now < abertura) {
       registrationStatus = 'not_started';
-      registrationMessage = `Inscrições abrem em ${abertura.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`;
+      registrationMessage = `Inscrições abrem em ${formatBrazilDateTime(abertura)}`;
       return res.status(400).json({ 
         success: false, 
         error: "Inscrições ainda não abertas",
@@ -347,10 +348,10 @@ router.post("/", async (req, res) => {
     if (now < abertura) {
       return res.status(400).json({ 
         success: false, 
-        error: "Inscrições ainda não abertas. As inscrições para este evento começam em " + abertura.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+        error: "Inscrições ainda não abertas. As inscrições para este evento começam em " + formatBrazilDateTime(abertura),
         errorCode: "REGISTRATION_NOT_STARTED",
         registrationStatus: 'not_started',
-        registrationMessage: `Inscrições abrem em ${abertura.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`
+        registrationMessage: `Inscrições abrem em ${formatBrazilDateTime(abertura)}`
       });
     }
     
