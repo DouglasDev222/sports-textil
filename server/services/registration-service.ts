@@ -28,6 +28,7 @@ export interface OrderData {
   status: string;
   metodoPagamento: string | null;
   ipComprador: string | null;
+  dataExpiracao?: string | null;
 }
 
 export type RegistrationErrorCode = 
@@ -54,6 +55,7 @@ export interface AtomicRegistrationResult {
     numeroPedido: string;
     valorTotal: number;
     status: string;
+    dataExpiracao?: string | null;
   };
   registration?: {
     id: string;
@@ -395,10 +397,10 @@ export async function registerForEventAtomic(
     const orderResult = await client.query(
       `INSERT INTO orders (
         id, numero_pedido, event_id, comprador_id, valor_total, 
-        valor_desconto, status, metodo_pagamento, ip_comprador
+        valor_desconto, status, metodo_pagamento, ip_comprador, data_expiracao
       ) VALUES (
-        gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8
-      ) RETURNING id, numero_pedido, valor_total, status`,
+        gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9
+      ) RETURNING id, numero_pedido, valor_total, status, data_expiracao`,
       [
         orderData.numeroPedido,
         orderData.eventId,
@@ -407,7 +409,8 @@ export async function registerForEventAtomic(
         orderData.valorDesconto,
         orderData.status,
         orderData.metodoPagamento,
-        orderData.ipComprador
+        orderData.ipComprador,
+        orderData.dataExpiracao || null
       ]
     );
     
@@ -529,7 +532,8 @@ export async function registerForEventAtomic(
         id: order.id,
         numeroPedido: order.numero_pedido,
         valorTotal: parseFloat(order.valor_total),
-        status: order.status
+        status: order.status,
+        dataExpiracao: order.data_expiracao
       },
       registration: {
         id: registration.id,

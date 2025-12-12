@@ -19,6 +19,8 @@ import uploadsRoutes from "./routes/admin/uploads";
 import eventStatsRoutes from "./routes/admin/eventStats";
 import athletesRoutes from "./routes/athletes";
 import registrationsRoutes from "./routes/registrations";
+import paymentsRoutes from "./routes/payments";
+import webhooksRoutes from "./routes/webhooks";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
@@ -37,6 +39,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.use("/api/athletes", athletesRoutes);
   app.use("/api/registrations", registrationsRoutes);
+  app.use("/api/payments", paymentsRoutes);
+  app.use("/api/webhooks", webhooksRoutes);
 
   function formatEventForResponse(event: any) {
     return {

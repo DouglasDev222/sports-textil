@@ -3,6 +3,7 @@ import session from "express-session";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { startOrderExpirationJob } from "./jobs/order-expiration-job";
+import { startPaymentPollingJob } from "./jobs/payment-polling-job";
 
 const app = express();
 
@@ -101,5 +102,7 @@ app.use((req, res, next) => {
     
     const expirationIntervalMs = parseInt(process.env.ORDER_EXPIRATION_CHECK_INTERVAL_MS || '60000', 10);
     startOrderExpirationJob(expirationIntervalMs);
+    
+    startPaymentPollingJob();
   });
 })();

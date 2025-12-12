@@ -415,6 +415,10 @@ router.post("/", async (req, res) => {
     const orderNumber = await storage.getNextOrderNumber();
     const registrationNumber = await storage.getNextRegistrationNumber();
 
+    // Calculate expiration date for pending (paid) orders: 30 minutes from now
+    const expirationMinutes = parseInt(process.env.ORDER_EXPIRATION_MINUTES || "30", 10);
+    const dataExpiracao = isGratuita ? null : new Date(Date.now() + expirationMinutes * 60 * 1000).toISOString();
+
     const result = await registerForEventAtomic(
       {
         numeroPedido: orderNumber,
@@ -424,7 +428,8 @@ router.post("/", async (req, res) => {
         valorDesconto: "0",
         status: isGratuita ? "pago" : "pendente",
         metodoPagamento: isGratuita ? "gratuito" : null,
-        ipComprador: req.ip || null
+        ipComprador: req.ip || null,
+        dataExpiracao
       },
       {
         eventId,
@@ -461,7 +466,10 @@ router.post("/", async (req, res) => {
     res.status(201).json({
       success: true,
       data: {
-        order: result.order,
+        order: {
+          ...result.order,
+          dataExpiracao: result.order?.dataExpiracao || null
+        },
         registration: {
           ...result.registration,
           modalidade: modality.nome,

@@ -17,7 +17,7 @@ import {
   registrations, documentAcceptances
 } from "@shared/schema";
 import { db, pool } from "./db";
-import { eq, and, isNull, lte, gt, sql, max } from "drizzle-orm";
+import { eq, and, isNull, isNotNull, lte, lt, gt, sql, max } from "drizzle-orm";
 
 export interface IStorage {
   getAdminUser(id: string): Promise<AdminUser | undefined>;
@@ -103,6 +103,11 @@ export interface IStorage {
   getOrdersByBuyer(buyerId: string): Promise<Order[]>;
   createOrder(order: InsertOrder): Promise<Order>;
   updateOrder(id: string, order: Partial<InsertOrder>): Promise<Order | undefined>;
+  updateOrderPaymentId(orderId: string, paymentId: string, paymentMethod: string): Promise<void>;
+  confirmOrderPayment(orderId: string, paymentId: string): Promise<void>;
+  getPendingOrdersWithPayment(): Promise<Order[]>;
+  getExpiredPendingOrders(): Promise<Order[]>;
+  getOrdersByPaymentId(paymentId: string): Promise<Order | undefined>;
   getNextOrderNumber(): Promise<number>;
 
   getRegistration(id: string): Promise<Registration | undefined>;
@@ -603,6 +608,57 @@ export class DbStorage implements IStorage {
     const result = await db.select({ maxNum: max(orders.numeroPedido) })
       .from(orders);
     return (result[0]?.maxNum ?? 0) + 1;
+  }
+
+  async updateOrderPaymentId(orderId: string, paymentId: string, paymentMethod: string): Promise<void> {
+    await db.update(orders)
+      .set({ 
+        idPagamentoGateway: paymentId,
+        metodoPagamento: paymentMethod
+      })
+      .where(eq(orders.id, orderId));
+  }
+
+  async confirmOrderPayment(orderId: string, paymentId: string): Promise<void> {
+    await db.update(orders)
+      .set({ 
+        status: 'pago',
+        dataPagamento: new Date().toISOString(),
+        idPagamentoGateway: paymentId
+      })
+      .where(eq(orders.id, orderId));
+
+    await db.update(registrations)
+      .set({ status: 'confirmada' })
+      .where(eq(registrations.orderId, orderId));
+  }
+
+  async getPendingOrdersWithPayment(): Promise<Order[]> {
+    return db.select().from(orders)
+      .where(
+        and(
+          eq(orders.status, 'pendente'),
+          isNotNull(orders.idPagamentoGateway),
+          gt(orders.dataExpiracao, new Date().toISOString())
+        )
+      );
+  }
+
+  async getExpiredPendingOrders(): Promise<Order[]> {
+    return db.select().from(orders)
+      .where(
+        and(
+          eq(orders.status, 'pendente'),
+          isNotNull(orders.dataExpiracao),
+          lt(orders.dataExpiracao, new Date().toISOString())
+        )
+      );
+  }
+
+  async getOrdersByPaymentId(paymentId: string): Promise<Order | undefined> {
+    const [order] = await db.select().from(orders)
+      .where(eq(orders.idPagamentoGateway, paymentId));
+    return order;
   }
 
   async getRegistration(id: string): Promise<Registration | undefined> {
