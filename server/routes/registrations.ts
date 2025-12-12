@@ -554,7 +554,10 @@ router.get("/orders/:orderId", async (req, res) => {
           valorDesconto: parseFloat(order.valorDesconto),
           status: order.status,
           metodoPagamento: order.metodoPagamento,
-          codigoVoucher: order.codigoVoucher
+          codigoVoucher: order.codigoVoucher,
+          dataExpiracao: order.dataExpiracao,
+          idPagamentoGateway: order.idPagamentoGateway,
+          dataPagamento: order.dataPagamento
         },
         evento: event ? {
           id: event.id,

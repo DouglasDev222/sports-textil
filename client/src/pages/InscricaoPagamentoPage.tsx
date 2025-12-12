@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRoute, useLocation, useSearch } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -8,10 +8,26 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
-import { ChevronLeft, Tag, CreditCard, CheckCircle2, AlertCircle, Loader2, Hash, Shirt, Users } from "lucide-react";
+import { 
+  ChevronLeft, 
+  Tag, 
+  CreditCard, 
+  CheckCircle2, 
+  AlertCircle, 
+  Loader2, 
+  Hash, 
+  Shirt, 
+  Users, 
+  Clock, 
+  Copy, 
+  QrCode,
+  RefreshCw,
+  AlertTriangle
+} from "lucide-react";
 import Header from "@/components/Header";
 import { useToast } from "@/hooks/use-toast";
 import { useAthleteAuth } from "@/contexts/AthleteAuthContext";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
 interface OrderData {
   order: {
@@ -22,6 +38,9 @@ interface OrderData {
     status: string;
     metodoPagamento: string | null;
     codigoVoucher: string | null;
+    dataExpiracao: string | null;
+    idPagamentoGateway: string | null;
+    dataPagamento: string | null;
   };
   evento: {
     id: string;
@@ -48,10 +67,45 @@ interface OrderData {
   }>;
 }
 
+interface PaymentResponse {
+  success: boolean;
+  data?: {
+    paymentId: string;
+    status: string;
+    qrCode: string;
+    qrCodeBase64: string;
+    expirationDate: string;
+    orderId: string;
+    dataExpiracao: string;
+  };
+  error?: string;
+  errorCode?: string;
+}
+
+interface PaymentStatusResponse {
+  success: boolean;
+  data?: {
+    orderId: string;
+    orderStatus: string;
+    paymentCreated: boolean;
+    paymentId?: string;
+    paymentStatus?: string;
+  };
+  error?: string;
+}
+
 const cuponsValidos: Record<string, { desconto: number; tipo: "percentual" | "fixo" }> = {
   "DESCONTO10": { desconto: 10, tipo: "percentual" },
   "CORRIDA50": { desconto: 50, tipo: "fixo" },
 };
+
+function formatTimeRemaining(ms: number): string {
+  if (ms <= 0) return "00:00";
+  const totalSeconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+}
 
 export default function InscricaoPagamentoPage() {
   const [, params] = useRoute("/evento/:slug/inscricao/pagamento");
@@ -62,7 +116,15 @@ export default function InscricaoPagamentoPage() {
   
   const [cupom, setCupom] = useState("");
   const [cupomAplicado, setCupomAplicado] = useState<string | null>(null);
-  const [processandoPagamento, setProcessandoPagamento] = useState(false);
+  const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
+  const [isExpired, setIsExpired] = useState(false);
+  const [pixData, setPixData] = useState<{
+    qrCode: string;
+    qrCodeBase64: string;
+    paymentId: string;
+  } | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [paymentConfirmed, setPaymentConfirmed] = useState(false);
 
   const searchParams = new URLSearchParams(searchString);
   const orderId = searchParams.get("orderId");
@@ -75,7 +137,7 @@ export default function InscricaoPagamentoPage() {
     }
   }, [authLoading, athlete, slug, orderId, setLocation]);
 
-  const { data, isLoading, error } = useQuery<{ success: boolean; data: OrderData }>({
+  const { data, isLoading, error, refetch } = useQuery<{ success: boolean; data: OrderData }>({
     queryKey: ["/api/registrations/orders", orderId],
     queryFn: async () => {
       const response = await fetch(`/api/registrations/orders/${orderId}`, {
@@ -86,7 +148,120 @@ export default function InscricaoPagamentoPage() {
     enabled: !!orderId && !!athlete,
   });
 
+  useEffect(() => {
+    if (!pixData || !orderId || paymentConfirmed || isExpired) return;
+
+    const pollPaymentStatus = async () => {
+      try {
+        const response = await fetch(`/api/payments/status/${orderId}`, {
+          credentials: "include"
+        });
+        const result: PaymentStatusResponse = await response.json();
+        
+        if (result.success && result.data) {
+          if (result.data.orderStatus === "pago" || result.data.paymentStatus === "approved") {
+            setPaymentConfirmed(true);
+            queryClient.invalidateQueries({ queryKey: ["/api/registrations/orders", orderId] });
+            toast({
+              title: "Pagamento confirmado!",
+              description: "Sua inscrição foi confirmada com sucesso.",
+            });
+          }
+        }
+      } catch (error) {
+        console.error("Erro ao verificar status do pagamento:", error);
+      }
+    };
+
+    const interval = setInterval(pollPaymentStatus, 5000);
+    pollPaymentStatus();
+
+    return () => clearInterval(interval);
+  }, [pixData, orderId, paymentConfirmed, isExpired, toast]);
+
+  const createPaymentMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/payments/create", {
+        orderId,
+        paymentMethod: "pix"
+      });
+      return response.json() as Promise<PaymentResponse>;
+    },
+    onSuccess: (response) => {
+      if (response.success && response.data) {
+        setPixData({
+          qrCode: response.data.qrCode,
+          qrCodeBase64: response.data.qrCodeBase64,
+          paymentId: response.data.paymentId
+        });
+        toast({
+          title: "PIX gerado com sucesso!",
+          description: "Escaneie o QR Code ou copie o código para pagar.",
+        });
+      } else {
+        if (response.errorCode === "ORDER_EXPIRED") {
+          setIsExpired(true);
+        }
+        toast({
+          title: "Erro ao gerar PIX",
+          description: response.error || "Tente novamente.",
+          variant: "destructive",
+        });
+      }
+    },
+    onError: () => {
+      toast({
+        title: "Erro ao gerar PIX",
+        description: "Tente novamente.",
+        variant: "destructive",
+      });
+    }
+  });
+
   const orderData = data?.data;
+
+  useEffect(() => {
+    if (orderData?.order.status === "pago" || paymentConfirmed) {
+      if (orderData?.registrations[0]?.id) {
+        setLocation(`/inscricao/${orderData.registrations[0].id}?sucesso=1`);
+      } else {
+        setLocation("/minhas-inscricoes");
+      }
+    }
+  }, [orderData?.order.status, orderData?.registrations, paymentConfirmed, setLocation]);
+
+  useEffect(() => {
+    if (orderData?.order.idPagamentoGateway && orderData.order.metodoPagamento === "pix" && !pixData) {
+      setPixData({
+        qrCode: "",
+        qrCodeBase64: "",
+        paymentId: orderData.order.idPagamentoGateway
+      });
+    }
+  }, [orderData?.order.idPagamentoGateway, orderData?.order.metodoPagamento, pixData]);
+
+  useEffect(() => {
+    if (!orderData?.order.dataExpiracao) return;
+    
+    const updateTimeRemaining = () => {
+      const expiration = new Date(orderData.order.dataExpiracao!).getTime();
+      const now = Date.now();
+      const remaining = expiration - now;
+      
+      if (remaining <= 0) {
+        setTimeRemaining(0);
+        setIsExpired(true);
+      } else {
+        setTimeRemaining(remaining);
+        setIsExpired(false);
+      }
+    };
+
+    updateTimeRemaining();
+    const interval = setInterval(updateTimeRemaining, 1000);
+    return () => clearInterval(interval);
+  }, [orderData?.order.dataExpiracao]);
+
   const valorOriginal = orderData?.order.valorTotal || 0;
   
   let valorDesconto = 0;
@@ -127,21 +302,40 @@ export default function InscricaoPagamentoPage() {
     setCupom("");
   };
 
-  const handleFinalizarPagamento = async () => {
-    setProcessandoPagamento(true);
-    
-    setTimeout(() => {
+  const handleGerarPix = () => {
+    if (isExpired) {
       toast({
-        title: "Pagamento realizado!",
-        description: "Sua inscrição foi confirmada com sucesso.",
+        title: "Tempo esgotado",
+        description: "O tempo para pagamento expirou. Por favor, faça uma nova inscrição.",
+        variant: "destructive",
       });
-      setProcessandoPagamento(false);
-      if (orderData?.registrations[0]?.id) {
-        setLocation(`/inscricao/${orderData.registrations[0].id}?sucesso=1`);
-      } else {
-        setLocation("/minhas-inscricoes");
-      }
-    }, 2000);
+      return;
+    }
+    createPaymentMutation.mutate();
+  };
+
+  const handleCopyPixCode = useCallback(async () => {
+    if (!pixData?.qrCode) return;
+    
+    try {
+      await navigator.clipboard.writeText(pixData.qrCode);
+      setCopied(true);
+      toast({
+        title: "Código copiado!",
+        description: "Cole no app do seu banco para pagar.",
+      });
+      setTimeout(() => setCopied(false), 3000);
+    } catch {
+      toast({
+        title: "Erro ao copiar",
+        description: "Tente copiar manualmente.",
+        variant: "destructive",
+      });
+    }
+  }, [pixData?.qrCode, toast]);
+
+  const handleNovaInscricao = () => {
+    setLocation(`/evento/${slug}`);
   };
 
   if (authLoading || isLoading) {
@@ -178,11 +372,11 @@ export default function InscricaoPagamentoPage() {
         <Header />
         <div className="max-w-2xl mx-auto px-4 py-8 md:py-12 text-center">
           <AlertCircle className="h-16 w-16 mx-auto text-destructive mb-4" />
-          <h1 className="text-2xl font-bold mb-2">Pedido não encontrado</h1>
+          <h1 className="text-2xl font-bold mb-2" data-testid="text-erro-pedido">Pedido não encontrado</h1>
           <p className="text-muted-foreground mb-6">
             Não foi possível identificar o pedido para pagamento.
           </p>
-          <Button onClick={() => setLocation(`/evento/${slug}`)}>
+          <Button onClick={() => setLocation(`/evento/${slug}`)} data-testid="button-voltar-evento">
             Voltar para o evento
           </Button>
         </div>
@@ -196,11 +390,11 @@ export default function InscricaoPagamentoPage() {
         <Header />
         <div className="max-w-2xl mx-auto px-4 py-8 md:py-12 text-center">
           <AlertCircle className="h-16 w-16 mx-auto text-destructive mb-4" />
-          <h1 className="text-2xl font-bold mb-2">Erro ao carregar pedido</h1>
+          <h1 className="text-2xl font-bold mb-2" data-testid="text-erro-carregar">Erro ao carregar pedido</h1>
           <p className="text-muted-foreground mb-6">
             Não foi possível carregar os dados do pedido.
           </p>
-          <Button onClick={() => setLocation(`/evento/${slug}`)}>
+          <Button onClick={() => setLocation(`/evento/${slug}`)} data-testid="button-voltar-evento-erro">
             Voltar para o evento
           </Button>
         </div>
@@ -214,12 +408,30 @@ export default function InscricaoPagamentoPage() {
         <Header />
         <div className="max-w-2xl mx-auto px-4 py-8 md:py-12 text-center">
           <CheckCircle2 className="h-16 w-16 mx-auto text-green-600 mb-4" />
-          <h1 className="text-2xl font-bold mb-2">Pedido já pago</h1>
+          <h1 className="text-2xl font-bold mb-2" data-testid="text-pedido-pago">Pedido já pago</h1>
           <p className="text-muted-foreground mb-6">
             Este pedido já foi pago e sua inscrição está confirmada.
           </p>
-          <Button onClick={() => setLocation("/minhas-inscricoes")}>
+          <Button onClick={() => setLocation("/minhas-inscricoes")} data-testid="button-ver-inscricoes">
             Ver minhas inscrições
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (orderData.order.status === "expirado" || isExpired) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <div className="max-w-2xl mx-auto px-4 py-8 md:py-12 text-center">
+          <AlertTriangle className="h-16 w-16 mx-auto text-yellow-600 mb-4" />
+          <h1 className="text-2xl font-bold mb-2" data-testid="text-tempo-esgotado">Tempo esgotado</h1>
+          <p className="text-muted-foreground mb-6">
+            O tempo para pagamento expirou. As vagas foram liberadas.
+          </p>
+          <Button onClick={handleNovaInscricao} data-testid="button-nova-inscricao">
+            Fazer nova inscrição
           </Button>
         </div>
       </div>
@@ -243,9 +455,9 @@ export default function InscricaoPagamentoPage() {
         </Button>
 
         <div className="mb-8">
-          <div className="flex items-center gap-2 text-muted-foreground mb-2">
+          <div className="flex items-center gap-2 text-muted-foreground mb-2 flex-wrap">
             <Hash className="h-4 w-4" />
-            <span className="text-sm">Pedido #{orderData.order.numeroPedido}</span>
+            <span className="text-sm" data-testid="text-numero-pedido">Pedido #{orderData.order.numeroPedido}</span>
           </div>
           <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-2">
             Pagamento
@@ -255,61 +467,85 @@ export default function InscricaoPagamentoPage() {
           </p>
         </div>
 
-        <div className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Tag className="h-5 w-5" />
-                Cupom de Desconto
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {!cupomAplicado ? (
-                <div className="space-y-3">
-                  <Label htmlFor="cupom" className="text-sm text-muted-foreground">
-                    Digite seu cupom de desconto
-                  </Label>
-                  <div className="flex gap-2">
-                    <Input
-                      id="cupom"
-                      placeholder="DESCONTO10"
-                      value={cupom}
-                      onChange={(e) => setCupom(e.target.value.toUpperCase())}
-                      data-testid="input-cupom"
-                    />
-                    <Button
-                      variant="outline"
-                      onClick={handleAplicarCupom}
-                      disabled={!cupom}
-                      data-testid="button-aplicar-cupom"
-                    >
-                      Aplicar
-                    </Button>
-                  </div>
+        {timeRemaining !== null && orderData.order.dataExpiracao && (
+          <Card className="mb-4 border-yellow-500/50 bg-yellow-50/50 dark:bg-yellow-950/20">
+            <CardContent className="py-4">
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <Clock className="h-5 w-5 text-yellow-600" />
+                  <span className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
+                    Tempo restante para pagamento
+                  </span>
                 </div>
-              ) : (
-                <div className="flex items-center justify-between gap-2 p-3 bg-primary/10 rounded-md flex-wrap">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="h-5 w-5 text-primary" />
-                    <div>
-                      <p className="font-semibold text-foreground">{cupomAplicado}</p>
-                      <p className="text-sm text-muted-foreground">
-                        Desconto aplicado: R$ {valorDesconto.toFixed(2).replace('.', ',')}
-                      </p>
-                    </div>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleRemoverCupom}
-                    data-testid="button-remover-cupom"
-                  >
-                    Remover
-                  </Button>
-                </div>
-              )}
+                <Badge 
+                  variant="outline" 
+                  className="text-lg font-mono font-bold border-yellow-600 text-yellow-800 dark:text-yellow-200"
+                  data-testid="badge-tempo-restante"
+                >
+                  {formatTimeRemaining(timeRemaining)}
+                </Badge>
+              </div>
             </CardContent>
           </Card>
+        )}
+
+        <div className="space-y-4">
+          {!pixData && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Tag className="h-5 w-5" />
+                  Cupom de Desconto
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {!cupomAplicado ? (
+                  <div className="space-y-3">
+                    <Label htmlFor="cupom" className="text-sm text-muted-foreground">
+                      Digite seu cupom de desconto
+                    </Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="cupom"
+                        placeholder="DESCONTO10"
+                        value={cupom}
+                        onChange={(e) => setCupom(e.target.value.toUpperCase())}
+                        data-testid="input-cupom"
+                      />
+                      <Button
+                        variant="outline"
+                        onClick={handleAplicarCupom}
+                        disabled={!cupom}
+                        data-testid="button-aplicar-cupom"
+                      >
+                        Aplicar
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between gap-2 p-3 bg-primary/10 rounded-md flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="h-5 w-5 text-primary" />
+                      <div>
+                        <p className="font-semibold text-foreground">{cupomAplicado}</p>
+                        <p className="text-sm text-muted-foreground">
+                          Desconto aplicado: R$ {valorDesconto.toFixed(2).replace('.', ',')}
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleRemoverCupom}
+                      data-testid="button-remover-cupom"
+                    >
+                      Remover
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           <Card>
             <CardHeader>
@@ -370,7 +606,7 @@ export default function InscricaoPagamentoPage() {
                 <Separator />
                 <div className="flex items-center justify-between gap-2 pt-2 flex-wrap">
                   <span className="text-lg font-semibold text-foreground">Total a Pagar</span>
-                  <span className="text-2xl font-bold text-primary">
+                  <span className="text-2xl font-bold text-primary" data-testid="text-valor-total">
                     R$ {valorFinal.toFixed(2).replace('.', ',')}
                   </span>
                 </div>
@@ -378,47 +614,116 @@ export default function InscricaoPagamentoPage() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <CreditCard className="h-5 w-5" />
-                Forma de Pagamento
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                <Badge variant="secondary" className="text-sm">
-                  Pagamento via PIX ou Cartão de Crédito
-                </Badge>
-                <p className="text-sm text-muted-foreground">
-                  Você será redirecionado para finalizar o pagamento de forma segura.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+          {pixData ? (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <QrCode className="h-5 w-5" />
+                  Pague com PIX
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex flex-col items-center gap-4">
+                  <div className="p-4 bg-white rounded-lg shadow-sm">
+                    <img 
+                      src={`data:image/png;base64,${pixData.qrCodeBase64}`} 
+                      alt="QR Code PIX"
+                      className="w-48 h-48"
+                      data-testid="img-qrcode-pix"
+                    />
+                  </div>
+                  <p className="text-sm text-muted-foreground text-center">
+                    Escaneie o QR Code acima com o app do seu banco
+                  </p>
+                </div>
+                
+                <Separator />
+                
+                <div className="space-y-2">
+                  <Label className="text-sm text-muted-foreground">
+                    Ou copie o código PIX:
+                  </Label>
+                  <div className="flex gap-2">
+                    <Input 
+                      value={pixData.qrCode} 
+                      readOnly 
+                      className="font-mono text-xs"
+                      data-testid="input-codigo-pix"
+                    />
+                    <Button
+                      variant="outline"
+                      onClick={handleCopyPixCode}
+                      data-testid="button-copiar-pix"
+                    >
+                      {copied ? (
+                        <CheckCircle2 className="h-4 w-4 text-green-600" />
+                      ) : (
+                        <Copy className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground pt-4">
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                  <span>Aguardando confirmação do pagamento...</span>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <CreditCard className="h-5 w-5" />
+                  Forma de Pagamento
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 p-4 border rounded-md">
+                    <QrCode className="h-6 w-6 text-primary" />
+                    <div className="flex-1">
+                      <p className="font-medium">PIX</p>
+                      <p className="text-sm text-muted-foreground">
+                        Pagamento instantâneo via QR Code
+                      </p>
+                    </div>
+                    <Badge variant="secondary">Recomendado</Badge>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Clique no botão abaixo para gerar o código PIX e finalizar o pagamento.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 bg-background border-t shadow-lg z-50">
-        <div className="max-w-2xl mx-auto px-4 py-3">
-          <Button
-            size="lg"
-            onClick={handleFinalizarPagamento}
-            disabled={processandoPagamento}
-            className="w-full font-semibold"
-            data-testid="button-finalizar-pagamento"
-          >
-            {processandoPagamento ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Processando...
-              </>
-            ) : (
-              `Finalizar Pagamento - R$ ${valorFinal.toFixed(2).replace('.', ',')}`
-            )}
-          </Button>
+      {!pixData && (
+        <div className="fixed bottom-0 left-0 right-0 bg-background border-t shadow-lg z-50">
+          <div className="max-w-2xl mx-auto px-4 py-3">
+            <Button
+              size="lg"
+              onClick={handleGerarPix}
+              disabled={createPaymentMutation.isPending || isExpired}
+              className="w-full font-semibold"
+              data-testid="button-gerar-pix"
+            >
+              {createPaymentMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Gerando PIX...
+                </>
+              ) : isExpired ? (
+                "Tempo esgotado"
+              ) : (
+                `Gerar PIX - R$ ${valorFinal.toFixed(2).replace('.', ',')}`
+              )}
+            </Button>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
