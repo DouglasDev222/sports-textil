@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ChevronLeft, User, Shirt, Award, Loader2, AlertCircle, CheckCircle } from "lucide-react";
+import { ChevronLeft, User, Shirt, Award, Loader2, AlertCircle, CheckCircle, CalendarClock } from "lucide-react";
 import Header from "@/components/Header";
 import { useAthleteAuth } from "@/contexts/AthleteAuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -33,6 +33,8 @@ interface RegistrationInfo {
     estado: string;
   };
   modalities: ModalityInfo[];
+  registrationStatus?: 'not_started' | 'open' | 'closed' | 'sold_out';
+  registrationMessage?: string | null;
 }
 
 export default function InscricaoResumoPage() {
@@ -55,7 +57,7 @@ export default function InscricaoResumoPage() {
     }
   }, [authLoading, athlete, slug, searchString, setLocation]);
 
-  const { data, isLoading, error } = useQuery<{ success: boolean; data: RegistrationInfo }>({
+  const { data, isLoading, error } = useQuery<{ success: boolean; data: RegistrationInfo; error?: string }>({
     queryKey: ["/api/registrations/events", slug, "registration-info"],
     queryFn: async () => {
       const response = await fetch(`/api/registrations/events/${slug}/registration-info`);
@@ -150,14 +152,30 @@ export default function InscricaoResumoPage() {
   }
 
   if (error || !data?.success) {
+    const errorResponse = data as any;
+    const registrationStatus = errorResponse?.registrationStatus;
+    const registrationMessage = errorResponse?.registrationMessage;
+    const errorMessage = data?.error;
+    
+    const isNotStarted = registrationStatus === 'not_started';
+    const isClosed = registrationStatus === 'closed';
+    
     return (
       <div className="min-h-screen bg-background">
         <Header />
         <div className="max-w-2xl mx-auto px-4 py-8 md:py-12 text-center">
-          <AlertCircle className="h-16 w-16 mx-auto text-destructive mb-4" />
-          <h1 className="text-2xl font-bold mb-2">Erro ao carregar dados</h1>
+          {isNotStarted ? (
+            <CalendarClock className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
+          ) : (
+            <AlertCircle className="h-16 w-16 mx-auto text-destructive mb-4" />
+          )}
+          <h1 className="text-2xl font-bold mb-2">
+            {isNotStarted ? "Inscrições em Breve" : 
+             isClosed ? "Inscrições Encerradas" : 
+             "Erro ao carregar dados"}
+          </h1>
           <p className="text-muted-foreground mb-6">
-            Não foi possível carregar as informações do evento.
+            {registrationMessage || errorMessage || "Não foi possível carregar as informações do evento."}
           </p>
           <Button onClick={() => setLocation(`/evento/${slug}`)}>
             Voltar para o evento

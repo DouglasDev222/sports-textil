@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ChevronLeft, ShieldCheck, AlertCircle, Loader2, CheckCircle, XCircle } from "lucide-react";
+import { ChevronLeft, ShieldCheck, AlertCircle, Loader2, CheckCircle, XCircle, CalendarClock } from "lucide-react";
 import Header from "@/components/Header";
 import { useAthleteAuth } from "@/contexts/AthleteAuthContext";
 
@@ -57,6 +57,8 @@ interface RegistrationInfo {
     data: ShirtSize[] | { modalityId: string; sizes: ShirtSize[] }[];
   };
   eventSoldOut?: boolean;
+  registrationStatus?: 'not_started' | 'open' | 'closed' | 'sold_out';
+  registrationMessage?: string | null;
 }
 
 export default function InscricaoModalidadePage() {
@@ -76,7 +78,7 @@ export default function InscricaoModalidadePage() {
     }
   }, [authLoading, athlete, slug, setLocation]);
 
-  const { data, isLoading, error } = useQuery<{ success: boolean; data: RegistrationInfo }>({
+  const { data, isLoading, error } = useQuery<{ success: boolean; data: RegistrationInfo; error?: string; aberturaInscricoes?: string }>({
     queryKey: ["/api/registrations/events", slug, "registration-info"],
     queryFn: async () => {
       const response = await fetch(`/api/registrations/events/${slug}/registration-info`);
@@ -141,14 +143,30 @@ export default function InscricaoModalidadePage() {
   }
 
   if (error || !data?.success) {
+    const errorResponse = data as any;
+    const registrationStatus = errorResponse?.registrationStatus;
+    const registrationMessage = errorResponse?.registrationMessage;
+    const errorMessage = data?.error;
+    
+    const isNotStarted = registrationStatus === 'not_started';
+    const isClosed = registrationStatus === 'closed';
+    
     return (
       <div className="min-h-screen bg-background">
         <Header />
         <div className="max-w-2xl mx-auto px-4 py-8 md:py-12 text-center">
-          <AlertCircle className="h-16 w-16 mx-auto text-destructive mb-4" />
-          <h1 className="text-2xl font-bold mb-2">Erro ao carregar dados</h1>
+          {isNotStarted ? (
+            <CalendarClock className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
+          ) : (
+            <AlertCircle className="h-16 w-16 mx-auto text-destructive mb-4" />
+          )}
+          <h1 className="text-2xl font-bold mb-2">
+            {isNotStarted ? "Inscrições em Breve" : 
+             isClosed ? "Inscrições Encerradas" : 
+             "Erro ao carregar dados"}
+          </h1>
           <p className="text-muted-foreground mb-6">
-            Não foi possível carregar as informações do evento.
+            {registrationMessage || errorMessage || "Não foi possível carregar as informações do evento."}
           </p>
           <Button onClick={() => setLocation(`/evento/${slug}`)}>
             Voltar para o evento
@@ -158,8 +176,9 @@ export default function InscricaoModalidadePage() {
     );
   }
 
-  const { modalities, shirtSizes, activeBatch, eventSoldOut } = data.data;
-  const isEventSoldOut = eventSoldOut || data.data?.event?.status === 'esgotado';
+  const { modalities, shirtSizes, activeBatch, eventSoldOut, registrationStatus, registrationMessage } = data.data;
+  const isEventSoldOut = eventSoldOut || data.data?.event?.status === 'esgotado' || registrationStatus === 'sold_out';
+  const cannotRegister = registrationStatus !== 'open' && registrationStatus !== undefined;
   const selectedModality = modalities.find(m => m.id === modalidadeSelecionada);
   
   let availableSizes: ShirtSize[] = [];
@@ -183,7 +202,8 @@ export default function InscricaoModalidadePage() {
   const podeAvancar = modalidadeSelecionada && 
     (!requiresShirtSize || tamanhoSelecionado) && 
     (!requiresCode || codigoComprovacao.trim() !== "") &&
-    !isEventSoldOut;
+    !isEventSoldOut &&
+    !cannotRegister;
 
   const getTipoAcessoBadge = (tipoAcesso: string) => {
     switch (tipoAcesso) {
@@ -236,11 +256,17 @@ export default function InscricaoModalidadePage() {
           )}
         </div>
 
-        {isEventSoldOut && (
-          <Alert variant="destructive" className="mb-6">
-            <XCircle className="h-4 w-4" />
+        {(isEventSoldOut || cannotRegister) && (
+          <Alert variant={registrationStatus === 'not_started' ? 'default' : 'destructive'} className="mb-6">
+            {registrationStatus === 'not_started' ? (
+              <CalendarClock className="h-4 w-4" />
+            ) : (
+              <XCircle className="h-4 w-4" />
+            )}
             <AlertDescription>
-              Este evento está com todas as vagas esgotadas. Não é possível realizar novas inscrições no momento.
+              {registrationMessage || (isEventSoldOut 
+                ? 'Este evento está com todas as vagas esgotadas. Não é possível realizar novas inscrições no momento.'
+                : 'Não é possível realizar inscrições no momento.')}
             </AlertDescription>
           </Alert>
         )}

@@ -121,11 +121,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
       });
 
+      // Calculate registration status based on dates
+      const now = new Date();
+      const abertura = new Date(currentEvent.aberturaInscricoes);
+      const encerramento = new Date(currentEvent.encerramentoInscricoes);
+      
+      let registrationStatus: 'not_started' | 'open' | 'closed' | 'sold_out' = 'open';
+      let registrationMessage: string | null = null;
+      
+      if (currentEvent.status === 'esgotado' || modalitiesAvailability?.eventSoldOut) {
+        registrationStatus = 'sold_out';
+        registrationMessage = 'Evento esgotado - todas as vagas foram preenchidas';
+      } else if (now < abertura) {
+        registrationStatus = 'not_started';
+        registrationMessage = `Inscrições abrem em ${abertura.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`;
+      } else if (now >= encerramento) {
+        registrationStatus = 'closed';
+        registrationMessage = 'Inscrições encerradas';
+      }
+
       res.json({
         success: true,
         data: {
           ...formatEventForResponse(currentEvent),
           eventSoldOut: modalitiesAvailability?.eventSoldOut ?? (currentEvent.status === 'esgotado'),
+          registrationStatus,
+          registrationMessage,
           modalities: modalitiesWithAvailability,
           activeBatch: activeBatch ? formatBatchForResponse(activeBatch) : null,
           prices: prices.filter(p => p.batchId === activeBatch?.id),

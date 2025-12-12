@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Calendar, MapPin, Clock, Award, Info, FileText, Download, Package, Map, AlertCircle, XCircle } from "lucide-react";
+import { Calendar, MapPin, Clock, Award, Info, FileText, Download, Package, Map, AlertCircle, XCircle, CalendarClock } from "lucide-react";
 import heroImage from '@assets/generated_images/Marathon_runners_landscape_hero_b439e181.png';
 import { formatDateOnlyLong } from "@/lib/timezone";
 import type { Event, Modality, RegistrationBatch, Price, Attachment } from "@shared/schema";
@@ -22,6 +22,8 @@ interface EventWithDetails extends Event {
   prices: Price[];
   attachments: Attachment[];
   eventSoldOut?: boolean;
+  registrationStatus?: 'not_started' | 'open' | 'closed' | 'sold_out';
+  registrationMessage?: string | null;
 }
 
 export default function EventoDetailPage() {
@@ -105,6 +107,51 @@ export default function EventoDetailPage() {
   const modalities = event.modalities || [];
   const attachments = event.attachments || [];
   const eventSoldOut = event.eventSoldOut || event.status === 'esgotado';
+  const registrationStatus = event.registrationStatus || (eventSoldOut ? 'sold_out' : 'open');
+  const registrationMessage = event.registrationMessage;
+  
+  const canRegister = registrationStatus === 'open';
+  
+  const getButtonText = () => {
+    switch (registrationStatus) {
+      case 'not_started':
+        return 'Inscrições em Breve';
+      case 'closed':
+        return 'Inscrições Encerradas';
+      case 'sold_out':
+        return 'Evento Esgotado';
+      default:
+        return 'Inscrever-se Agora';
+    }
+  };
+  
+  const getStatusBadge = () => {
+    switch (registrationStatus) {
+      case 'not_started':
+        return (
+          <Badge variant="secondary" className="text-sm px-3 py-1">
+            <CalendarClock className="h-4 w-4 mr-1" />
+            Em Breve
+          </Badge>
+        );
+      case 'closed':
+        return (
+          <Badge variant="destructive" className="text-sm px-3 py-1">
+            <XCircle className="h-4 w-4 mr-1" />
+            Encerrado
+          </Badge>
+        );
+      case 'sold_out':
+        return (
+          <Badge variant="destructive" className="text-sm px-3 py-1">
+            <XCircle className="h-4 w-4 mr-1" />
+            Esgotado
+          </Badge>
+        );
+      default:
+        return null;
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -124,12 +171,7 @@ export default function EventoDetailPage() {
                 <h1 className="text-3xl md:text-5xl font-bold text-white">
                   {event.nome}
                 </h1>
-                {eventSoldOut && (
-                  <Badge variant="destructive" className="text-sm px-3 py-1">
-                    <XCircle className="h-4 w-4 mr-1" />
-                    Esgotado
-                  </Badge>
-                )}
+                {getStatusBadge()}
               </div>
               <div className="flex flex-wrap gap-2">
                 {modalities.map((mod) => (
@@ -375,14 +417,25 @@ export default function EventoDetailPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {eventSoldOut && (
-                    <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 rounded-md">
-                      <p className="text-sm font-medium text-destructive flex items-center gap-2">
-                        <XCircle className="h-4 w-4" />
-                        Evento Esgotado
+                  {registrationMessage && (
+                    <div className={`mb-4 p-3 rounded-md ${
+                      registrationStatus === 'not_started' 
+                        ? 'bg-secondary/50 border border-secondary' 
+                        : 'bg-destructive/10 border border-destructive/20'
+                    }`}>
+                      <p className={`text-sm font-medium flex items-center gap-2 ${
+                        registrationStatus === 'not_started' ? 'text-foreground' : 'text-destructive'
+                      }`}>
+                        {registrationStatus === 'not_started' ? (
+                          <CalendarClock className="h-4 w-4" />
+                        ) : (
+                          <XCircle className="h-4 w-4" />
+                        )}
+                        {registrationStatus === 'not_started' ? 'Inscrições em Breve' : 
+                         registrationStatus === 'closed' ? 'Inscrições Encerradas' : 'Evento Esgotado'}
                       </p>
                       <p className="text-xs text-muted-foreground mt-1">
-                        Todas as vagas foram preenchidas
+                        {registrationMessage}
                       </p>
                     </div>
                   )}
@@ -411,10 +464,10 @@ export default function EventoDetailPage() {
                     size="lg"
                     className="w-full font-semibold"
                     onClick={handleInscricao}
-                    disabled={eventSoldOut}
+                    disabled={!canRegister}
                     data-testid="button-inscricao"
                   >
-                    {eventSoldOut ? 'Inscrições Encerradas' : 'Inscrever-se Agora'}
+                    {getButtonText()}
                   </Button>
                 </CardContent>
               </Card>
@@ -430,10 +483,10 @@ export default function EventoDetailPage() {
             size="lg"
             className="w-full font-semibold"
             onClick={handleInscricao}
-            disabled={eventSoldOut}
+            disabled={!canRegister}
             data-testid="button-inscricao-mobile"
           >
-            {eventSoldOut ? 'Inscrições Encerradas' : 'Inscrever-se Agora'}
+            {getButtonText()}
           </Button>
         </div>
       </div>

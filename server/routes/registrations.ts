@@ -57,6 +57,8 @@ router.get("/events/:slug/registration-info", async (req, res) => {
             idadeMinimaEvento: currentEvent.idadeMinimaEvento
           },
           eventSoldOut: true,
+          registrationStatus: 'sold_out' as const,
+          registrationMessage: 'Evento esgotado - todas as vagas foram preenchidas',
           soldOutMessage: "Inscrições encerradas - evento esgotado.",
           modalities: modalitiesAvailability.modalities.map(m => ({
             id: m.id,
@@ -85,19 +87,31 @@ router.get("/events/:slug/registration-info", async (req, res) => {
     const now = new Date();
     const abertura = new Date(currentEvent.aberturaInscricoes);
     const encerramento = new Date(currentEvent.encerramentoInscricoes);
+    
+    // Calculate registration status
+    let registrationStatus: 'not_started' | 'open' | 'closed' | 'sold_out' = 'open';
+    let registrationMessage: string | null = null;
 
     if (now < abertura) {
+      registrationStatus = 'not_started';
+      registrationMessage = `Inscrições abrem em ${abertura.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`;
       return res.status(400).json({ 
         success: false, 
         error: "Inscrições ainda não abertas",
+        registrationStatus,
+        registrationMessage,
         aberturaInscricoes: currentEvent.aberturaInscricoes
       });
     }
 
-    if (now > encerramento) {
+    if (now >= encerramento) {
+      registrationStatus = 'closed';
+      registrationMessage = 'Inscrições encerradas';
       return res.status(400).json({ 
         success: false, 
-        error: "Inscrições encerradas" 
+        error: "Inscrições encerradas",
+        registrationStatus,
+        registrationMessage
       });
     }
 
@@ -226,6 +240,13 @@ router.get("/events/:slug/registration-info", async (req, res) => {
       };
     }).sort((a, b) => a.ordem - b.ordem);
 
+    // Check if event is sold out and update registration status
+    const isEventSoldOut = modalitiesAvailability?.eventSoldOut ?? false;
+    if (isEventSoldOut) {
+      registrationStatus = 'sold_out';
+      registrationMessage = 'Evento esgotado - todas as vagas foram preenchidas';
+    }
+
     res.json({
       success: true,
       data: {
@@ -243,7 +264,9 @@ router.get("/events/:slug/registration-info", async (req, res) => {
           entregaCamisaNoKit: currentEvent.entregaCamisaNoKit,
           idadeMinimaEvento: currentEvent.idadeMinimaEvento
         },
-        eventSoldOut: modalitiesAvailability?.eventSoldOut ?? false,
+        eventSoldOut: isEventSoldOut,
+        registrationStatus,
+        registrationMessage,
         modalities: modalitiesWithInfo,
         activeBatch: activeBatch ? {
           id: activeBatch.id,
@@ -318,8 +341,27 @@ router.post("/", async (req, res) => {
     }
 
     const now = new Date();
-    if (now < new Date(event.aberturaInscricoes) || now > new Date(event.encerramentoInscricoes)) {
-      return res.status(400).json({ success: false, error: "Período de inscrições encerrado" });
+    const abertura = new Date(event.aberturaInscricoes);
+    const encerramento = new Date(event.encerramentoInscricoes);
+    
+    if (now < abertura) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "Inscrições ainda não abertas. As inscrições para este evento começam em " + abertura.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+        errorCode: "REGISTRATION_NOT_STARTED",
+        registrationStatus: 'not_started',
+        registrationMessage: `Inscrições abrem em ${abertura.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`
+      });
+    }
+    
+    if (now >= encerramento) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "Período de inscrições encerrado",
+        errorCode: "REGISTRATION_CLOSED",
+        registrationStatus: 'closed',
+        registrationMessage: 'Inscrições encerradas'
+      });
     }
 
     const modality = await storage.getModality(modalityId);
