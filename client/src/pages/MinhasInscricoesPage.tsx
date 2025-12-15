@@ -97,60 +97,60 @@ function InscricaoItem({ inscricao, evento }: { inscricao: Inscricao; evento: Ev
   const statusConfig = getStatusConfig(inscricao.status);
   
   return (
-    <div className="flex flex-col md:flex-row gap-4 p-4 bg-muted/30 rounded-md" data-testid={`inscricao-item-${inscricao.id}`}>
-      {evento?.bannerUrl && (
-        <div className="w-full md:w-24 h-20 md:h-16 rounded-md overflow-hidden flex-shrink-0">
-          <img
-            src={evento.bannerUrl}
-            alt={evento.nome}
-            className="w-full h-full object-cover"
-          />
-        </div>
-      )}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-start justify-between gap-2 flex-wrap mb-2">
-          <div>
-            <p className="text-xs text-muted-foreground mb-1">
-              Inscrição #{inscricao.numeroInscricao}
-            </p>
-            <h4 className="font-semibold text-foreground text-sm">
-              {evento?.nome || "Evento"}
-            </h4>
-          </div>
+    <div className="p-4 bg-muted/30 rounded-md space-y-3" data-testid={`inscricao-item-${inscricao.id}`}>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-medium text-muted-foreground">#{inscricao.numeroInscricao}</span>
           <Badge variant={statusConfig.variant} className="text-xs">
             {statusConfig.label}
           </Badge>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs text-muted-foreground">
-          <div className="flex items-center gap-1">
-            <User className="h-3 w-3" />
+      </div>
+      
+      <div className="flex items-start gap-3">
+        {evento?.bannerUrl && (
+          <div className="w-14 h-14 rounded-md overflow-hidden flex-shrink-0">
+            <img
+              src={evento.bannerUrl}
+              alt={evento.nome}
+              className="w-full h-full object-cover"
+            />
+          </div>
+        )}
+        <div className="flex-1 min-w-0">
+          <h4 className="font-semibold text-foreground text-sm mb-1 line-clamp-2">
+            {evento?.nome || "Evento"}
+          </h4>
+          <p className="text-sm text-muted-foreground flex items-center gap-1.5">
+            <User className="h-3.5 w-3.5 flex-shrink-0" />
             <span className="truncate">{inscricao.participanteNome}</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <Award className="h-3 w-3" />
-            <span>{inscricao.modalidade?.nome || "-"}</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <Calendar className="h-3 w-3" />
-            <span>{evento?.dataEvento ? formatDate(evento.dataEvento) : "-"}</span>
-          </div>
-          {inscricao.tamanhoCamisa && (
-            <div className="flex items-center gap-1">
-              <Shirt className="h-3 w-3" />
-              <span>Camisa {inscricao.tamanhoCamisa}</span>
-            </div>
-          )}
+          </p>
         </div>
       </div>
-      <div className="flex items-center flex-shrink-0">
-        <Link href={`/inscricao/${inscricao.id}`}>
-          <Button variant="outline" size="sm" className="gap-1.5" data-testid={`button-view-inscricao-${inscricao.id}`}>
-            <Eye className="h-4 w-4" />
-            <span className="hidden sm:inline">Ver Inscricao</span>
-            <span className="sm:hidden">Ver</span>
-          </Button>
-        </Link>
+
+      <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs text-muted-foreground">
+        <div className="flex items-center gap-1.5">
+          <Award className="h-3.5 w-3.5 flex-shrink-0" />
+          <span className="truncate">{inscricao.modalidade?.nome || "-"}</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <Calendar className="h-3.5 w-3.5 flex-shrink-0" />
+          <span>{evento?.dataEvento ? formatDate(evento.dataEvento) : "-"}</span>
+        </div>
+        {inscricao.tamanhoCamisa && (
+          <div className="flex items-center gap-1.5 col-span-2 sm:col-span-1">
+            <Shirt className="h-3.5 w-3.5 flex-shrink-0" />
+            <span>Camisa {inscricao.tamanhoCamisa}</span>
+          </div>
+        )}
       </div>
+
+      <Link href={`/inscricao/${inscricao.id}`} className="block">
+        <Button variant="outline" size="sm" className="w-full gap-1.5" data-testid={`button-view-inscricao-${inscricao.id}`}>
+          <Eye className="h-4 w-4" />
+          Ver Inscricao
+        </Button>
+      </Link>
     </div>
   );
 }
