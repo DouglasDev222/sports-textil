@@ -173,6 +173,10 @@ export const orders = pgTable("orders", {
   dataPagamento: timestamp("data_pagamento", { withTimezone: true }),
   dataExpiracao: timestamp("data_expiracao", { withTimezone: true }),
   ipComprador: varchar("ip_comprador", { length: 45 }),
+  pixQrCode: text("pix_qr_code"),
+  pixQrCodeBase64: text("pix_qr_code_base64"),
+  pixExpiracao: timestamp("pix_expiracao", { withTimezone: true }),
+  pixDataGeracao: timestamp("pix_data_geracao", { withTimezone: true }),
 });
 
 export const registrations = pgTable("registrations", {

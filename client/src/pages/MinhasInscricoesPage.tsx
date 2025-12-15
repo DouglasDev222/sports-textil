@@ -157,6 +157,7 @@ function PedidoCard({ pedido }: { pedido: Pedido }) {
   const statusConfig = getStatusConfig(pedido.status);
   const StatusIcon = statusConfig.icon;
   const qtdInscricoes = pedido.inscricoes.length;
+  const isPending = pedido.status === "pendente";
   
   return (
     <Card className="overflow-hidden" data-testid={`card-pedido-${pedido.id}`}>
@@ -168,9 +169,11 @@ function PedidoCard({ pedido }: { pedido: Pedido }) {
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="font-bold text-foreground" data-testid={`text-pedido-numero-${pedido.id}`}>
-                  Pedido #{pedido.numeroPedido}
-                </h3>
+                <Link href={`/pedido/${pedido.id}`}>
+                  <h3 className="font-bold text-foreground hover:text-primary transition-colors cursor-pointer" data-testid={`text-pedido-numero-${pedido.id}`}>
+                    Pedido #{pedido.numeroPedido}
+                  </h3>
+                </Link>
                 <Badge variant={statusConfig.variant} className="text-xs">
                   <StatusIcon className="h-3 w-3 mr-1" />
                   {statusConfig.label}
@@ -181,11 +184,18 @@ function PedidoCard({ pedido }: { pedido: Pedido }) {
               </p>
             </div>
           </div>
-          <div className="text-right">
-            <p className="text-xs text-muted-foreground">Valor total</p>
-            <p className="font-bold text-lg text-foreground">
-              R$ {pedido.valorTotal.toFixed(2)}
-            </p>
+          <div className="text-right flex items-center gap-4">
+            <div>
+              <p className="text-xs text-muted-foreground">Valor total</p>
+              <p className="font-bold text-lg text-foreground">
+                R$ {pedido.valorTotal.toFixed(2)}
+              </p>
+            </div>
+            <Link href={`/pedido/${pedido.id}`}>
+              <Button variant={isPending ? "default" : "outline"} size="sm" data-testid={`button-ver-pedido-${pedido.id}`}>
+                {isPending ? "Pagar" : "Ver Pedido"}
+              </Button>
+            </Link>
           </div>
         </div>
       </CardHeader>

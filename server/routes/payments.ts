@@ -100,6 +100,14 @@ router.post("/create", async (req, res) => {
 
       await storage.updateOrderPaymentId(order.id, result.paymentId!, "pix");
 
+      if (result.qrCode && result.qrCodeBase64 && result.expirationDate) {
+        await storage.updateOrderPixData(order.id, {
+          qrCode: result.qrCode,
+          qrCodeBase64: result.qrCodeBase64,
+          expiracao: new Date(result.expirationDate)
+        });
+      }
+
       return res.json({
         success: true,
         data: {
@@ -158,6 +166,140 @@ router.post("/create", async (req, res) => {
     return res.status(400).json({ success: false, error: "Método de pagamento inválido" });
   } catch (error) {
     console.error("[payments] Erro ao criar pagamento:", error);
+    return res.status(500).json({ success: false, error: "Erro interno do servidor" });
+  }
+});
+
+router.get("/order/:orderId", async (req, res) => {
+  try {
+    const athleteId = (req.session as any)?.athleteId;
+    if (!athleteId) {
+      return res.status(401).json({ success: false, error: "Não autenticado" });
+    }
+
+    const { orderId } = req.params;
+    const order = await storage.getOrder(orderId);
+
+    if (!order) {
+      return res.status(404).json({ success: false, error: "Pedido não encontrado" });
+    }
+
+    if (order.compradorId !== athleteId) {
+      return res.status(403).json({ success: false, error: "Acesso não autorizado" });
+    }
+
+    const [registrations, event, athlete] = await Promise.all([
+      storage.getRegistrationsByOrder(orderId),
+      storage.getEvent(order.eventId),
+      storage.getAthlete(order.compradorId)
+    ]);
+
+    const registrationsWithDetails = await Promise.all(
+      registrations.map(async (reg) => {
+        const [modality, participantAthlete] = await Promise.all([
+          storage.getModality(reg.modalityId),
+          storage.getAthlete(reg.athleteId)
+        ]);
+        return {
+          id: reg.id,
+          numeroInscricao: reg.numeroInscricao,
+          status: reg.status,
+          tamanhoCamisa: reg.tamanhoCamisa,
+          equipe: reg.equipe,
+          valorUnitario: parseFloat(reg.valorUnitario),
+          taxaComodidade: parseFloat(reg.taxaComodidade),
+          dataInscricao: reg.dataInscricao,
+          participanteNome: reg.nomeCompleto || participantAthlete?.nome || "Participante",
+          participanteCpf: reg.cpf || participantAthlete?.cpf,
+          modalidade: modality ? {
+            id: modality.id,
+            nome: modality.nome,
+            distancia: modality.distancia,
+            unidadeDistancia: modality.unidadeDistancia
+          } : null
+        };
+      })
+    );
+
+    const now = new Date();
+    const pixExpired = order.pixExpiracao ? new Date(order.pixExpiracao) <= now : true;
+    const orderExpired = order.dataExpiracao ? new Date(order.dataExpiracao) <= now : false;
+
+    return res.json({
+      success: true,
+      data: {
+        id: order.id,
+        numeroPedido: order.numeroPedido,
+        status: order.status,
+        valorTotal: parseFloat(order.valorTotal),
+        valorDesconto: parseFloat(order.valorDesconto),
+        metodoPagamento: order.metodoPagamento,
+        dataPedido: order.dataPedido,
+        dataPagamento: order.dataPagamento,
+        dataExpiracao: order.dataExpiracao,
+        pixQrCode: !pixExpired ? order.pixQrCode : null,
+        pixQrCodeBase64: !pixExpired ? order.pixQrCodeBase64 : null,
+        pixExpiracao: order.pixExpiracao,
+        pixDataGeracao: order.pixDataGeracao,
+        pixExpired,
+        orderExpired,
+        evento: event ? {
+          id: event.id,
+          nome: event.nome,
+          slug: event.slug,
+          dataEvento: event.dataEvento,
+          cidade: event.cidade,
+          estado: event.estado,
+          bannerUrl: event.bannerUrl
+        } : null,
+        comprador: athlete ? {
+          id: athlete.id,
+          nome: athlete.nome,
+          email: athlete.email
+        } : null,
+        inscricoes: registrationsWithDetails
+      }
+    });
+  } catch (error) {
+    console.error("[payments] Erro ao buscar pedido:", error);
+    return res.status(500).json({ success: false, error: "Erro interno do servidor" });
+  }
+});
+
+router.post("/change-method/:orderId", async (req, res) => {
+  try {
+    const athleteId = (req.session as any)?.athleteId;
+    if (!athleteId) {
+      return res.status(401).json({ success: false, error: "Não autenticado" });
+    }
+
+    const { orderId } = req.params;
+    const order = await storage.getOrder(orderId);
+
+    if (!order) {
+      return res.status(404).json({ success: false, error: "Pedido não encontrado" });
+    }
+
+    if (order.compradorId !== athleteId) {
+      return res.status(403).json({ success: false, error: "Acesso não autorizado" });
+    }
+
+    if (order.status !== "pendente") {
+      return res.status(400).json({ 
+        success: false, 
+        error: "Só é possível trocar método de pagamento para pedidos pendentes"
+      });
+    }
+
+    await storage.clearOrderPixData(orderId);
+    await storage.updateOrder(orderId, { metodoPagamento: null, idPagamentoGateway: null });
+
+    return res.json({
+      success: true,
+      message: "Método de pagamento limpo. Você pode escolher um novo método."
+    });
+  } catch (error) {
+    console.error("[payments] Erro ao trocar método:", error);
     return res.status(500).json({ success: false, error: "Erro interno do servidor" });
   }
 });

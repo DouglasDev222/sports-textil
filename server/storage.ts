@@ -104,6 +104,8 @@ export interface IStorage {
   createOrder(order: InsertOrder): Promise<Order>;
   updateOrder(id: string, order: Partial<InsertOrder>): Promise<Order | undefined>;
   updateOrderPaymentId(orderId: string, paymentId: string, paymentMethod: string): Promise<void>;
+  updateOrderPixData(orderId: string, pixData: { qrCode: string; qrCodeBase64: string; expiracao: Date }): Promise<void>;
+  clearOrderPixData(orderId: string): Promise<void>;
   confirmOrderPayment(orderId: string, paymentId: string): Promise<void>;
   getPendingOrdersWithPayment(): Promise<Order[]>;
   getExpiredPendingOrders(): Promise<Order[]>;
@@ -615,6 +617,28 @@ export class DbStorage implements IStorage {
       .set({ 
         idPagamentoGateway: paymentId,
         metodoPagamento: paymentMethod
+      })
+      .where(eq(orders.id, orderId));
+  }
+
+  async updateOrderPixData(orderId: string, pixData: { qrCode: string; qrCodeBase64: string; expiracao: Date }): Promise<void> {
+    await db.update(orders)
+      .set({
+        pixQrCode: pixData.qrCode,
+        pixQrCodeBase64: pixData.qrCodeBase64,
+        pixExpiracao: pixData.expiracao,
+        pixDataGeracao: new Date()
+      })
+      .where(eq(orders.id, orderId));
+  }
+
+  async clearOrderPixData(orderId: string): Promise<void> {
+    await db.update(orders)
+      .set({
+        pixQrCode: null,
+        pixQrCodeBase64: null,
+        pixExpiracao: null,
+        pixDataGeracao: null
       })
       .where(eq(orders.id, orderId));
   }

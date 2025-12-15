@@ -1,0 +1,571 @@
+import { useState, useEffect, useCallback } from "react";
+import { useRoute, useLocation } from "wouter";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import Header from "@/components/Header";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
+import { 
+  ArrowLeft, 
+  Calendar, 
+  Clock,
+  CheckCircle2,
+  XCircle,
+  AlertCircle,
+  Package,
+  User,
+  Award,
+  Shirt,
+  Copy,
+  CreditCard,
+  QrCode,
+  RefreshCw,
+  Download,
+  Timer,
+  Hash
+} from "lucide-react";
+import { useAthleteAuth } from "@/contexts/AthleteAuthContext";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+
+interface Modalidade {
+  id: string;
+  nome: string;
+  distancia: string;
+  unidadeDistancia: string;
+}
+
+interface Inscricao {
+  id: string;
+  numeroInscricao: number;
+  status: string;
+  tamanhoCamisa: string | null;
+  equipe: string | null;
+  valorUnitario: number;
+  taxaComodidade: number;
+  dataInscricao: string;
+  participanteNome: string;
+  participanteCpf: string | null;
+  modalidade: Modalidade | null;
+}
+
+interface Evento {
+  id: string;
+  nome: string;
+  slug: string;
+  dataEvento: string;
+  cidade: string;
+  estado: string;
+  bannerUrl: string | null;
+}
+
+interface OrderDetail {
+  id: string;
+  numeroPedido: number;
+  status: string;
+  valorTotal: number;
+  valorDesconto: number;
+  metodoPagamento: string | null;
+  dataPedido: string;
+  dataPagamento: string | null;
+  dataExpiracao: string | null;
+  pixQrCode: string | null;
+  pixQrCodeBase64: string | null;
+  pixExpiracao: string | null;
+  pixDataGeracao: string | null;
+  pixExpired: boolean;
+  orderExpired: boolean;
+  evento: Evento | null;
+  comprador: { id: string; nome: string; email: string } | null;
+  inscricoes: Inscricao[];
+}
+
+function formatDate(dateString: string | null) {
+  if (!dateString) return "";
+  const date = new Date(dateString);
+  return date.toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  });
+}
+
+function formatDateTime(dateString: string | null) {
+  if (!dateString) return "";
+  const date = new Date(dateString);
+  return date.toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function getStatusConfig(status: string) {
+  const configs: Record<string, { variant: "default" | "secondary" | "destructive" | "outline"; label: string; icon: typeof CheckCircle2; color: string }> = {
+    pago: { variant: "default", label: "Pago", icon: CheckCircle2, color: "text-green-600" },
+    confirmado: { variant: "default", label: "Confirmado", icon: CheckCircle2, color: "text-green-600" },
+    confirmada: { variant: "default", label: "Confirmada", icon: CheckCircle2, color: "text-green-600" },
+    pendente: { variant: "secondary", label: "Aguardando Pagamento", icon: Clock, color: "text-yellow-600" },
+    cancelado: { variant: "destructive", label: "Cancelado", icon: XCircle, color: "text-red-600" },
+    cancelada: { variant: "destructive", label: "Cancelada", icon: XCircle, color: "text-red-600" },
+    expirado: { variant: "destructive", label: "Expirado", icon: AlertCircle, color: "text-red-600" },
+    reembolsado: { variant: "outline", label: "Reembolsado", icon: RefreshCw, color: "text-gray-600" },
+  };
+  return configs[status] || { variant: "secondary" as const, label: status, icon: Clock, color: "text-gray-600" };
+}
+
+function CountdownTimer({ expirationDate, onExpire }: { expirationDate: string; onExpire?: () => void }) {
+  const [timeLeft, setTimeLeft] = useState<{ minutes: number; seconds: number } | null>(null);
+
+  useEffect(() => {
+    const calculateTimeLeft = () => {
+      const now = new Date().getTime();
+      const expiration = new Date(expirationDate).getTime();
+      const difference = expiration - now;
+
+      if (difference <= 0) {
+        setTimeLeft(null);
+        onExpire?.();
+        return;
+      }
+
+      const minutes = Math.floor((difference / 1000 / 60) % 60);
+      const seconds = Math.floor((difference / 1000) % 60);
+      setTimeLeft({ minutes, seconds });
+    };
+
+    calculateTimeLeft();
+    const timer = setInterval(calculateTimeLeft, 1000);
+
+    return () => clearInterval(timer);
+  }, [expirationDate, onExpire]);
+
+  if (!timeLeft) {
+    return <span className="text-destructive font-semibold">Expirado</span>;
+  }
+
+  return (
+    <span className="font-mono text-lg font-bold">
+      {String(timeLeft.minutes).padStart(2, "0")}:{String(timeLeft.seconds).padStart(2, "0")}
+    </span>
+  );
+}
+
+function InscricaoCard({ inscricao, showDetails = true }: { inscricao: Inscricao; showDetails?: boolean }) {
+  const statusConfig = getStatusConfig(inscricao.status);
+  const StatusIcon = statusConfig.icon;
+
+  return (
+    <div className="p-4 bg-muted/30 rounded-md" data-testid={`card-inscricao-${inscricao.id}`}>
+      <div className="flex items-start justify-between gap-2 flex-wrap mb-3">
+        <div className="flex items-center gap-2">
+          <Hash className="h-4 w-4 text-primary" />
+          <span className="font-mono font-bold text-primary">#{inscricao.numeroInscricao}</span>
+        </div>
+        <Badge variant={statusConfig.variant} className="text-xs">
+          <StatusIcon className="h-3 w-3 mr-1" />
+          {statusConfig.label}
+        </Badge>
+      </div>
+
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <User className="h-4 w-4 text-muted-foreground" />
+          <span className="font-medium">{inscricao.participanteNome}</span>
+        </div>
+
+        {inscricao.modalidade && (
+          <div className="flex items-center gap-2">
+            <Award className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm text-muted-foreground">
+              {inscricao.modalidade.nome} - {inscricao.modalidade.distancia} {inscricao.modalidade.unidadeDistancia}
+            </span>
+          </div>
+        )}
+
+        {inscricao.tamanhoCamisa && (
+          <div className="flex items-center gap-2">
+            <Shirt className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm text-muted-foreground">Camisa {inscricao.tamanhoCamisa}</span>
+          </div>
+        )}
+      </div>
+
+      {showDetails && inscricao.status === "confirmada" && (
+        <div className="mt-4 pt-3 border-t">
+          <Button variant="outline" size="sm" className="w-full" data-testid={`button-download-comprovante-${inscricao.id}`}>
+            <Download className="h-4 w-4 mr-2" />
+            Baixar Comprovante
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function PedidoDetailPage() {
+  const [, params] = useRoute("/pedido/:id");
+  const [, setLocation] = useLocation();
+  const { athlete, isLoading: authLoading } = useAthleteAuth();
+  const { toast } = useToast();
+  const orderId = params?.id;
+
+  useEffect(() => {
+    if (!authLoading && !athlete) {
+      setLocation(`/login?redirect=${encodeURIComponent(`/pedido/${orderId}`)}`);
+    }
+  }, [authLoading, athlete, orderId, setLocation]);
+
+  const { data, isLoading, refetch } = useQuery<{ success: boolean; data: OrderDetail }>({
+    queryKey: ["/api/payments/order", orderId],
+    enabled: !!athlete && !!orderId,
+  });
+
+  const createPaymentMutation = useMutation({
+    mutationFn: async (paymentMethod: "pix" | "credit_card") => {
+      const response = await apiRequest("POST", "/api/payments/create", {
+        orderId,
+        paymentMethod,
+      });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      if (data.success) {
+        queryClient.invalidateQueries({ queryKey: ["/api/payments/order", orderId] });
+        toast({
+          title: "Pagamento iniciado",
+          description: data.data.paymentMethod === "pix" ? "QR Code PIX gerado com sucesso!" : "Processando pagamento...",
+        });
+      } else {
+        toast({
+          title: "Erro",
+          description: data.error || "Erro ao criar pagamento",
+          variant: "destructive",
+        });
+      }
+    },
+    onError: () => {
+      toast({
+        title: "Erro",
+        description: "Erro ao processar pagamento",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const changeMethodMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", `/api/payments/change-method/${orderId}`);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/payments/order", orderId] });
+      toast({
+        title: "Pronto",
+        description: "Você pode escolher outro método de pagamento.",
+      });
+    },
+  });
+
+  const handleCopyPixCode = useCallback(() => {
+    if (data?.data?.pixQrCode) {
+      navigator.clipboard.writeText(data.data.pixQrCode);
+      toast({
+        title: "Copiado!",
+        description: "Código PIX copiado para a área de transferência.",
+      });
+    }
+  }, [data?.data?.pixQrCode, toast]);
+
+  const handleRefreshStatus = useCallback(() => {
+    refetch();
+  }, [refetch]);
+
+  if (authLoading || isLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <div className="max-w-4xl mx-auto px-4 md:px-6 py-8">
+          <Skeleton className="h-8 w-48 mb-4" />
+          <Skeleton className="h-64 w-full mb-4" />
+          <Skeleton className="h-48 w-full" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!athlete) {
+    return null;
+  }
+
+  const order = data?.data;
+
+  if (!order) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <div className="max-w-4xl mx-auto px-4 md:px-6 py-16 text-center">
+          <AlertCircle className="h-16 w-16 mx-auto text-destructive mb-4" />
+          <h1 className="text-2xl font-bold mb-2">Pedido não encontrado</h1>
+          <p className="text-muted-foreground mb-6">
+            O pedido que você está procurando não existe ou não está disponível.
+          </p>
+          <Button onClick={() => setLocation("/minhas-inscricoes")} data-testid="button-voltar-inscricoes">
+            Ver minhas inscrições
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  const statusConfig = getStatusConfig(order.status);
+  const StatusIcon = statusConfig.icon;
+  const isPending = order.status === "pendente";
+  const isPaid = order.status === "pago";
+  const isExpired = order.status === "expirado";
+  const isCanceled = order.status === "cancelado";
+  const hasPixActive = isPending && order.pixQrCode && !order.pixExpired;
+  const canPay = isPending && !order.orderExpired;
+
+  return (
+    <div className="min-h-screen bg-background">
+      <Header />
+
+      <div className="max-w-4xl mx-auto px-4 md:px-6 py-8 md:py-12">
+        <Button
+          variant="ghost"
+          onClick={() => setLocation("/minhas-inscricoes")}
+          className="mb-6"
+          data-testid="button-voltar"
+        >
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Voltar
+        </Button>
+
+        <Card className="mb-6">
+          <CardHeader className="pb-4">
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div className="flex items-center gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-md bg-primary/10">
+                  <Package className="h-6 w-6 text-primary" />
+                </div>
+                <div>
+                  <CardTitle className="text-xl" data-testid="text-pedido-numero">
+                    Pedido #{order.numeroPedido}
+                  </CardTitle>
+                  <p className="text-sm text-muted-foreground">{formatDateTime(order.dataPedido)}</p>
+                </div>
+              </div>
+              <Badge variant={statusConfig.variant} className="text-sm px-3 py-1">
+                <StatusIcon className="h-4 w-4 mr-1" />
+                {statusConfig.label}
+              </Badge>
+            </div>
+          </CardHeader>
+
+          <CardContent>
+            {isPending && order.dataExpiracao && !order.orderExpired && (
+              <div className="flex items-center gap-3 p-4 bg-yellow-50 dark:bg-yellow-950/20 rounded-md mb-4">
+                <Timer className="h-5 w-5 text-yellow-600" />
+                <div>
+                  <p className="font-medium text-yellow-800 dark:text-yellow-400">
+                    Tempo restante para pagamento
+                  </p>
+                  <CountdownTimer
+                    expirationDate={order.dataExpiracao}
+                    onExpire={handleRefreshStatus}
+                  />
+                </div>
+              </div>
+            )}
+
+            {isPaid && (
+              <div className="flex items-center gap-3 p-4 bg-green-50 dark:bg-green-950/20 rounded-md mb-4">
+                <CheckCircle2 className="h-5 w-5 text-green-600" />
+                <div>
+                  <p className="font-semibold text-green-800 dark:text-green-400">
+                    Pagamento confirmado!
+                  </p>
+                  {order.dataPagamento && (
+                    <p className="text-sm text-green-700 dark:text-green-500">
+                      Pago em {formatDateTime(order.dataPagamento)}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {isExpired && (
+              <div className="flex items-center gap-3 p-4 bg-red-50 dark:bg-red-950/20 rounded-md mb-4">
+                <AlertCircle className="h-5 w-5 text-red-600" />
+                <div>
+                  <p className="font-semibold text-red-800 dark:text-red-400">
+                    O tempo para pagamento acabou
+                  </p>
+                  <p className="text-sm text-red-700 dark:text-red-500">
+                    Este pedido expirou e as inscrições foram canceladas.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {isCanceled && (
+              <div className="flex items-center gap-3 p-4 bg-red-50 dark:bg-red-950/20 rounded-md mb-4">
+                <XCircle className="h-5 w-5 text-red-600" />
+                <div>
+                  <p className="font-semibold text-red-800 dark:text-red-400">Pedido cancelado</p>
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between pt-2">
+              <span className="text-muted-foreground">Valor total</span>
+              <span className="text-2xl font-bold text-primary">
+                R$ {order.valorTotal.toFixed(2).replace(".", ",")}
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+
+        {canPay && (
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CreditCard className="h-5 w-5" />
+                Pagamento
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {hasPixActive ? (
+                <div className="space-y-4">
+                  <div className="text-center">
+                    <p className="text-sm text-muted-foreground mb-2">Escaneie o QR Code ou copie o código</p>
+                    {order.pixQrCodeBase64 && (
+                      <div className="flex justify-center mb-4">
+                        <img
+                          src={`data:image/png;base64,${order.pixQrCodeBase64}`}
+                          alt="QR Code PIX"
+                          className="w-48 h-48 border rounded-md"
+                          data-testid="img-qrcode-pix"
+                        />
+                      </div>
+                    )}
+                    {order.pixExpiracao && (
+                      <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground mb-4">
+                        <Clock className="h-4 w-4" />
+                        <span>PIX expira em: </span>
+                        <CountdownTimer expirationDate={order.pixExpiracao} onExpire={handleRefreshStatus} />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    <Button onClick={handleCopyPixCode} variant="outline" data-testid="button-copiar-pix">
+                      <Copy className="h-4 w-4 mr-2" />
+                      Copiar Código PIX
+                    </Button>
+                    <Button
+                      onClick={handleRefreshStatus}
+                      variant="ghost"
+                      data-testid="button-verificar-pagamento"
+                    >
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Verificar Pagamento
+                    </Button>
+                  </div>
+
+                  <Separator />
+
+                  <Button
+                    variant="ghost"
+                    className="w-full"
+                    onClick={() => changeMethodMutation.mutate()}
+                    disabled={changeMethodMutation.isPending}
+                    data-testid="button-trocar-metodo"
+                  >
+                    Trocar forma de pagamento
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <p className="text-center text-muted-foreground">
+                    Escolha a forma de pagamento
+                  </p>
+
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <Button
+                      onClick={() => createPaymentMutation.mutate("pix")}
+                      disabled={createPaymentMutation.isPending}
+                      className="h-auto py-4"
+                      data-testid="button-pagar-pix"
+                    >
+                      <QrCode className="h-6 w-6 mr-3" />
+                      <div className="text-left">
+                        <p className="font-semibold">Pagar com PIX</p>
+                        <p className="text-xs opacity-80">Aprovação instantânea</p>
+                      </div>
+                    </Button>
+
+                    <Button
+                      variant="outline"
+                      onClick={() => createPaymentMutation.mutate("credit_card")}
+                      disabled={createPaymentMutation.isPending}
+                      className="h-auto py-4"
+                      data-testid="button-pagar-cartao"
+                    >
+                      <CreditCard className="h-6 w-6 mr-3" />
+                      <div className="text-left">
+                        <p className="font-semibold">Cartão de Crédito</p>
+                        <p className="text-xs text-muted-foreground">Parcelamento disponível</p>
+                      </div>
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <User className="h-5 w-5" />
+                Inscrições
+              </CardTitle>
+              {order.inscricoes.length > 1 && (
+                <Badge variant="secondary">
+                  {order.inscricoes.length} inscrições
+                </Badge>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent>
+            {order.evento && (
+              <div className="mb-4 p-3 bg-muted/50 rounded-md">
+                <div className="flex items-center gap-2 text-sm">
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  <span className="font-medium">{order.evento.nome}</span>
+                  <span className="text-muted-foreground">-</span>
+                  <span className="text-muted-foreground">
+                    {formatDate(order.evento.dataEvento)}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-4">
+              {order.inscricoes.map((inscricao) => (
+                <InscricaoCard key={inscricao.id} inscricao={inscricao} />
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
