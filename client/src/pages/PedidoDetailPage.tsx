@@ -114,6 +114,8 @@ function getStatusConfig(status: string) {
     cancelada: { variant: "destructive", label: "Cancelada", icon: XCircle, color: "text-red-600" },
     expirado: { variant: "destructive", label: "Expirado", icon: AlertCircle, color: "text-red-600" },
     reembolsado: { variant: "outline", label: "Reembolsado", icon: RefreshCw, color: "text-gray-600" },
+    falhou: { variant: "destructive", label: "Falha no Pagamento", icon: XCircle, color: "text-red-600" },
+    failed: { variant: "destructive", label: "Falha no Pagamento", icon: XCircle, color: "text-red-600" },
   };
   return configs[status] || { variant: "secondary" as const, label: status, icon: Clock, color: "text-gray-600" };
 }
@@ -156,8 +158,53 @@ function CountdownTimer({ expirationDate, onExpire }: { expirationDate: string; 
 }
 
 function InscricaoCard({ inscricao, showDetails = true }: { inscricao: Inscricao; showDetails?: boolean }) {
+  const [isDownloading, setIsDownloading] = useState(false);
+  const { toast } = useToast();
   const statusConfig = getStatusConfig(inscricao.status);
   const StatusIcon = statusConfig.icon;
+
+  const handleDownloadComprovante = async () => {
+    setIsDownloading(true);
+    try {
+      const response = await fetch(`/api/receipts/${inscricao.id}`, {
+        credentials: "include",
+      });
+      
+      if (!response.ok) {
+        let errorMessage = "Erro ao baixar comprovante";
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+        } catch {
+          errorMessage = `Erro de rede (${response.status})`;
+        }
+        throw new Error(errorMessage);
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `comprovante-inscricao-${inscricao.numeroInscricao}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      toast({
+        title: "Sucesso",
+        description: "Comprovante baixado com sucesso!",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao baixar comprovante. Tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDownloading(false);
+    }
+  };
 
   return (
     <div className="p-4 bg-muted/30 rounded-md" data-testid={`card-inscricao-${inscricao.id}`}>
@@ -197,9 +244,16 @@ function InscricaoCard({ inscricao, showDetails = true }: { inscricao: Inscricao
 
       {showDetails && inscricao.status === "confirmada" && (
         <div className="mt-4 pt-3 border-t">
-          <Button variant="outline" size="sm" className="w-full" data-testid={`button-download-comprovante-${inscricao.id}`}>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="w-full" 
+            onClick={handleDownloadComprovante}
+            disabled={isDownloading}
+            data-testid={`button-download-comprovante-${inscricao.id}`}
+          >
             <Download className="h-4 w-4 mr-2" />
-            Baixar Comprovante
+            {isDownloading ? "Baixando..." : "Baixar Comprovante"}
           </Button>
         </div>
       )}
@@ -328,9 +382,11 @@ export default function PedidoDetailPage() {
   const isPaid = order.status === "pago";
   const isExpired = order.status === "expirado";
   const isCanceled = order.status === "cancelado";
+  const isFailed = order.status === "falhou" || order.status === "failed";
   const hasPixActive = isPending && order.pixQrCode && !order.pixExpired;
   const hasPixExpired = isPending && order.pixExpiracao && order.pixExpired;
   const canPay = isPending && !order.orderExpired;
+  const canRetryPayment = isFailed && !order.orderExpired;
 
   return (
     <div className="min-h-screen bg-background">
@@ -419,6 +475,20 @@ export default function PedidoDetailPage() {
                 <XCircle className="h-5 w-5 text-red-600" />
                 <div>
                   <p className="font-semibold text-red-800 dark:text-red-400">Pedido cancelado</p>
+                </div>
+              </div>
+            )}
+
+            {isFailed && (
+              <div className="flex items-center gap-3 p-4 bg-red-50 dark:bg-red-950/20 rounded-md mb-4">
+                <XCircle className="h-5 w-5 text-red-600" />
+                <div>
+                  <p className="font-semibold text-red-800 dark:text-red-400">
+                    Falha no pagamento
+                  </p>
+                  <p className="text-sm text-red-700 dark:text-red-500">
+                    Houve um problema com seu pagamento. Você pode tentar novamente.
+                  </p>
                 </div>
               </div>
             )}
@@ -563,6 +633,53 @@ export default function PedidoDetailPage() {
                   </div>
                 </div>
               )}
+            </CardContent>
+          </Card>
+        )}
+
+        {canRetryPayment && (
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CreditCard className="h-5 w-5" />
+                Tentar Novamente
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <p className="text-center text-muted-foreground">
+                  Escolha uma forma de pagamento para tentar novamente
+                </p>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Button
+                    onClick={() => createPaymentMutation.mutate("pix")}
+                    disabled={createPaymentMutation.isPending}
+                    className="h-auto py-4"
+                    data-testid="button-retry-pix"
+                  >
+                    <QrCode className="h-6 w-6 mr-3" />
+                    <div className="text-left">
+                      <p className="font-semibold">Pagar com PIX</p>
+                      <p className="text-xs opacity-80">Aprovação instantânea</p>
+                    </div>
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    onClick={() => createPaymentMutation.mutate("credit_card")}
+                    disabled={createPaymentMutation.isPending}
+                    className="h-auto py-4"
+                    data-testid="button-retry-cartao"
+                  >
+                    <CreditCard className="h-6 w-6 mr-3" />
+                    <div className="text-left">
+                      <p className="font-semibold">Cartão de Crédito</p>
+                      <p className="text-xs text-muted-foreground">Parcelamento disponível</p>
+                    </div>
+                  </Button>
+                </div>
+              </div>
             </CardContent>
           </Card>
         )}
