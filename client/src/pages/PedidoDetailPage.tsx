@@ -24,8 +24,10 @@ import {
   RefreshCw,
   Download,
   Timer,
-  Hash
+  Hash,
+  Eye
 } from "lucide-react";
+import { Link } from "wouter";
 import { useAthleteAuth } from "@/contexts/AthleteAuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -242,19 +244,34 @@ function InscricaoCard({ inscricao, showDetails = true }: { inscricao: Inscricao
         )}
       </div>
 
-      {showDetails && inscricao.status === "confirmada" && (
-        <div className="mt-4 pt-3 border-t">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="w-full" 
-            onClick={handleDownloadComprovante}
-            disabled={isDownloading}
-            data-testid={`button-download-comprovante-${inscricao.id}`}
-          >
-            <Download className="h-4 w-4 mr-2" />
-            {isDownloading ? "Baixando..." : "Baixar Comprovante"}
-          </Button>
+      {showDetails && (
+        <div className="mt-4 pt-3 border-t flex flex-col sm:flex-row gap-2">
+          <Link href={`/inscricao/${inscricao.id}`} className="flex-1">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="w-full gap-1.5"
+              data-testid={`button-view-inscricao-${inscricao.id}`}
+            >
+              <Eye className="h-4 w-4" />
+              <span className="hidden sm:inline">Ver Inscricao</span>
+              <span className="sm:hidden">Ver</span>
+            </Button>
+          </Link>
+          {inscricao.status === "confirmada" && (
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="flex-1 gap-1.5"
+              onClick={handleDownloadComprovante}
+              disabled={isDownloading}
+              data-testid={`button-download-comprovante-${inscricao.id}`}
+            >
+              <Download className="h-4 w-4" />
+              <span className="hidden sm:inline">{isDownloading ? "Baixando..." : "Baixar Comprovante"}</span>
+              <span className="sm:hidden">{isDownloading ? "..." : "PDF"}</span>
+            </Button>
+          )}
         </div>
       )}
     </div>

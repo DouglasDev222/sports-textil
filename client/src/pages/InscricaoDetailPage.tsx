@@ -19,12 +19,14 @@ import {
   Hash,
   Package,
   AlertCircle,
-  PartyPopper
+  PartyPopper,
+  Download,
+  ExternalLink
 } from "lucide-react";
-import heroImage from '@assets/generated_images/Marathon_runners_landscape_hero_b439e181.png';
 import { formatDateOnlyLong, formatDateOnlyBrazil, formatCPF, formatPhone } from "@/lib/timezone";
 import { useAthleteAuth } from "@/contexts/AthleteAuthContext";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { useToast } from "@/hooks/use-toast";
 
 interface RegistrationDetail {
   id: string;
@@ -60,6 +62,55 @@ interface RegistrationDetail {
   } | null;
 }
 
+function StatusCard({ status }: { status: string }) {
+  const statusConfig = {
+    confirmada: {
+      variant: "default" as const,
+      label: "Confirmada",
+      icon: CheckCircle2,
+      bgColor: "bg-green-50 dark:bg-green-950/20",
+      textColor: "text-green-800 dark:text-green-400",
+      subTextColor: "text-green-700 dark:text-green-500",
+      description: "Sua inscricao esta confirmada! Voce recebera um e-mail com mais informacoes sobre a retirada do kit."
+    },
+    pendente: {
+      variant: "secondary" as const,
+      label: "Aguardando Pagamento",
+      icon: Clock,
+      bgColor: "bg-yellow-50 dark:bg-yellow-950/20",
+      textColor: "text-yellow-800 dark:text-yellow-400",
+      subTextColor: "text-yellow-700 dark:text-yellow-500",
+      description: "Estamos aguardando a confirmacao do pagamento. Isso pode levar ate 48 horas."
+    },
+    cancelada: {
+      variant: "destructive" as const,
+      label: "Cancelada",
+      icon: AlertCircle,
+      bgColor: "bg-red-50 dark:bg-red-950/20",
+      textColor: "text-red-800 dark:text-red-400",
+      subTextColor: "text-red-700 dark:text-red-500",
+      description: "Esta inscricao foi cancelada."
+    }
+  };
+
+  const currentStatus = statusConfig[status as keyof typeof statusConfig] || statusConfig.pendente;
+  const StatusIcon = currentStatus.icon;
+
+  return (
+    <div className={`flex items-center gap-3 p-4 ${currentStatus.bgColor} rounded-md`}>
+      <StatusIcon className={`h-5 w-5 flex-shrink-0 ${currentStatus.textColor}`} />
+      <div className="min-w-0">
+        <p className={`font-semibold ${currentStatus.textColor}`}>
+          {currentStatus.label}
+        </p>
+        <p className={`text-sm ${currentStatus.subTextColor}`}>
+          {currentStatus.description}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export default function InscricaoDetailPage() {
   const [, params] = useRoute("/inscricao/:id");
   const [, setLocation] = useLocation();
@@ -68,6 +119,8 @@ export default function InscricaoDetailPage() {
   const isSuccess = searchParams.get("sucesso") === "1";
   const { athlete, isLoading: authLoading } = useAthleteAuth();
   const registrationId = params?.id;
+  const { toast } = useToast();
+  const [isDownloading, setIsDownloading] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !athlete) {
@@ -88,22 +141,60 @@ export default function InscricaoDetailPage() {
     setLocation(`/evento/${slug}`);
   };
 
+  const handleDownloadComprovante = async () => {
+    if (!registrationId) return;
+    
+    setIsDownloading(true);
+    try {
+      const response = await fetch(`/api/receipts/${registrationId}`, {
+        credentials: "include",
+      });
+      
+      if (!response.ok) {
+        let errorMessage = "Erro ao baixar comprovante";
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+        } catch {
+          errorMessage = `Erro de rede (${response.status})`;
+        }
+        throw new Error(errorMessage);
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      const registration = data?.data?.find(r => r.id === registrationId);
+      link.download = `comprovante-inscricao-${registration?.numeroInscricao || registrationId}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      toast({
+        title: "Sucesso",
+        description: "Comprovante baixado com sucesso!",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao baixar comprovante. Tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
   if (authLoading || isLoading) {
     return (
       <div className="min-h-screen bg-background">
         <Header />
-        <Skeleton className="w-full h-[200px] md:h-[300px]" />
-        <div className="max-w-5xl mx-auto px-4 md:px-6 py-8 md:py-12">
-          <div className="grid gap-6 md:grid-cols-3">
-            <div className="md:col-span-2 space-y-6">
-              <Skeleton className="h-32 w-full" />
-              <Skeleton className="h-48 w-full" />
-              <Skeleton className="h-48 w-full" />
-            </div>
-            <div>
-              <Skeleton className="h-64 w-full" />
-            </div>
-          </div>
+        <div className="max-w-4xl mx-auto px-4 py-8">
+          <Skeleton className="h-8 w-48 mb-4" />
+          <Skeleton className="h-64 w-full mb-4" />
+          <Skeleton className="h-48 w-full" />
         </div>
       </div>
     );
@@ -119,14 +210,14 @@ export default function InscricaoDetailPage() {
     return (
       <div className="min-h-screen bg-background">
         <Header />
-        <div className="max-w-5xl mx-auto px-4 md:px-6 py-16 text-center">
+        <div className="max-w-4xl mx-auto px-4 py-16 text-center">
           <AlertCircle className="h-16 w-16 mx-auto text-destructive mb-4" />
-          <h1 className="text-2xl font-bold mb-2">Inscrição não encontrada</h1>
+          <h1 className="text-2xl font-bold mb-2">Inscricao nao encontrada</h1>
           <p className="text-muted-foreground mb-6">
-            A inscrição que você está procurando não existe ou não está disponível.
+            A inscricao que voce esta procurando nao existe ou nao esta disponivel.
           </p>
-          <Button onClick={() => setLocation("/minhas-inscricoes")}>
-            Ver minhas inscrições
+          <Button onClick={() => setLocation("/minhas-inscricoes")} data-testid="button-voltar-inscricoes">
+            Ver minhas inscricoes
           </Button>
         </div>
       </div>
@@ -137,267 +228,239 @@ export default function InscricaoDetailPage() {
   const formattedInscricaoDate = formatDateOnlyLong(registration.dataInscricao);
 
   const statusConfig = {
-    confirmada: {
-      variant: "default" as const,
-      label: "Confirmada",
-      icon: CheckCircle2,
-      description: "Sua inscrição está confirmada! Você receberá um e-mail com mais informações sobre a retirada do kit."
-    },
-    pendente: {
-      variant: "secondary" as const,
-      label: "Aguardando Pagamento",
-      icon: Clock,
-      description: "Estamos aguardando a confirmação do pagamento. Isso pode levar até 48 horas."
-    },
-    cancelada: {
-      variant: "destructive" as const,
-      label: "Cancelada",
-      icon: AlertCircle,
-      description: "Esta inscrição foi cancelada."
-    }
+    confirmada: { variant: "default" as const, label: "Confirmada" },
+    pendente: { variant: "secondary" as const, label: "Pendente" },
+    cancelada: { variant: "destructive" as const, label: "Cancelada" }
   };
-
   const currentStatus = statusConfig[registration.status as keyof typeof statusConfig] || statusConfig.pendente;
-  const StatusIcon = currentStatus.icon;
 
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      
-      <div className="relative">
-        <div className="absolute inset-0 bg-gradient-to-r from-primary/95 to-primary/75 z-10"></div>
-        <img
-          src={heroImage}
-          alt={registration.evento?.nome || "Evento"}
-          className="w-full h-[200px] md:h-[300px] object-cover"
-        />
-        <div className="absolute inset-0 z-20 flex items-end">
-          <div className="w-full px-4 md:px-6 pb-6 md:pb-8">
-            <div className="max-w-5xl mx-auto">
-              <Button 
-                variant="ghost" 
-                onClick={handleVoltar}
-                className="mb-4 text-white hover:bg-white/20"
-                data-testid="button-voltar"
-              >
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Voltar
-              </Button>
-              <div className="flex items-center gap-3 mb-2 text-white/80 flex-wrap">
-                {registration.pedido && (
-                  <>
-                    <div className="flex items-center gap-1">
-                      <Package className="h-4 w-4" />
-                      <span className="text-sm font-medium">Pedido #{registration.pedido.numeroPedido}</span>
-                    </div>
-                    <span className="text-white/50">|</span>
-                  </>
-                )}
-                <div className="flex items-center gap-1">
-                  <Hash className="h-4 w-4" />
-                  <span className="text-sm font-medium">Inscrição #{registration.numeroInscricao}</span>
+
+      <div className="max-w-4xl mx-auto px-4 py-6 md:py-8">
+        <Button
+          variant="ghost"
+          onClick={handleVoltar}
+          className="mb-4"
+          data-testid="button-voltar"
+        >
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Voltar
+        </Button>
+
+        <Card className="mb-4">
+          <CardHeader className="pb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-md bg-primary/10 flex-shrink-0">
+                  <Hash className="h-6 w-6 text-primary" />
+                </div>
+                <div className="min-w-0">
+                  <CardTitle className="text-xl" data-testid="text-inscricao-numero">
+                    Inscricao #{registration.numeroInscricao}
+                  </CardTitle>
+                  <p className="text-sm text-muted-foreground">{formattedInscricaoDate}</p>
                 </div>
               </div>
-              <h1 className="text-2xl md:text-4xl font-bold text-white mb-2">
-                {registration.evento?.nome || "Evento"}
-              </h1>
-              <div className="flex items-center gap-2 flex-wrap">
-                {registration.modalidade && (
-                  <Badge variant="secondary" className="text-sm">
-                    {registration.modalidade.distancia} {registration.modalidade.unidadeDistancia}
-                  </Badge>
-                )}
-                <Badge variant={currentStatus.variant} className="text-sm">
-                  {currentStatus.label}
-                </Badge>
-              </div>
+              <Badge variant={currentStatus.variant} className="text-sm px-3 py-1 w-fit">
+                {currentStatus.label}
+              </Badge>
             </div>
-          </div>
-        </div>
-      </div>
+          </CardHeader>
 
-      <div className="max-w-5xl mx-auto px-4 md:px-6 py-8 md:py-12">
-        {isSuccess && (
-          <Card className="mb-6 border-green-500 bg-green-50 dark:bg-green-950/20">
-            <CardContent className="py-4">
-              <div className="flex items-center gap-3">
-                <PartyPopper className="h-8 w-8 text-green-600" />
+          <CardContent className="space-y-4">
+            {isSuccess && (
+              <div className="flex items-center gap-3 p-4 bg-green-50 dark:bg-green-950/20 rounded-md">
+                <PartyPopper className="h-5 w-5 text-green-600 flex-shrink-0" />
                 <div>
                   <p className="font-semibold text-green-800 dark:text-green-400">
-                    Inscrição realizada com sucesso!
+                    Inscricao realizada com sucesso!
                   </p>
                   <p className="text-sm text-green-700 dark:text-green-500">
-                    Sua inscrição foi confirmada. Guarde o número da inscrição para referência.
+                    Guarde o numero da inscricao para referencia.
                   </p>
                 </div>
               </div>
+            )}
+
+            <StatusCard status={registration.status} />
+
+            <div className="flex items-center justify-between pt-2">
+              <span className="text-muted-foreground">Valor pago</span>
+              <span className="text-2xl font-bold text-primary">
+                {registration.valorPago === 0 ? (
+                  <span className="text-green-600 dark:text-green-400">Gratuito</span>
+                ) : (
+                  `R$ ${registration.valorPago.toFixed(2).replace(".", ",")}`
+                )}
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+
+        {registration.status === "confirmada" && (
+          <Card className="mb-4">
+            <CardContent className="py-4">
+              <Button 
+                onClick={handleDownloadComprovante}
+                disabled={isDownloading}
+                className="w-full gap-2"
+                data-testid="button-download-comprovante"
+              >
+                <Download className="h-4 w-4" />
+                {isDownloading ? "Baixando..." : "Baixar Comprovante PDF"}
+              </Button>
             </CardContent>
           </Card>
         )}
 
-        <div className="grid gap-6 md:grid-cols-3">
-          <div className="md:col-span-2 space-y-6">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary/10">
-                    <StatusIcon className="h-5 w-5 text-primary" />
-                  </div>
-                  <div>
-                    <CardTitle>Status da Inscrição</CardTitle>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  {currentStatus.description}
-                </p>
-              </CardContent>
-            </Card>
-
-            {registration.evento && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Calendar className="h-5 w-5" />
-                    Informações do Evento
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-1">Data</p>
-                    <p className="font-semibold text-foreground">{formattedEventDate}</p>
-                  </div>
-                  <Separator />
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-1">Local</p>
-                    <p className="font-semibold text-foreground">
-                      {registration.evento.cidade}, {registration.evento.estado}
-                    </p>
-                  </div>
-                  <Separator />
-                  <Button 
-                    variant="outline" 
-                    className="w-full"
-                    onClick={() => handleVerEvento(registration.evento!.slug)}
-                    data-testid="button-ver-evento"
-                  >
-                    Ver Página do Evento
-                  </Button>
-                </CardContent>
-              </Card>
-            )}
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <User className="h-5 w-5" />
-                  Dados do Participante
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
+        {registration.evento && (
+          <Card className="mb-4">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Calendar className="h-5 w-5" />
+                Evento
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <p className="font-semibold text-foreground text-lg">{registration.evento.nome}</p>
+              </div>
+              <Separator />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <p className="text-sm text-muted-foreground mb-1">Nome</p>
-                  <p className="font-semibold text-foreground">{registration.participanteNome}</p>
+                  <p className="text-sm text-muted-foreground mb-1">Data</p>
+                  <p className="font-medium text-foreground">{formattedEventDate}</p>
                 </div>
-                <Separator />
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-1">CPF</p>
-                    <p className="text-sm text-foreground">{formatCPF(registration.participanteCpf)}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-1">Data de Nascimento</p>
-                    <p className="text-sm text-foreground">{formatDateOnlyBrazil(registration.participanteDataNascimento)}</p>
-                  </div>
-                </div>
-                <Separator />
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-1">E-mail</p>
-                    <p className="text-sm text-foreground">{registration.participanteEmail || athlete?.email}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-1">Telefone</p>
-                    <p className="text-sm text-foreground">{formatPhone(registration.participanteTelefone || athlete?.telefone)}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Award className="h-5 w-5" />
-                  Detalhes da Inscrição
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
                 <div>
-                  <p className="text-sm text-muted-foreground mb-1">Número da Inscrição</p>
-                  <p className="font-mono text-2xl font-bold text-primary flex items-center gap-2">
-                    <Hash className="h-5 w-5" />
-                    {registration.numeroInscricao}
+                  <p className="text-sm text-muted-foreground mb-1">Local</p>
+                  <p className="font-medium text-foreground flex items-center gap-1">
+                    <MapPin className="h-4 w-4" />
+                    {registration.evento.cidade}, {registration.evento.estado}
                   </p>
                 </div>
-                <Separator />
-                {registration.modalidade && (
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-1">Modalidade</p>
-                    <p className="font-semibold text-foreground">
-                      {registration.modalidade.nome}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {registration.modalidade.distancia} {registration.modalidade.unidadeDistancia}
-                    </p>
-                  </div>
-                )}
-                {registration.tamanhoCamisa && (
-                  <>
-                    <Separator />
+              </div>
+              <Button 
+                variant="outline" 
+                className="w-full gap-2"
+                onClick={() => handleVerEvento(registration.evento!.slug)}
+                data-testid="button-ver-evento"
+              >
+                <ExternalLink className="h-4 w-4" />
+                Ver Pagina do Evento
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        <Card className="mb-4">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Award className="h-5 w-5" />
+              Modalidade
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {registration.modalidade ? (
+              <>
+                <div>
+                  <p className="font-semibold text-foreground">{registration.modalidade.nome}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {registration.modalidade.distancia} {registration.modalidade.unidadeDistancia}
+                  </p>
+                </div>
+                {(registration.tamanhoCamisa || registration.equipe) && <Separator />}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {registration.tamanhoCamisa && (
                     <div className="flex items-center gap-2">
                       <Shirt className="h-4 w-4 text-muted-foreground" />
                       <div>
-                        <p className="text-sm text-muted-foreground mb-1">Tamanho da Camisa</p>
-                        <p className="font-semibold text-foreground">{registration.tamanhoCamisa}</p>
+                        <p className="text-sm text-muted-foreground">Camisa</p>
+                        <p className="font-medium text-foreground">{registration.tamanhoCamisa}</p>
                       </div>
                     </div>
-                  </>
-                )}
-                {registration.equipe && (
-                  <>
-                    <Separator />
-                    <div>
-                      <p className="text-sm text-muted-foreground mb-1">Equipe</p>
-                      <p className="font-semibold text-foreground flex items-center gap-2">
-                        <Users className="h-4 w-4" />
-                        {registration.equipe}
-                      </p>
+                  )}
+                  {registration.equipe && (
+                    <div className="flex items-center gap-2">
+                      <Users className="h-4 w-4 text-muted-foreground" />
+                      <div>
+                        <p className="text-sm text-muted-foreground">Equipe</p>
+                        <p className="font-medium text-foreground">{registration.equipe}</p>
+                      </div>
                     </div>
-                  </>
-                )}
-                <Separator />
+                  )}
+                </div>
+              </>
+            ) : (
+              <p className="text-muted-foreground">Modalidade nao informada</p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="mb-4">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <User className="h-5 w-5" />
+              Participante
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <p className="text-sm text-muted-foreground mb-1">Nome</p>
+              <p className="font-semibold text-foreground">{registration.participanteNome}</p>
+            </div>
+            <Separator />
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm text-muted-foreground mb-1">CPF</p>
+                <p className="text-sm text-foreground">{formatCPF(registration.participanteCpf)}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground mb-1">Nascimento</p>
+                <p className="text-sm text-foreground">{formatDateOnlyBrazil(registration.participanteDataNascimento)}</p>
+              </div>
+            </div>
+            <Separator />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm text-muted-foreground mb-1">E-mail</p>
+                <p className="text-sm text-foreground break-all">{registration.participanteEmail || athlete?.email}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground mb-1">Telefone</p>
+                <p className="text-sm text-foreground">{formatPhone(registration.participanteTelefone || athlete?.telefone)}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {registration.pedido && (
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Package className="h-5 w-5" />
+                Pedido
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground mb-1">Data da Inscrição</p>
-                  <p className="text-sm text-foreground">{formattedInscricaoDate}</p>
+                  <p className="font-mono font-bold text-primary">#{registration.pedido.numeroPedido}</p>
+                  <p className="text-sm text-muted-foreground capitalize">{registration.pedido.status}</p>
                 </div>
-                <Separator />
-                <div className="flex items-center justify-between pt-2">
-                  <span className="font-semibold text-foreground">Valor</span>
-                  <span className="text-xl font-bold text-primary">
-                    {registration.valorPago === 0 ? (
-                      <span className="text-green-600 dark:text-green-400">Gratuito</span>
-                    ) : (
-                      `R$ ${registration.valorPago.toFixed(2).replace('.', ',')}`
-                    )}
-                  </span>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => setLocation(`/pedido/${registration.id.split('-')[0]}`)}
+                  data-testid="button-ver-pedido"
+                >
+                  Ver Pedido
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );

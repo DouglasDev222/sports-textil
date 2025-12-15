@@ -11,7 +11,7 @@ import {
   Calendar, 
   MapPin, 
   Award, 
-  ChevronRight,
+  Eye,
   User,
   Package,
   CheckCircle2,
@@ -142,10 +142,12 @@ function InscricaoItem({ inscricao, evento }: { inscricao: Inscricao; evento: Ev
           )}
         </div>
       </div>
-      <div className="flex items-center">
+      <div className="flex items-center flex-shrink-0">
         <Link href={`/inscricao/${inscricao.id}`}>
-          <Button variant="ghost" size="icon" data-testid={`button-view-inscricao-${inscricao.id}`}>
-            <ChevronRight className="h-5 w-5" />
+          <Button variant="outline" size="sm" className="gap-1.5" data-testid={`button-view-inscricao-${inscricao.id}`}>
+            <Eye className="h-4 w-4" />
+            <span className="hidden sm:inline">Ver Inscricao</span>
+            <span className="sm:hidden">Ver</span>
           </Button>
         </Link>
       </div>
