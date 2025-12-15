@@ -329,6 +329,7 @@ export default function PedidoDetailPage() {
   const isExpired = order.status === "expirado";
   const isCanceled = order.status === "cancelado";
   const hasPixActive = isPending && order.pixQrCode && !order.pixExpired;
+  const hasPixExpired = isPending && order.pixExpiracao && order.pixExpired;
   const canPay = isPending && !order.orderExpired;
 
   return (
@@ -447,7 +448,9 @@ export default function PedidoDetailPage() {
                     {order.pixQrCodeBase64 && (
                       <div className="flex justify-center mb-4">
                         <img
-                          src={`data:image/png;base64,${order.pixQrCodeBase64}`}
+                          src={order.pixQrCodeBase64.startsWith("data:") 
+                            ? order.pixQrCodeBase64 
+                            : `data:image/png;base64,${order.pixQrCodeBase64}`}
                           alt="QR Code PIX"
                           className="w-48 h-48 border rounded-md"
                           data-testid="img-qrcode-pix"
@@ -488,6 +491,40 @@ export default function PedidoDetailPage() {
                     data-testid="button-trocar-metodo"
                   >
                     Trocar forma de pagamento
+                  </Button>
+                </div>
+              ) : hasPixExpired ? (
+                <div className="space-y-4">
+                  <div className="p-4 bg-yellow-50 dark:bg-yellow-950/20 rounded-md text-center">
+                    <AlertCircle className="h-8 w-8 mx-auto text-yellow-600 mb-2" />
+                    <p className="font-semibold text-yellow-800 dark:text-yellow-400">
+                      O QR Code PIX expirou
+                    </p>
+                    <p className="text-sm text-yellow-700 dark:text-yellow-500">
+                      Gere um novo código para continuar o pagamento
+                    </p>
+                  </div>
+
+                  <Button
+                    onClick={() => createPaymentMutation.mutate("pix")}
+                    disabled={createPaymentMutation.isPending}
+                    className="w-full h-auto py-4"
+                    data-testid="button-regenerar-pix"
+                  >
+                    <RefreshCw className="h-5 w-5 mr-2" />
+                    Gerar Novo QR Code PIX
+                  </Button>
+
+                  <Separator />
+
+                  <Button
+                    variant="ghost"
+                    className="w-full"
+                    onClick={() => changeMethodMutation.mutate()}
+                    disabled={changeMethodMutation.isPending}
+                    data-testid="button-trocar-metodo-expirado"
+                  >
+                    Pagar com cartão de crédito
                   </Button>
                 </div>
               ) : (

@@ -291,6 +291,13 @@ router.post("/change-method/:orderId", async (req, res) => {
       });
     }
 
+    if (order.dataExpiracao && new Date(order.dataExpiracao) <= new Date()) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "O prazo para pagamento deste pedido expirou"
+      });
+    }
+
     await storage.clearOrderPixData(orderId);
     await storage.updateOrder(orderId, { metodoPagamento: null, idPagamentoGateway: null });
 
