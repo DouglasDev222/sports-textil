@@ -77,7 +77,9 @@ const BRAZILIAN_STATES = [
 ];
 
 const athleteSchema = z.object({
-  cpf: z.string().min(11, "CPF deve ter 11 digitos"),
+  cpf: z.string()
+    .min(11, "CPF deve ter 11 digitos")
+    .refine((val) => isValidCpf(val), { message: "CPF invalido. Verifique os digitos informados" }),
   nome: z.string().min(2, "Nome deve ter pelo menos 2 caracteres"),
   dataNascimento: z.string().min(1, "Data de nascimento obrigatoria"),
   sexo: z.string().min(1, "Sexo obrigatorio"),
@@ -155,6 +157,35 @@ function formatCepInput(value: string): string {
 
 function stripNonDigits(value: string): string {
   return value.replace(/\D/g, "");
+}
+
+function isValidCpf(cpf: string): boolean {
+  const cleaned = cpf.replace(/\D/g, "");
+  
+  if (cleaned.length !== 11) return false;
+  
+  // Check for known invalid CPFs (all same digits)
+  if (/^(\d)\1{10}$/.test(cleaned)) return false;
+  
+  // Validate first verification digit
+  let sum = 0;
+  for (let i = 0; i < 9; i++) {
+    sum += parseInt(cleaned[i]) * (10 - i);
+  }
+  let remainder = (sum * 10) % 11;
+  if (remainder === 10 || remainder === 11) remainder = 0;
+  if (remainder !== parseInt(cleaned[9])) return false;
+  
+  // Validate second verification digit
+  sum = 0;
+  for (let i = 0; i < 10; i++) {
+    sum += parseInt(cleaned[i]) * (11 - i);
+  }
+  remainder = (sum * 10) % 11;
+  if (remainder === 10 || remainder === 11) remainder = 0;
+  if (remainder !== parseInt(cleaned[10])) return false;
+  
+  return true;
 }
 
 function getErrorMessage(error: Error): string {
