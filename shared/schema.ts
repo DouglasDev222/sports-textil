@@ -207,6 +207,76 @@ export const documentAcceptances = pgTable("document_acceptances", {
   ipAceite: varchar("ip_aceite", { length: 45 }),
 });
 
+// Enums para vouchers e cupons
+export const voucherStatusEnum = pgEnum("voucher_status", ["available", "used", "expired"]);
+export const couponTypeEnum = pgEnum("coupon_type", ["percentage", "fixed", "full"]);
+
+// Tabela de lotes de vouchers
+export const eventVoucherBatches = pgTable("event_voucher_batches", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  eventId: varchar("event_id").notNull().references(() => events.id),
+  nome: text("nome").notNull(),
+  quantidade: integer("quantidade").notNull(),
+  validFrom: timestamp("valid_from", { withTimezone: true }).notNull(),
+  validUntil: timestamp("valid_until", { withTimezone: true }).notNull(),
+  descricao: text("descricao"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  createdBy: varchar("created_by").references(() => adminUsers.id),
+});
+
+// Tabela de vouchers
+export const eventVouchers = pgTable("event_vouchers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  eventId: varchar("event_id").notNull().references(() => events.id),
+  batchId: varchar("batch_id").references(() => eventVoucherBatches.id),
+  code: varchar("code", { length: 20 }).notNull(),
+  status: voucherStatusEnum("status").default("available").notNull(),
+  validFrom: timestamp("valid_from", { withTimezone: true }).notNull(),
+  validUntil: timestamp("valid_until", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  uniqueCodePerEvent: unique("unique_voucher_code_event").on(table.eventId, table.code),
+}));
+
+// Tabela de auditoria de uso de vouchers
+export const voucherUsages = pgTable("voucher_usages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  voucherId: varchar("voucher_id").notNull().references(() => eventVouchers.id),
+  userId: varchar("user_id").notNull().references(() => athletes.id),
+  registrationId: varchar("registration_id").references(() => registrations.id),
+  usedAt: timestamp("used_at", { withTimezone: true }).defaultNow().notNull(),
+  ipAddress: varchar("ip_address", { length: 45 }),
+  userAgent: text("user_agent"),
+});
+
+// Tabela de cupons de desconto
+export const eventCoupons = pgTable("event_coupons", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  eventId: varchar("event_id").notNull().references(() => events.id),
+  code: varchar("code", { length: 50 }).notNull(),
+  discountType: couponTypeEnum("discount_type").notNull(),
+  discountValue: decimal("discount_value", { precision: 10, scale: 2 }),
+  maxUses: integer("max_uses"),
+  maxUsesPerUser: integer("max_uses_per_user").default(1).notNull(),
+  currentUses: integer("current_uses").default(0).notNull(),
+  validFrom: timestamp("valid_from", { withTimezone: true }).notNull(),
+  validUntil: timestamp("valid_until", { withTimezone: true }).notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  uniqueCouponPerEvent: unique("unique_coupon_code_event").on(table.eventId, table.code),
+}));
+
+// Tabela de auditoria de uso de cupons
+export const couponUsages = pgTable("coupon_usages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  couponId: varchar("coupon_id").notNull().references(() => eventCoupons.id),
+  userId: varchar("user_id").notNull().references(() => athletes.id),
+  orderId: varchar("order_id").references(() => orders.id),
+  discountApplied: decimal("discount_applied", { precision: 10, scale: 2 }).notNull(),
+  usedAt: timestamp("used_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
 export const insertOrganizerSchema = createInsertSchema(organizers).omit({ id: true, dataCadastro: true });
 export const insertAdminUserSchema = createInsertSchema(adminUsers).omit({ id: true, dataCriacao: true, dataAtualizacao: true, ultimoLogin: true });
 export const insertPermissionSchema = createInsertSchema(permissions).omit({ id: true });
@@ -222,6 +292,13 @@ export const insertAthleteSchema = createInsertSchema(athletes).omit({ id: true,
 export const insertOrderSchema = createInsertSchema(orders).omit({ id: true, dataPedido: true });
 export const insertRegistrationSchema = createInsertSchema(registrations).omit({ id: true, dataInscricao: true });
 export const insertDocumentAcceptanceSchema = createInsertSchema(documentAcceptances).omit({ id: true, dataAceite: true });
+
+// Schemas de inserção para vouchers e cupons
+export const insertEventVoucherBatchSchema = createInsertSchema(eventVoucherBatches).omit({ id: true, createdAt: true });
+export const insertEventVoucherSchema = createInsertSchema(eventVouchers).omit({ id: true, createdAt: true });
+export const insertVoucherUsageSchema = createInsertSchema(voucherUsages).omit({ id: true, usedAt: true });
+export const insertEventCouponSchema = createInsertSchema(eventCoupons).omit({ id: true, createdAt: true, currentUses: true });
+export const insertCouponUsageSchema = createInsertSchema(couponUsages).omit({ id: true, usedAt: true });
 
 export type InsertOrganizer = z.infer<typeof insertOrganizerSchema>;
 export type Organizer = typeof organizers.$inferSelect;
@@ -270,3 +347,22 @@ export type Registration = typeof registrations.$inferSelect;
 
 export type InsertDocumentAcceptance = z.infer<typeof insertDocumentAcceptanceSchema>;
 export type DocumentAcceptance = typeof documentAcceptances.$inferSelect;
+
+// Types para vouchers e cupons
+export type InsertEventVoucherBatch = z.infer<typeof insertEventVoucherBatchSchema>;
+export type EventVoucherBatch = typeof eventVoucherBatches.$inferSelect;
+
+export type InsertEventVoucher = z.infer<typeof insertEventVoucherSchema>;
+export type EventVoucher = typeof eventVouchers.$inferSelect;
+
+export type InsertVoucherUsage = z.infer<typeof insertVoucherUsageSchema>;
+export type VoucherUsage = typeof voucherUsages.$inferSelect;
+
+export type InsertEventCoupon = z.infer<typeof insertEventCouponSchema>;
+export type EventCoupon = typeof eventCoupons.$inferSelect;
+
+export type InsertCouponUsage = z.infer<typeof insertCouponUsageSchema>;
+export type CouponUsage = typeof couponUsages.$inferSelect;
+
+export type VoucherStatus = "available" | "used" | "expired";
+export type CouponType = "percentage" | "fixed" | "full";
