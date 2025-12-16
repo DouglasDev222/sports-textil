@@ -477,10 +477,12 @@ export default function EventoDetailPage() {
                                   <Badge variant="outline" className="text-xs">Encerrado</Badge>
                                 )}
                               </div>
-                              <p className="text-sm text-muted-foreground">
-                                {formatBatchDate(batch.dataInicio)}
-                                {batch.dataTermino && ` - ${formatBatchDate(batch.dataTermino)}`}
-                              </p>
+                              <div className="text-sm text-muted-foreground space-y-0.5">
+                                <p><span className="font-medium">Início:</span> {formatBatchDate(batch.dataInicio)}</p>
+                                {batch.dataTermino && (
+                                  <p><span className="font-medium">Término:</span> {formatBatchDate(batch.dataTermino)}</p>
+                                )}
+                              </div>
                             </div>
                           </div>
                         </div>
