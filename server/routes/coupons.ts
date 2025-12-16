@@ -152,6 +152,13 @@ router.post("/apply", async (req, res) => {
       });
     }
 
+    if (order.codigoCupom) {
+      return res.status(400).json({
+        success: false,
+        error: "Ja existe um cupom aplicado neste pedido. Remova-o antes de aplicar outro."
+      });
+    }
+
     const coupon = await storage.getCouponByCode(order.eventId, couponCode.toUpperCase());
     if (!coupon) {
       return res.status(400).json({
@@ -184,7 +191,26 @@ router.post("/apply", async (req, res) => {
       });
     }
 
-    const valorOriginal = parseFloat(order.valorTotal);
+    const registrations = await storage.getRegistrationsByOrder(orderId);
+    if (!registrations || registrations.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: "Pedido nao possui inscricoes para aplicar desconto"
+      });
+    }
+
+    let valorOriginal = 0;
+    for (const reg of registrations) {
+      valorOriginal += parseFloat(reg.valorUnitario) + parseFloat(reg.taxaComodidade || "0");
+    }
+
+    if (isNaN(valorOriginal) || valorOriginal <= 0) {
+      return res.status(400).json({
+        success: false,
+        error: "Valor do pedido invalido para aplicar cupom"
+      });
+    }
+
     let discountAmount = 0;
 
     switch (coupon.discountType) {
@@ -208,12 +234,34 @@ router.post("/apply", async (req, res) => {
       codigoCupom: coupon.code,
     });
 
-    await storage.incrementCouponUsage(coupon.id);
-    await storage.createCouponUsage({
-      couponId: coupon.id,
-      userId: athleteId,
-      orderId: orderId,
-    });
+    let usageIncremented = false;
+    try {
+      await storage.incrementCouponUsage(coupon.id);
+      usageIncremented = true;
+      await storage.createCouponUsage({
+        couponId: coupon.id,
+        userId: athleteId,
+        orderId: orderId,
+      });
+    } catch (usageError) {
+      console.error("Error recording coupon usage, rolling back:", usageError);
+      if (usageIncremented) {
+        try {
+          await storage.decrementCouponUsage(coupon.id);
+        } catch (decrementError) {
+          console.error("Failed to rollback coupon usage increment:", decrementError);
+        }
+      }
+      await storage.updateOrder(orderId, {
+        valorDesconto: "0",
+        valorTotal: valorOriginal.toFixed(2),
+        codigoCupom: null,
+      });
+      return res.status(500).json({
+        success: false,
+        error: "Erro ao registrar uso do cupom. Tente novamente."
+      });
+    }
 
     res.json({
       success: true,
@@ -228,7 +276,7 @@ router.post("/apply", async (req, res) => {
     console.error("Apply coupon error:", error);
     res.status(500).json({
       success: false,
-      error: "Erro interno do servidor"
+      error: "Erro interno ao aplicar cupom"
     });
   }
 });
@@ -269,9 +317,35 @@ router.post("/remove", async (req, res) => {
     }
 
     const registrations = await storage.getRegistrationsByOrder(orderId);
+    if (!registrations || registrations.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: "Pedido nao possui inscricoes para recalcular valor"
+      });
+    }
+
     let valorOriginal = 0;
     for (const reg of registrations) {
       valorOriginal += parseFloat(reg.valorUnitario) + parseFloat(reg.taxaComodidade || "0");
+    }
+
+    if (isNaN(valorOriginal) || valorOriginal < 0) {
+      return res.status(400).json({
+        success: false,
+        error: "Erro ao calcular valor original do pedido"
+      });
+    }
+
+    const couponUsage = await storage.getCouponUsageByOrder(orderId);
+    let usageCleanedUp = true;
+    if (couponUsage) {
+      try {
+        await storage.deleteCouponUsageByOrder(orderId);
+        await storage.decrementCouponUsage(couponUsage.couponId);
+      } catch (usageError) {
+        console.error("Error removing coupon usage record:", usageError);
+        usageCleanedUp = false;
+      }
     }
 
     await storage.updateOrder(orderId, {
@@ -279,6 +353,10 @@ router.post("/remove", async (req, res) => {
       valorTotal: valorOriginal.toFixed(2),
       codigoCupom: null,
     });
+
+    if (!usageCleanedUp) {
+      console.warn(`Coupon removed from order ${orderId} but usage record cleanup failed`);
+    }
 
     res.json({
       success: true,
@@ -290,7 +368,7 @@ router.post("/remove", async (req, res) => {
     console.error("Remove coupon error:", error);
     res.status(500).json({
       success: false,
-      error: "Erro interno do servidor"
+      error: "Erro interno ao remover cupom"
     });
   }
 });

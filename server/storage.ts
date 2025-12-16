@@ -161,7 +161,10 @@ export interface IStorage {
 
   // Coupon Usage methods
   getCouponUsagesByUser(couponId: string, userId: string): Promise<CouponUsage[]>;
+  getCouponUsageByOrder(orderId: string): Promise<CouponUsage | undefined>;
   createCouponUsage(usage: InsertCouponUsage): Promise<CouponUsage>;
+  deleteCouponUsageByOrder(orderId: string): Promise<boolean>;
+  decrementCouponUsage(id: string): Promise<void>;
 }
 
 export class DbStorage implements IStorage {
@@ -939,9 +942,28 @@ export class DbStorage implements IStorage {
       .where(and(eq(couponUsages.couponId, couponId), eq(couponUsages.userId, userId)));
   }
 
+  async getCouponUsageByOrder(orderId: string): Promise<CouponUsage | undefined> {
+    const [usage] = await db.select().from(couponUsages)
+      .where(eq(couponUsages.orderId, orderId));
+    return usage;
+  }
+
   async createCouponUsage(usage: InsertCouponUsage): Promise<CouponUsage> {
     const [created] = await db.insert(couponUsages).values(usage).returning();
     return created;
+  }
+
+  async deleteCouponUsageByOrder(orderId: string): Promise<boolean> {
+    const result = await db.delete(couponUsages)
+      .where(eq(couponUsages.orderId, orderId))
+      .returning();
+    return result.length > 0;
+  }
+
+  async decrementCouponUsage(id: string): Promise<void> {
+    await db.update(eventCoupons)
+      .set({ currentUses: sql`GREATEST(${eventCoupons.currentUses} - 1, 0)` })
+      .where(eq(eventCoupons.id, id));
   }
 }
 
