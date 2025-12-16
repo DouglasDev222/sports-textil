@@ -110,8 +110,13 @@ function formatCpf(cpf: string): string {
 
 function formatDate(dateStr: string): string {
   if (!dateStr) return "-";
-  const date = new Date(dateStr);
-  return date.toLocaleDateString("pt-BR");
+  // Parse YYYY-MM-DD directly to avoid timezone conversion issues
+  const parts = dateStr.split("-");
+  if (parts.length === 3) {
+    const [year, month, day] = parts;
+    return `${day}/${month}/${year}`;
+  }
+  return dateStr;
 }
 
 function formatPhone(phone: string): string {
