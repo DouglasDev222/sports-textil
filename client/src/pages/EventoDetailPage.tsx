@@ -259,83 +259,13 @@ export default function EventoDetailPage() {
               </Card>
             </div>
 
-            {/* Batches Card */}
-            {activeBatches.length > 0 && (
-              <Card className="mb-8">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Tag className="h-5 w-5" />
-                    Lotes de Inscrição
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {activeBatches.map((batch, index) => {
-                      const isCurrentBatch = event.activeBatch?.id === batch.id;
-                      const isFuture = batch.status === 'future';
-                      const isClosed = batch.status === 'closed';
-                      
-                      return (
-                        <div 
-                          key={batch.id}
-                          className={`flex items-center justify-between p-4 rounded-lg border ${
-                            isCurrentBatch 
-                              ? 'bg-primary/5 border-primary' 
-                              : isClosed 
-                                ? 'bg-muted/50 opacity-60' 
-                                : 'bg-muted/30'
-                          }`}
-                          data-testid={`batch-item-${index}`}
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className={`w-2 h-2 rounded-full ${
-                              isCurrentBatch ? 'bg-primary' : isClosed ? 'bg-muted-foreground' : 'bg-muted-foreground/50'
-                            }`} />
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <span className="font-medium">{batch.nome}</span>
-                                {isCurrentBatch && (
-                                  <Badge variant="default" className="text-xs">Ativo</Badge>
-                                )}
-                                {isFuture && (
-                                  <Badge variant="secondary" className="text-xs">Em breve</Badge>
-                                )}
-                                {isClosed && (
-                                  <Badge variant="outline" className="text-xs">Encerrado</Badge>
-                                )}
-                              </div>
-                              <p className="text-sm text-muted-foreground">
-                                {formatBatchDate(batch.dataInicio)}
-                                {batch.dataTermino && ` - ${formatBatchDate(batch.dataTermino)}`}
-                              </p>
-                            </div>
-                          </div>
-                          {batch.quantidadeMaxima && (
-                            <div className="text-right text-sm text-muted-foreground">
-                              <Users className="h-4 w-4 inline mr-1" />
-                              {batch.quantidadeUtilizada}/{batch.quantidadeMaxima}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            <Tabs defaultValue="modalidades" className="space-y-4 md:space-y-6">
+            {/* Tabs - Sobre, Kit, Documentos */}
+            <Tabs defaultValue="sobre" className="space-y-4 md:space-y-6 mb-8">
               <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
-                <TabsList className="inline-flex w-auto min-w-full md:grid md:w-full md:grid-cols-4 gap-1">
-                  <TabsTrigger value="modalidades" data-testid="tab-modalidades" className="flex-shrink-0 text-xs md:text-sm px-3 md:px-4">
-                    <Award className="h-3.5 w-3.5 md:hidden mr-1.5" />
-                    <span className="hidden md:inline">Modalidades</span>
-                    <span className="md:hidden">Modalidades</span>
-                  </TabsTrigger>
+                <TabsList className="inline-flex w-auto min-w-full md:grid md:w-full md:grid-cols-3 gap-1">
                   <TabsTrigger value="sobre" data-testid="tab-sobre" className="flex-shrink-0 text-xs md:text-sm px-3 md:px-4">
                     <Info className="h-3.5 w-3.5 md:hidden mr-1.5" />
-                    <span className="hidden md:inline">Sobre</span>
-                    <span className="md:hidden">Sobre</span>
+                    <span>Sobre</span>
                   </TabsTrigger>
                   <TabsTrigger value="retirada" data-testid="tab-retirada" className="flex-shrink-0 text-xs md:text-sm px-3 md:px-4">
                     <Package className="h-3.5 w-3.5 md:hidden mr-1.5" />
@@ -362,79 +292,6 @@ export default function EventoDetailPage() {
                     <p className="text-muted-foreground leading-relaxed whitespace-pre-wrap">
                       {event.descricao}
                     </p>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              <TabsContent value="modalidades" className="space-y-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Award className="h-5 w-5" />
-                      Modalidades {eventSoldOut ? '' : 'Disponíveis'}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {modalities.length > 0 ? (
-                      <div className="grid grid-cols-1 gap-4">
-                        {modalities.map((mod) => {
-                          const isSoldOut = eventSoldOut || mod.isSoldOut;
-                          return (
-                            <div 
-                              key={mod.id} 
-                              className={`p-4 border rounded-lg ${isSoldOut ? 'opacity-60 bg-muted/30' : ''}`}
-                              data-testid={`modality-item-${mod.id}`}
-                            >
-                              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                                <div className="flex-1">
-                                  <div className="flex items-center gap-2 mb-1">
-                                    <h3 className="font-semibold text-lg">{mod.nome}</h3>
-                                    {isSoldOut && (
-                                      <Badge variant="destructive" className="text-xs">
-                                        Esgotado
-                                      </Badge>
-                                    )}
-                                  </div>
-                                  <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-                                    <span className="flex items-center gap-1">
-                                      <Award className="h-4 w-4" />
-                                      {mod.distancia} {mod.unidadeDistancia}
-                                    </span>
-                                    <span className="flex items-center gap-1">
-                                      <Timer className="h-4 w-4" />
-                                      Largada: {mod.horarioLargada}
-                                    </span>
-                                    {mod.limiteVagas && (
-                                      <span className="flex items-center gap-1">
-                                        <Users className="h-4 w-4" />
-                                        {mod.limiteVagas} vagas
-                                      </span>
-                                    )}
-                                  </div>
-                                  {mod.descricao && (
-                                    <p className="text-sm text-muted-foreground mt-2">{mod.descricao}</p>
-                                  )}
-                                  {(mod.idadeMinima !== null && mod.idadeMinima !== undefined) || event.idadeMinimaEvento ? (
-                                    <p className="text-xs text-muted-foreground mt-1">
-                                      Idade mínima: {mod.idadeMinima ?? event.idadeMinimaEvento} anos
-                                    </p>
-                                  ) : null}
-                                </div>
-                                <div className="text-right">
-                                  {!isSoldOut && (
-                                    <span className="text-xl font-bold text-primary">{getPrice(mod.id)}</span>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <p className="text-center py-8 text-muted-foreground">
-                        Nenhuma modalidade cadastrada
-                      </p>
-                    )}
                   </CardContent>
                 </Card>
               </TabsContent>
@@ -513,6 +370,143 @@ export default function EventoDetailPage() {
                 </Card>
               </TabsContent>
             </Tabs>
+
+            {/* Modalidades Section - Separate from tabs */}
+            <Card className="mb-8">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Award className="h-5 w-5" />
+                  Modalidades {eventSoldOut ? '' : 'Disponíveis'}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {modalities.length > 0 ? (
+                  <div className="grid grid-cols-1 gap-4">
+                    {modalities.map((mod) => {
+                      const isSoldOut = eventSoldOut || mod.isSoldOut;
+                      return (
+                        <div 
+                          key={mod.id} 
+                          className={`p-4 border rounded-lg ${isSoldOut ? 'opacity-60 bg-muted/30' : ''}`}
+                          data-testid={`modality-item-${mod.id}`}
+                        >
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <h3 className="font-semibold text-lg">{mod.nome}</h3>
+                                {isSoldOut && (
+                                  <Badge variant="destructive" className="text-xs">
+                                    Esgotado
+                                  </Badge>
+                                )}
+                              </div>
+                              <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+                                <span className="flex items-center gap-1">
+                                  <Award className="h-4 w-4" />
+                                  {mod.distancia} {mod.unidadeDistancia}
+                                </span>
+                                <span className="flex items-center gap-1">
+                                  <Timer className="h-4 w-4" />
+                                  Largada: {mod.horarioLargada}
+                                </span>
+                                {mod.limiteVagas && (
+                                  <span className="flex items-center gap-1">
+                                    <Users className="h-4 w-4" />
+                                    {mod.limiteVagas} vagas
+                                  </span>
+                                )}
+                              </div>
+                              {mod.descricao && (
+                                <p className="text-sm text-muted-foreground mt-2">{mod.descricao}</p>
+                              )}
+                              {(mod.idadeMinima !== null && mod.idadeMinima !== undefined) || event.idadeMinimaEvento ? (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Idade mínima: {mod.idadeMinima ?? event.idadeMinimaEvento} anos
+                                </p>
+                              ) : null}
+                            </div>
+                            <div className="text-right">
+                              {!isSoldOut && (
+                                <span className="text-xl font-bold text-primary">{getPrice(mod.id)}</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-center py-8 text-muted-foreground">
+                    Nenhuma modalidade cadastrada
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Batches Card - At the end */}
+            {activeBatches.length > 0 && (
+              <Card className="mb-8">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Tag className="h-5 w-5" />
+                    Lotes de Inscrição
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {activeBatches.map((batch, index) => {
+                      const isCurrentBatch = event.activeBatch?.id === batch.id;
+                      const isFuture = batch.status === 'future';
+                      const isClosed = batch.status === 'closed';
+                      
+                      return (
+                        <div 
+                          key={batch.id}
+                          className={`flex items-center justify-between p-4 rounded-lg border ${
+                            isCurrentBatch 
+                              ? 'bg-primary/5 border-primary' 
+                              : isClosed 
+                                ? 'bg-muted/50 opacity-60' 
+                                : 'bg-muted/30'
+                          }`}
+                          data-testid={`batch-item-${index}`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className={`w-2 h-2 rounded-full ${
+                              isCurrentBatch ? 'bg-primary' : isClosed ? 'bg-muted-foreground' : 'bg-muted-foreground/50'
+                            }`} />
+                            <div>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-medium">{batch.nome}</span>
+                                {isCurrentBatch && (
+                                  <Badge variant="default" className="text-xs">Ativo</Badge>
+                                )}
+                                {isFuture && (
+                                  <Badge variant="secondary" className="text-xs">Em breve</Badge>
+                                )}
+                                {isClosed && (
+                                  <Badge variant="outline" className="text-xs">Encerrado</Badge>
+                                )}
+                              </div>
+                              <p className="text-sm text-muted-foreground">
+                                {formatBatchDate(batch.dataInicio)}
+                                {batch.dataTermino && ` - ${formatBatchDate(batch.dataTermino)}`}
+                              </p>
+                            </div>
+                          </div>
+                          {batch.quantidadeMaxima && (
+                            <div className="text-right text-sm text-muted-foreground">
+                              <Users className="h-4 w-4 inline mr-1" />
+                              {batch.quantidadeUtilizada}/{batch.quantidadeMaxima}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </div>
 
           {/* Sidebar - Registration Card */}
