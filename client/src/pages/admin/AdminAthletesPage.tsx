@@ -46,14 +46,44 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Plus, Pencil, Loader2, Eye, Search, X, Users } from "lucide-react";
 import type { Athlete, Registration } from "@shared/schema";
 
+const BRAZILIAN_STATES = [
+  { value: "AC", label: "Acre" },
+  { value: "AL", label: "Alagoas" },
+  { value: "AP", label: "Amapa" },
+  { value: "AM", label: "Amazonas" },
+  { value: "BA", label: "Bahia" },
+  { value: "CE", label: "Ceara" },
+  { value: "DF", label: "Distrito Federal" },
+  { value: "ES", label: "Espirito Santo" },
+  { value: "GO", label: "Goias" },
+  { value: "MA", label: "Maranhao" },
+  { value: "MT", label: "Mato Grosso" },
+  { value: "MS", label: "Mato Grosso do Sul" },
+  { value: "MG", label: "Minas Gerais" },
+  { value: "PA", label: "Para" },
+  { value: "PB", label: "Paraiba" },
+  { value: "PR", label: "Parana" },
+  { value: "PE", label: "Pernambuco" },
+  { value: "PI", label: "Piaui" },
+  { value: "RJ", label: "Rio de Janeiro" },
+  { value: "RN", label: "Rio Grande do Norte" },
+  { value: "RS", label: "Rio Grande do Sul" },
+  { value: "RO", label: "Rondonia" },
+  { value: "RR", label: "Roraima" },
+  { value: "SC", label: "Santa Catarina" },
+  { value: "SP", label: "Sao Paulo" },
+  { value: "SE", label: "Sergipe" },
+  { value: "TO", label: "Tocantins" },
+];
+
 const athleteSchema = z.object({
-  cpf: z.string().min(11, "CPF deve ter pelo menos 11 caracteres"),
+  cpf: z.string().min(11, "CPF deve ter 11 digitos"),
   nome: z.string().min(2, "Nome deve ter pelo menos 2 caracteres"),
   dataNascimento: z.string().min(1, "Data de nascimento obrigatoria"),
   sexo: z.string().min(1, "Sexo obrigatorio"),
   email: z.string().email("Email invalido"),
   telefone: z.string().min(10, "Telefone deve ter pelo menos 10 digitos"),
-  estado: z.string().length(2, "Estado deve ter 2 caracteres"),
+  estado: z.string().length(2, "Selecione um estado"),
   cidade: z.string().min(2, "Cidade obrigatoria"),
   cep: z.string().optional(),
   rua: z.string().optional(),
@@ -91,6 +121,57 @@ function formatPhone(phone: string): string {
     return cleaned.replace(/(\d{2})(\d{4})(\d{4})/, "($1) $2-$3");
   }
   return phone;
+}
+
+function formatCep(cep: string): string {
+  const cleaned = cep.replace(/\D/g, "");
+  if (cleaned.length === 8) {
+    return cleaned.replace(/(\d{5})(\d{3})/, "$1-$2");
+  }
+  return cep;
+}
+
+function formatCpfInput(value: string): string {
+  const cleaned = value.replace(/\D/g, "").slice(0, 11);
+  if (cleaned.length <= 3) return cleaned;
+  if (cleaned.length <= 6) return `${cleaned.slice(0, 3)}.${cleaned.slice(3)}`;
+  if (cleaned.length <= 9) return `${cleaned.slice(0, 3)}.${cleaned.slice(3, 6)}.${cleaned.slice(6)}`;
+  return `${cleaned.slice(0, 3)}.${cleaned.slice(3, 6)}.${cleaned.slice(6, 9)}-${cleaned.slice(9)}`;
+}
+
+function formatPhoneInput(value: string): string {
+  const cleaned = value.replace(/\D/g, "").slice(0, 11);
+  if (cleaned.length <= 2) return cleaned;
+  if (cleaned.length <= 7) return `(${cleaned.slice(0, 2)}) ${cleaned.slice(2)}`;
+  if (cleaned.length <= 10) return `(${cleaned.slice(0, 2)}) ${cleaned.slice(2, 6)}-${cleaned.slice(6)}`;
+  return `(${cleaned.slice(0, 2)}) ${cleaned.slice(2, 7)}-${cleaned.slice(7)}`;
+}
+
+function formatCepInput(value: string): string {
+  const cleaned = value.replace(/\D/g, "").slice(0, 8);
+  if (cleaned.length <= 5) return cleaned;
+  return `${cleaned.slice(0, 5)}-${cleaned.slice(5)}`;
+}
+
+function stripNonDigits(value: string): string {
+  return value.replace(/\D/g, "");
+}
+
+function getErrorMessage(error: Error): string {
+  const message = error.message?.toLowerCase() || "";
+  if (message.includes("cpf") && (message.includes("existe") || message.includes("duplicate") || message.includes("unique"))) {
+    return "Ja existe um atleta cadastrado com este CPF";
+  }
+  if (message.includes("email") && (message.includes("existe") || message.includes("duplicate") || message.includes("unique"))) {
+    return "Ja existe um atleta cadastrado com este email";
+  }
+  if (message.includes("cpf") && message.includes("invalid")) {
+    return "O CPF informado e invalido";
+  }
+  if (message.includes("network") || message.includes("fetch")) {
+    return "Erro de conexao. Verifique sua internet e tente novamente";
+  }
+  return error.message || "Ocorreu um erro inesperado. Tente novamente";
 }
 
 function getStatusBadge(status: string) {
@@ -157,18 +238,24 @@ export default function AdminAthletesPage() {
 
   const createMutation = useMutation({
     mutationFn: async (data: AthleteFormData) => {
-      return apiRequest("POST", "/api/admin/athletes", data);
+      const cleanedData = {
+        ...data,
+        cpf: stripNonDigits(data.cpf),
+        telefone: stripNonDigits(data.telefone),
+        cep: data.cep ? stripNonDigits(data.cep) : undefined,
+      };
+      return apiRequest("POST", "/api/admin/athletes", cleanedData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/athletes"] });
-      toast({ title: "Atleta criado com sucesso" });
+      toast({ title: "Atleta criado com sucesso", description: "O atleta foi cadastrado no sistema" });
       setIsCreateOpen(false);
       form.reset();
     },
     onError: (error: Error) => {
       toast({
-        title: "Erro ao criar atleta",
-        description: error.message || "Tente novamente",
+        title: "Nao foi possivel criar o atleta",
+        description: getErrorMessage(error),
         variant: "destructive",
       });
     },
@@ -176,18 +263,24 @@ export default function AdminAthletesPage() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<AthleteFormData> }) => {
-      return apiRequest("PATCH", `/api/admin/athletes/${id}`, data);
+      const cleanedData = {
+        ...data,
+        cpf: data.cpf ? stripNonDigits(data.cpf) : undefined,
+        telefone: data.telefone ? stripNonDigits(data.telefone) : undefined,
+        cep: data.cep ? stripNonDigits(data.cep) : undefined,
+      };
+      return apiRequest("PATCH", `/api/admin/athletes/${id}`, cleanedData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/athletes"] });
-      toast({ title: "Atleta atualizado com sucesso" });
+      toast({ title: "Atleta atualizado com sucesso", description: "As alteracoes foram salvas" });
       setEditingAthlete(null);
       form.reset();
     },
     onError: (error: Error) => {
       toast({
-        title: "Erro ao atualizar atleta",
-        description: error.message || "Tente novamente",
+        title: "Nao foi possivel atualizar o atleta",
+        description: getErrorMessage(error),
         variant: "destructive",
       });
     },
@@ -195,15 +288,15 @@ export default function AdminAthletesPage() {
 
   const handleEdit = (athlete: Athlete) => {
     form.reset({
-      cpf: athlete.cpf,
+      cpf: formatCpfInput(athlete.cpf),
       nome: athlete.nome,
       dataNascimento: athlete.dataNascimento,
       sexo: athlete.sexo,
       email: athlete.email,
-      telefone: athlete.telefone,
+      telefone: formatPhoneInput(athlete.telefone),
       estado: athlete.estado,
       cidade: athlete.cidade,
-      cep: athlete.cep || "",
+      cep: athlete.cep ? formatCepInput(athlete.cep) : "",
       rua: athlete.rua || "",
       numero: athlete.numero || "",
       complemento: athlete.complemento || "",
@@ -392,7 +485,15 @@ export default function AdminAthletesPage() {
                     <FormItem>
                       <FormLabel>CPF *</FormLabel>
                       <FormControl>
-                        <Input placeholder="000.000.000-00" data-testid="input-athlete-cpf" {...field} />
+                        <Input 
+                          placeholder="000.000.000-00" 
+                          data-testid="input-athlete-cpf"
+                          value={field.value}
+                          onChange={(e) => field.onChange(formatCpfInput(e.target.value))}
+                          onBlur={field.onBlur}
+                          name={field.name}
+                          ref={field.ref}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -452,7 +553,15 @@ export default function AdminAthletesPage() {
                     <FormItem>
                       <FormLabel>Telefone *</FormLabel>
                       <FormControl>
-                        <Input placeholder="(00) 00000-0000" data-testid="input-athlete-telefone" {...field} />
+                        <Input 
+                          placeholder="(00) 00000-0000" 
+                          data-testid="input-athlete-telefone"
+                          value={field.value}
+                          onChange={(e) => field.onChange(formatPhoneInput(e.target.value))}
+                          onBlur={field.onBlur}
+                          name={field.name}
+                          ref={field.ref}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -464,9 +573,20 @@ export default function AdminAthletesPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Estado *</FormLabel>
-                      <FormControl>
-                        <Input placeholder="UF" maxLength={2} data-testid="input-athlete-estado" {...field} />
-                      </FormControl>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-athlete-estado">
+                            <SelectValue placeholder="Selecione o estado" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {BRAZILIAN_STATES.map((state) => (
+                            <SelectItem key={state.value} value={state.value}>
+                              {state.value} - {state.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -491,7 +611,15 @@ export default function AdminAthletesPage() {
                     <FormItem>
                       <FormLabel>CEP</FormLabel>
                       <FormControl>
-                        <Input placeholder="00000-000" data-testid="input-athlete-cep" {...field} />
+                        <Input 
+                          placeholder="00000-000" 
+                          data-testid="input-athlete-cep"
+                          value={field.value || ""}
+                          onChange={(e) => field.onChange(formatCepInput(e.target.value))}
+                          onBlur={field.onBlur}
+                          name={field.name}
+                          ref={field.ref}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
