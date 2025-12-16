@@ -409,21 +409,10 @@ export default function EventoDetailPage() {
                                   <Timer className="h-4 w-4" />
                                   Largada: {mod.horarioLargada}
                                 </span>
-                                {mod.limiteVagas && (
-                                  <span className="flex items-center gap-1">
-                                    <Users className="h-4 w-4" />
-                                    {mod.limiteVagas} vagas
-                                  </span>
-                                )}
                               </div>
                               {mod.descricao && (
                                 <p className="text-sm text-muted-foreground mt-2">{mod.descricao}</p>
                               )}
-                              {(mod.idadeMinima !== null && mod.idadeMinima !== undefined) || event.idadeMinimaEvento ? (
-                                <p className="text-xs text-muted-foreground mt-1">
-                                  Idade mínima: {mod.idadeMinima ?? event.idadeMinimaEvento} anos
-                                </p>
-                              ) : null}
                             </div>
                             <div className="text-right">
                               {!isSoldOut && (
@@ -494,12 +483,6 @@ export default function EventoDetailPage() {
                               </p>
                             </div>
                           </div>
-                          {batch.quantidadeMaxima && (
-                            <div className="text-right text-sm text-muted-foreground">
-                              <Users className="h-4 w-4 inline mr-1" />
-                              {batch.quantidadeUtilizada}/{batch.quantidadeMaxima}
-                            </div>
-                          )}
                         </div>
                       );
                     })}
