@@ -20,7 +20,8 @@ import {
   LogOut,
   Shield,
   UserCog,
-  Building2
+  Building2,
+  UserCheck
 } from "lucide-react";
 
 interface MenuItem {
@@ -46,6 +47,12 @@ const menuItems: MenuItem[] = [
     title: "Eventos",
     url: "/admin/eventos",
     icon: Calendar,
+  },
+  {
+    title: "Atletas",
+    url: "/admin/atletas",
+    icon: UserCheck,
+    roles: ["superadmin", "admin"],
   },
   {
     title: "Usuários",
