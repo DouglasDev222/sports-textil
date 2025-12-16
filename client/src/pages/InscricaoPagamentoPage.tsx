@@ -94,10 +94,19 @@ interface PaymentStatusResponse {
   error?: string;
 }
 
-const cuponsValidos: Record<string, { desconto: number; tipo: "percentual" | "fixo" }> = {
-  "DESCONTO10": { desconto: 10, tipo: "percentual" },
-  "CORRIDA50": { desconto: 50, tipo: "fixo" },
-};
+interface CouponValidationResponse {
+  valid: boolean;
+  coupon?: {
+    id: string;
+    code: string;
+    discountType: string;
+    discountValue: string;
+    discountAmount: string;
+    finalValue: string;
+  };
+  error?: string;
+  message?: string;
+}
 
 function formatTimeRemaining(ms: number): string {
   if (ms <= 0) return "00:00";
@@ -115,7 +124,8 @@ export default function InscricaoPagamentoPage() {
   const { athlete, isLoading: authLoading } = useAthleteAuth();
   
   const [cupom, setCupom] = useState("");
-  const [cupomAplicado, setCupomAplicado] = useState<string | null>(null);
+  const [cupomAplicado, setCupomAplicado] = useState<CouponValidationResponse["coupon"] | null>(null);
+  const [cupomValidando, setCupomValidando] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
   const [isExpired, setIsExpired] = useState(false);
   const [pixData, setPixData] = useState<{
@@ -262,44 +272,99 @@ export default function InscricaoPagamentoPage() {
     return () => clearInterval(interval);
   }, [orderData?.order.dataExpiracao]);
 
-  const valorOriginal = orderData?.order.valorTotal || 0;
+  const valorTotal = orderData?.order.valorTotal || 0;
+  const valorDescontoFromOrder = parseFloat(orderData?.order.valorDesconto || "0");
   
-  let valorDesconto = 0;
-  if (cupomAplicado && cuponsValidos[cupomAplicado]) {
-    const cupomInfo = cuponsValidos[cupomAplicado];
-    if (cupomInfo.tipo === "percentual") {
-      valorDesconto = valorOriginal * (cupomInfo.desconto / 100);
-    } else {
-      valorDesconto = Math.min(cupomInfo.desconto, valorOriginal);
-    }
-  }
-
-  const valorFinal = Math.max(0, valorOriginal - valorDesconto);
+  const valorDesconto = cupomAplicado ? parseFloat(cupomAplicado.discountAmount) : valorDescontoFromOrder;
+  const valorFinal = valorTotal;
+  const valorOriginalSemDesconto = valorTotal + valorDescontoFromOrder;
 
   const handleVoltar = () => {
     setLocation(`/evento/${slug}`);
   };
 
-  const handleAplicarCupom = () => {
-    const cupomUpper = cupom.toUpperCase();
-    if (cuponsValidos[cupomUpper]) {
-      setCupomAplicado(cupomUpper);
+  const handleAplicarCupom = async () => {
+    if (!orderId || !cupom.trim()) {
       toast({
-        title: "Cupom aplicado!",
-        description: "Seu desconto foi aplicado com sucesso.",
-      });
-    } else {
-      toast({
-        title: "Cupom inválido",
-        description: "O cupom informado não existe ou expirou.",
+        title: "Erro",
+        description: "Dados incompletos para aplicar o cupom.",
         variant: "destructive",
       });
+      return;
+    }
+
+    setCupomValidando(true);
+    try {
+      const response = await apiRequest("POST", "/api/coupons/apply", {
+        orderId,
+        couponCode: cupom.trim().toUpperCase(),
+      });
+      const result = await response.json();
+      
+      if (result.success && result.data) {
+        setCupomAplicado({
+          id: "",
+          code: result.data.couponCode,
+          discountType: "",
+          discountValue: "",
+          discountAmount: result.data.discountAmount,
+          finalValue: result.data.valorFinal,
+        });
+        await refetch();
+        toast({
+          title: "Cupom aplicado!",
+          description: `Desconto de R$ ${parseFloat(result.data.discountAmount).toFixed(2)} aplicado.`,
+        });
+      } else {
+        toast({
+          title: "Cupom inválido",
+          description: result.error || "O cupom informado não existe ou expirou.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Erro ao aplicar cupom",
+        description: "Tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setCupomValidando(false);
     }
   };
 
-  const handleRemoverCupom = () => {
-    setCupomAplicado(null);
-    setCupom("");
+  const handleRemoverCupom = async () => {
+    if (!orderId) return;
+    
+    setCupomValidando(true);
+    try {
+      const response = await apiRequest("POST", "/api/coupons/remove", { orderId });
+      const result = await response.json();
+      
+      if (result.success) {
+        setCupomAplicado(null);
+        setCupom("");
+        await refetch();
+        toast({
+          title: "Cupom removido",
+          description: "O desconto foi removido do pedido.",
+        });
+      } else {
+        toast({
+          title: "Erro ao remover cupom",
+          description: result.error || "Tente novamente.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Erro ao remover cupom",
+        description: "Tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setCupomValidando(false);
+    }
   };
 
   const handleGerarPix = () => {
@@ -515,10 +580,17 @@ export default function InscricaoPagamentoPage() {
                       <Button
                         variant="outline"
                         onClick={handleAplicarCupom}
-                        disabled={!cupom}
+                        disabled={!cupom || cupomValidando}
                         data-testid="button-aplicar-cupom"
                       >
-                        Aplicar
+                        {cupomValidando ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Validando...
+                          </>
+                        ) : (
+                          "Aplicar"
+                        )}
                       </Button>
                     </div>
                   </div>
@@ -527,7 +599,7 @@ export default function InscricaoPagamentoPage() {
                     <div className="flex items-center gap-2">
                       <CheckCircle2 className="h-5 w-5 text-primary" />
                       <div>
-                        <p className="font-semibold text-foreground">{cupomAplicado}</p>
+                        <p className="font-semibold text-foreground">{cupomAplicado.code}</p>
                         <p className="text-sm text-muted-foreground">
                           Desconto aplicado: R$ {valorDesconto.toFixed(2).replace('.', ',')}
                         </p>

@@ -416,34 +416,34 @@ Em caso de falha no pagamento, o voucher deve permanecer disponivel.
 - [ ] Implementar endpoint POST `/api/events/:eventId/vouchers/batch`
 - [ ] Implementar endpoint POST `/api/events/:eventId/vouchers`
 - [ ] Implementar endpoint GET `/api/events/:eventId/vouchers`
-- [ ] Implementar endpoint POST `/api/vouchers/validate`
+- [x] Implementar endpoint POST `/api/vouchers/validate`
 - [ ] Implementar endpoint DELETE `/api/vouchers/:id`
 - [ ] Implementar endpoint GET `/api/events/:eventId/vouchers/batches`
 - [ ] Implementar endpoint GET `/api/events/:eventId/vouchers/report`
-- [ ] Implementar endpoint POST `/api/events/:eventId/coupons`
-- [ ] Implementar endpoint GET `/api/events/:eventId/coupons`
-- [ ] Implementar endpoint POST `/api/coupons/validate`
-- [ ] Implementar endpoint PATCH `/api/coupons/:id`
+- [x] Implementar endpoint POST `/api/events/:eventId/coupons`
+- [x] Implementar endpoint GET `/api/events/:eventId/coupons`
+- [x] Implementar endpoint POST `/api/coupons/validate`
+- [x] Implementar endpoint PATCH `/api/coupons/:id`
 - [ ] Implementar endpoint DELETE `/api/coupons/:id`
-- [ ] Implementar funcao de geracao de codigo seguro
+- [x] Implementar funcao de geracao de codigo seguro
 - [ ] Implementar rate limiting nos endpoints de validacao
-- [ ] Implementar registro de auditoria
-- [ ] Adicionar logica de voucher no fluxo de inscricao
-- [ ] Adicionar logica de cupom no fluxo de pagamento
+- [x] Implementar registro de auditoria
+- [x] Adicionar logica de voucher no fluxo de inscricao
+- [x] Adicionar logica de cupom no fluxo de pagamento
 
 ### Frontend
 
-- [ ] Criar componente de input de voucher
-- [ ] Integrar validacao de voucher no fluxo de inscricao
-- [ ] Criar pagina de gerenciamento de vouchers (admin)
-- [ ] Criar formulario de criacao de lote
-- [ ] Criar formulario de criacao de voucher avulso
-- [ ] Criar listagem de vouchers com filtros
+- [x] Criar componente de input de voucher
+- [x] Integrar validacao de voucher no fluxo de inscricao
+- [x] Criar pagina de gerenciamento de vouchers (admin)
+- [x] Criar formulario de criacao de lote
+- [x] Criar formulario de criacao de voucher avulso
+- [x] Criar listagem de vouchers com filtros
 - [ ] Criar visualizacao de auditoria
-- [ ] Criar pagina de gerenciamento de cupons (admin)
-- [ ] Criar formulario de criacao de cupom
-- [ ] Criar listagem de cupons
-- [ ] Integrar cupom na tela de pagamento
+- [x] Criar pagina de gerenciamento de cupons (admin)
+- [x] Criar formulario de criacao de cupom
+- [x] Criar listagem de cupons
+- [x] Integrar cupom na tela de pagamento
 - [ ] Adicionar relatorios de uso
 
 ### Testes
