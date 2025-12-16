@@ -324,13 +324,31 @@ export default function EventoDetailPage() {
               </Card>
             )}
 
-            <Tabs defaultValue="sobre" className="space-y-6">
-              <TabsList className="grid w-full grid-cols-4">
-                <TabsTrigger value="sobre" data-testid="tab-sobre">Sobre</TabsTrigger>
-                <TabsTrigger value="modalidades" data-testid="tab-modalidades">Modalidades</TabsTrigger>
-                <TabsTrigger value="retirada" data-testid="tab-retirada">Retirada Kit</TabsTrigger>
-                <TabsTrigger value="documentos" data-testid="tab-documentos">Documentos</TabsTrigger>
-              </TabsList>
+            <Tabs defaultValue="modalidades" className="space-y-4 md:space-y-6">
+              <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
+                <TabsList className="inline-flex w-auto min-w-full md:grid md:w-full md:grid-cols-4 gap-1">
+                  <TabsTrigger value="modalidades" data-testid="tab-modalidades" className="flex-shrink-0 text-xs md:text-sm px-3 md:px-4">
+                    <Award className="h-3.5 w-3.5 md:hidden mr-1.5" />
+                    <span className="hidden md:inline">Modalidades</span>
+                    <span className="md:hidden">Modalidades</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="sobre" data-testid="tab-sobre" className="flex-shrink-0 text-xs md:text-sm px-3 md:px-4">
+                    <Info className="h-3.5 w-3.5 md:hidden mr-1.5" />
+                    <span className="hidden md:inline">Sobre</span>
+                    <span className="md:hidden">Sobre</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="retirada" data-testid="tab-retirada" className="flex-shrink-0 text-xs md:text-sm px-3 md:px-4">
+                    <Package className="h-3.5 w-3.5 md:hidden mr-1.5" />
+                    <span className="hidden md:inline">Retirada Kit</span>
+                    <span className="md:hidden">Kit</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="documentos" data-testid="tab-documentos" className="flex-shrink-0 text-xs md:text-sm px-3 md:px-4">
+                    <FileText className="h-3.5 w-3.5 md:hidden mr-1.5" />
+                    <span className="hidden md:inline">Documentos</span>
+                    <span className="md:hidden">Docs</span>
+                  </TabsTrigger>
+                </TabsList>
+              </div>
 
               <TabsContent value="sobre" className="space-y-6">
                 <Card>
