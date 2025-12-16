@@ -200,7 +200,6 @@ export default function EventoDetailPage() {
   return (
     <div className="min-h-screen bg-background">
       <Header />
-
       <div className="max-w-7xl mx-auto px-4 md:px-6 py-6 md:py-8">
         {/* Banner with 4:3 aspect ratio */}
         <div className="relative rounded-lg overflow-hidden mb-8">
@@ -270,7 +269,7 @@ export default function EventoDetailPage() {
                   <TabsTrigger value="retirada" data-testid="tab-retirada" className="flex-shrink-0 text-xs md:text-sm px-3 md:px-4">
                     <Package className="h-3.5 w-3.5 md:hidden mr-1.5" />
                     <span className="hidden md:inline">Retirada Kit</span>
-                    <span className="md:hidden">Kit</span>
+                    <span className="md:hidden">Retirada de Kit</span>
                   </TabsTrigger>
                   <TabsTrigger value="documentos" data-testid="tab-documentos" className="flex-shrink-0 text-xs md:text-sm px-3 md:px-4">
                     <FileText className="h-3.5 w-3.5 md:hidden mr-1.5" />
@@ -607,7 +606,6 @@ export default function EventoDetailPage() {
           </div>
         </div>
       </div>
-
       {/* Mobile Fixed Bottom Bar */}
       <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-background border-t shadow-lg z-50">
         <div className="px-4 py-3">
