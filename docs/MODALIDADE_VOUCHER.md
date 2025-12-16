@@ -1,0 +1,484 @@
+# Modalidade Voucher - Documentacao Completa
+
+## Resumo da Funcionalidade
+
+A modalidade **voucher** e uma nova forma de acesso a inscricao em eventos. Nesta modalidade, o participante so consegue realizar a inscricao se informar um codigo de voucher valido. O voucher pode estar vinculado a uma inscricao gratuita ou paga, dependendo da configuracao do lote.
+
+### Principais Caracteristicas
+
+- Inscricao condicionada a apresentacao de voucher valido
+- Suporte a vouchers gratuitos e pagos
+- Modulo completo de gestao de vouchers e cupons
+- Geracao em massa de codigos unicos (ate 50.000)
+- Sistema de auditoria completo
+- Cupons de desconto independentes (opcionais)
+
+---
+
+## Regras de Negocio
+
+### 1. Modalidade Voucher
+
+| Regra | Descricao |
+|-------|-----------|
+| Tipo de Acesso | `access_type = 'voucher'` |
+| Obrigatoriedade | Voucher e obrigatorio antes de criar pedido |
+| Valor | Pode ter valor normal do lote OU valor zero |
+| Gratuidade | Mesmo gratuito, voucher continua obrigatorio |
+
+### 2. Validacao do Voucher
+
+O voucher deve atender a **todos** os criterios abaixo:
+
+1. **Unicidade**: Codigo deve ser unico no sistema
+2. **Pertencer ao Evento**: Vinculado ao evento atual da inscricao
+3. **Validade Temporal**: `valid_from <= now <= valid_until`
+4. **Nao Utilizado**: Status diferente de "utilizado"
+5. **Limite de Uso**: Maximo 1 uso por participante
+6. **Validade do Lote**: Se criado em lote, respeitar validade do lote
+
+### 3. Registro de Uso
+
+Ao utilizar um voucher, registrar:
+- Usuario que utilizou (user_id)
+- Data/hora do uso
+- Inscricao vinculada (registration_id)
+- IP do usuario (seguranca)
+
+### 4. Vouchers vs Cupons
+
+| Aspecto | Voucher | Cupom |
+|---------|---------|-------|
+| Objetivo | Habilitar inscricao | Dar desconto |
+| Momento de Uso | Antes do pedido | Na tela de pagamento |
+| Obrigatoriedade | Sim (modalidade voucher) | Nao |
+| Desconto | Nao concede | Sim (parcial, total ou fixo) |
+
+---
+
+## Fluxos Completos
+
+### Fluxo de Inscricao com Voucher
+
+```
+[Usuario acessa evento]
+         |
+         v
+[Seleciona modalidade com access_type = 'voucher']
+         |
+         v
+[Sistema exibe input "Codigo do Voucher"]
+         |
+         v
+[Usuario informa codigo]
+         |
+         v
+[POST /api/vouchers/validate]
+         |
+    +----+----+
+    |         |
+ INVALIDO   VALIDO
+    |         |
+    v         v
+[Erro]    [Seguir fluxo]
+[Bloqueio]     |
+              v
+      [Criar inscricao + pedido]
+              |
+         +----+----+
+         |         |
+    valor > 0   valor = 0
+         |         |
+         v         v
+   [Pagamento]  [Inscricao Confirmada]
+         |
+         v
+   [Input cupom (opcional)]
+         |
+         v
+   [Aplicar desconto se houver]
+         |
+         v
+   [Processar pagamento]
+         |
+         v
+   [Inscricao Confirmada]
+```
+
+### Fluxo de Pagamento com Cupom
+
+```
+[Tela de Pagamento]
+         |
+         v
+[Exibir campo "Codigo do Cupom" (opcional)]
+         |
+         v
+[Usuario informa cupom]
+         |
+         v
+[POST /api/coupons/validate]
+         |
+    +----+----+
+    |         |
+ INVALIDO   VALIDO
+    |         |
+    v         v
+[Mensagem]  [Aplicar desconto]
+[Erro]           |
+                 v
+         [Recalcular valor]
+                 |
+                 v
+         [Processar pagamento]
+```
+
+---
+
+## Estrutura das Tabelas
+
+### 1. event_voucher_batches (Lotes de Vouchers)
+
+```sql
+CREATE TABLE event_voucher_batches (
+  id SERIAL PRIMARY KEY,
+  event_id INTEGER NOT NULL REFERENCES events(id),
+  name VARCHAR(255) NOT NULL,
+  quantity INTEGER NOT NULL,
+  valid_from TIMESTAMP NOT NULL,
+  valid_until TIMESTAMP NOT NULL,
+  description TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  created_by INTEGER REFERENCES users(id)
+);
+```
+
+### 2. event_vouchers (Vouchers)
+
+```sql
+CREATE TABLE event_vouchers (
+  id SERIAL PRIMARY KEY,
+  event_id INTEGER NOT NULL REFERENCES events(id),
+  batch_id INTEGER REFERENCES event_voucher_batches(id),
+  code VARCHAR(20) NOT NULL UNIQUE,
+  status VARCHAR(20) DEFAULT 'available', -- 'available', 'used', 'expired'
+  valid_from TIMESTAMP NOT NULL,
+  valid_until TIMESTAMP NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  
+  CONSTRAINT unique_code_per_event UNIQUE (event_id, code)
+);
+
+CREATE INDEX idx_vouchers_code ON event_vouchers(code);
+CREATE INDEX idx_vouchers_event ON event_vouchers(event_id);
+CREATE INDEX idx_vouchers_status ON event_vouchers(status);
+```
+
+### 3. voucher_usages (Auditoria de Vouchers)
+
+```sql
+CREATE TABLE voucher_usages (
+  id SERIAL PRIMARY KEY,
+  voucher_id INTEGER NOT NULL REFERENCES event_vouchers(id),
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  registration_id INTEGER REFERENCES registrations(id),
+  used_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  ip_address VARCHAR(45),
+  user_agent TEXT
+);
+
+CREATE INDEX idx_voucher_usages_voucher ON voucher_usages(voucher_id);
+CREATE INDEX idx_voucher_usages_user ON voucher_usages(user_id);
+```
+
+### 4. event_coupons (Cupons de Desconto)
+
+```sql
+CREATE TABLE event_coupons (
+  id SERIAL PRIMARY KEY,
+  event_id INTEGER NOT NULL REFERENCES events(id),
+  code VARCHAR(50) NOT NULL,
+  discount_type VARCHAR(20) NOT NULL, -- 'percentage', 'fixed', 'full'
+  discount_value DECIMAL(10, 2), -- valor ou porcentagem
+  max_uses INTEGER, -- limite total de usos
+  max_uses_per_user INTEGER DEFAULT 1,
+  current_uses INTEGER DEFAULT 0,
+  valid_from TIMESTAMP NOT NULL,
+  valid_until TIMESTAMP NOT NULL,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  
+  CONSTRAINT unique_coupon_per_event UNIQUE (event_id, code)
+);
+
+CREATE INDEX idx_coupons_code ON event_coupons(code);
+CREATE INDEX idx_coupons_event ON event_coupons(event_id);
+```
+
+### 5. coupon_usages (Auditoria de Cupons)
+
+```sql
+CREATE TABLE coupon_usages (
+  id SERIAL PRIMARY KEY,
+  coupon_id INTEGER NOT NULL REFERENCES event_coupons(id),
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  order_id INTEGER REFERENCES orders(id),
+  discount_applied DECIMAL(10, 2),
+  used_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_coupon_usages_coupon ON coupon_usages(coupon_id);
+CREATE INDEX idx_coupon_usages_user ON coupon_usages(user_id);
+```
+
+### 6. Alteracao na tabela modalities
+
+```sql
+ALTER TABLE modalities 
+ADD COLUMN access_type VARCHAR(20) DEFAULT 'open'; 
+-- Valores: 'open', 'voucher', 'invite'
+```
+
+---
+
+## Endpoints Necessarios
+
+### Vouchers
+
+| Metodo | Endpoint | Descricao |
+|--------|----------|-----------|
+| GET | `/api/events/:eventId/vouchers` | Listar vouchers do evento |
+| POST | `/api/events/:eventId/vouchers` | Criar voucher avulso |
+| POST | `/api/events/:eventId/vouchers/batch` | Criar lote de vouchers |
+| POST | `/api/vouchers/validate` | Validar voucher |
+| GET | `/api/events/:eventId/vouchers/batches` | Listar lotes |
+| GET | `/api/events/:eventId/vouchers/report` | Relatorio de vouchers |
+| DELETE | `/api/vouchers/:id` | Remover voucher (se nao usado) |
+
+### Cupons
+
+| Metodo | Endpoint | Descricao |
+|--------|----------|-----------|
+| GET | `/api/events/:eventId/coupons` | Listar cupons do evento |
+| POST | `/api/events/:eventId/coupons` | Criar cupom |
+| POST | `/api/coupons/validate` | Validar e aplicar cupom |
+| PATCH | `/api/coupons/:id` | Atualizar cupom |
+| DELETE | `/api/coupons/:id` | Desativar cupom |
+
+### Exemplos de Request/Response
+
+#### POST /api/events/:eventId/vouchers/batch
+
+**Request:**
+```json
+{
+  "name": "Lote Patrocinadores 2024",
+  "quantity": 100,
+  "valid_from": "2024-01-01T00:00:00Z",
+  "valid_until": "2024-12-31T23:59:59Z",
+  "description": "Vouchers para patrocinadores do evento"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "batch": {
+    "id": 1,
+    "name": "Lote Patrocinadores 2024",
+    "quantity": 100,
+    "vouchers_created": 100,
+    "valid_from": "2024-01-01T00:00:00Z",
+    "valid_until": "2024-12-31T23:59:59Z"
+  }
+}
+```
+
+#### POST /api/vouchers/validate
+
+**Request:**
+```json
+{
+  "code": "A7F3B2",
+  "event_id": 123,
+  "modality_id": 456
+}
+```
+
+**Response (sucesso):**
+```json
+{
+  "valid": true,
+  "voucher": {
+    "id": 789,
+    "code": "A7F3B2",
+    "batch_name": "Lote Patrocinadores 2024",
+    "valid_until": "2024-12-31T23:59:59Z"
+  }
+}
+```
+
+**Response (erro):**
+```json
+{
+  "valid": false,
+  "error": "voucher_expired",
+  "message": "Este voucher expirou em 01/12/2024"
+}
+```
+
+---
+
+## Regras de Seguranca
+
+### 1. Geracao de Codigos
+
+- Codigos hexadecimais de 6-10 caracteres
+- Geracao aleatoria (crypto.randomBytes)
+- Sem padroes previsiveis ou sequenciais
+- Verificacao de colisao antes de salvar
+
+**Exemplo de geracao:**
+```typescript
+import crypto from 'crypto';
+
+function generateVoucherCode(length: number = 8): string {
+  return crypto.randomBytes(length / 2).toString('hex').toUpperCase();
+}
+```
+
+### 2. Rate Limiting
+
+| Acao | Limite |
+|------|--------|
+| Tentativas de validacao | 10 por minuto por IP |
+| Tentativas por usuario | 5 por minuto |
+| Criacao de vouchers | 1 lote por minuto |
+
+### 3. Registro de Auditoria
+
+Toda tentativa de uso (valida ou invalida) deve registrar:
+- Codigo tentado
+- IP do usuario
+- User Agent
+- Timestamp
+- Resultado (sucesso/falha)
+- Motivo da falha (se aplicavel)
+
+### 4. Validacao de Uso
+
+O voucher so e marcado como **usado** apos:
+1. Inscricao ser criada com sucesso
+2. Pagamento confirmado (se aplicavel)
+
+Em caso de falha no pagamento, o voucher deve permanecer disponivel.
+
+---
+
+## Exemplos de Uso
+
+### Cenario 1: Evento Corporativo com Vouchers Gratuitos
+
+1. Organizador cria lote de 500 vouchers
+2. Distribui codigos para funcionarios via email
+3. Funcionarios acessam evento e informam voucher
+4. Sistema valida e cria inscricao gratuita
+
+### Cenario 2: Evento Pago com Acesso Restrito
+
+1. Organizador cria lote de 100 vouchers
+2. Envia para convidados especiais
+3. Convidados informam voucher
+4. Sistema valida e exibe tela de pagamento
+5. Convidado pode usar cupom de desconto adicional
+
+### Cenario 3: Cupom de Desconto em Evento Aberto
+
+1. Evento com modalidade normal (sem voucher)
+2. Usuario faz inscricao normalmente
+3. Na tela de pagamento, informa cupom "DESCONTO50"
+4. Sistema aplica 50% de desconto
+5. Usuario paga valor reduzido
+
+---
+
+## Checklist de Implementacao
+
+### Backend
+
+- [ ] Criar tabela `event_voucher_batches` (schema Drizzle)
+- [ ] Criar tabela `event_vouchers` (schema Drizzle)
+- [ ] Criar tabela `voucher_usages` (schema Drizzle)
+- [ ] Criar tabela `event_coupons` (schema Drizzle)
+- [ ] Criar tabela `coupon_usages` (schema Drizzle)
+- [ ] Adicionar campo `access_type` na tabela `modalities`
+- [ ] Implementar endpoint POST `/api/events/:eventId/vouchers/batch`
+- [ ] Implementar endpoint POST `/api/events/:eventId/vouchers`
+- [ ] Implementar endpoint GET `/api/events/:eventId/vouchers`
+- [ ] Implementar endpoint POST `/api/vouchers/validate`
+- [ ] Implementar endpoint DELETE `/api/vouchers/:id`
+- [ ] Implementar endpoint GET `/api/events/:eventId/vouchers/batches`
+- [ ] Implementar endpoint GET `/api/events/:eventId/vouchers/report`
+- [ ] Implementar endpoint POST `/api/events/:eventId/coupons`
+- [ ] Implementar endpoint GET `/api/events/:eventId/coupons`
+- [ ] Implementar endpoint POST `/api/coupons/validate`
+- [ ] Implementar endpoint PATCH `/api/coupons/:id`
+- [ ] Implementar endpoint DELETE `/api/coupons/:id`
+- [ ] Implementar funcao de geracao de codigo seguro
+- [ ] Implementar rate limiting nos endpoints de validacao
+- [ ] Implementar registro de auditoria
+- [ ] Adicionar logica de voucher no fluxo de inscricao
+- [ ] Adicionar logica de cupom no fluxo de pagamento
+
+### Frontend
+
+- [ ] Criar componente de input de voucher
+- [ ] Integrar validacao de voucher no fluxo de inscricao
+- [ ] Criar pagina de gerenciamento de vouchers (admin)
+- [ ] Criar formulario de criacao de lote
+- [ ] Criar formulario de criacao de voucher avulso
+- [ ] Criar listagem de vouchers com filtros
+- [ ] Criar visualizacao de auditoria
+- [ ] Criar pagina de gerenciamento de cupons (admin)
+- [ ] Criar formulario de criacao de cupom
+- [ ] Criar listagem de cupons
+- [ ] Integrar cupom na tela de pagamento
+- [ ] Adicionar relatorios de uso
+
+### Testes
+
+- [ ] Testes unitarios para geracao de codigo
+- [ ] Testes unitarios para validacao de voucher
+- [ ] Testes unitarios para validacao de cupom
+- [ ] Testes de integracao para fluxo completo de inscricao
+- [ ] Testes de integracao para fluxo completo de pagamento
+- [ ] Testes de seguranca (rate limiting, colisao de codigos)
+
+### Documentacao
+
+- [x] Documentacao de regras de negocio
+- [x] Documentacao de estrutura de tabelas
+- [x] Documentacao de endpoints
+- [x] Documentacao de seguranca
+- [ ] Documentacao de uso para organizadores (manual)
+
+---
+
+## Consideracoes Finais
+
+### Performance
+
+- Indexar campos de busca frequente (code, event_id, status)
+- Considerar cache para validacao de vouchers em eventos grandes
+- Limitar tamanho de lotes para evitar timeout (max 50.000)
+
+### Escalabilidade
+
+- Geracao de lotes grandes pode ser assincrona (job/queue)
+- Relatorios podem usar agregacao pre-calculada
+
+### Manutencao
+
+- Criar job para atualizar status de vouchers expirados
+- Criar job para limpeza de logs de auditoria antigos (> 1 ano)
