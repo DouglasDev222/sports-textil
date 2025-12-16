@@ -17,12 +17,16 @@ import shirtsRoutes from "./routes/admin/shirts";
 import attachmentsRoutes from "./routes/admin/attachments";
 import uploadsRoutes from "./routes/admin/uploads";
 import eventStatsRoutes from "./routes/admin/eventStats";
+import vouchersRoutes from "./routes/admin/vouchers";
+import couponsRoutes from "./routes/admin/coupons";
 import athletesRoutes from "./routes/athletes";
 import adminAthletesRoutes from "./routes/admin/athletes";
 import registrationsRoutes from "./routes/registrations";
 import paymentsRoutes from "./routes/payments";
 import webhooksRoutes from "./routes/webhooks";
 import receiptsRoutes from "./routes/receipts";
+import publicVouchersRoutes from "./routes/vouchers";
+import publicCouponsRoutes from "./routes/coupons";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
@@ -39,12 +43,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/admin/uploads", uploadsRoutes);
   app.use("/api/admin/events", eventStatsRoutes);
   app.use("/api/admin/athletes", adminAthletesRoutes);
+  app.use("/api/admin/events/:eventId/vouchers", vouchersRoutes);
+  app.use("/api/admin/events/:eventId/coupons", couponsRoutes);
 
   app.use("/api/athletes", athletesRoutes);
   app.use("/api/registrations", registrationsRoutes);
   app.use("/api/payments", paymentsRoutes);
   app.use("/api/webhooks", webhooksRoutes);
   app.use("/api/receipts", receiptsRoutes);
+  app.use("/api/vouchers", publicVouchersRoutes);
+  app.use("/api/coupons", publicCouponsRoutes);
 
   function formatEventForResponse(event: any) {
     return {

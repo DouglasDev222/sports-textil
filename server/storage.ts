@@ -12,9 +12,15 @@ import {
   type Order, type InsertOrder,
   type Registration, type InsertRegistration,
   type DocumentAcceptance, type InsertDocumentAcceptance,
+  type EventVoucherBatch, type InsertEventVoucherBatch,
+  type EventVoucher, type InsertEventVoucher,
+  type VoucherUsage, type InsertVoucherUsage,
+  type EventCoupon, type InsertEventCoupon,
+  type CouponUsage, type InsertCouponUsage,
   organizers, adminUsers, events, modalities, shirtSizes,
   registrationBatches, prices, attachments, eventBanners, athletes, orders,
-  registrations, documentAcceptances
+  registrations, documentAcceptances,
+  eventVoucherBatches, eventVouchers, voucherUsages, eventCoupons, couponUsages
 } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, and, isNull, isNotNull, lte, lt, gt, sql, max } from "drizzle-orm";
@@ -123,6 +129,39 @@ export interface IStorage {
 
   getDocumentAcceptancesByRegistration(registrationId: string): Promise<DocumentAcceptance[]>;
   createDocumentAcceptance(acceptance: InsertDocumentAcceptance): Promise<DocumentAcceptance>;
+
+  // Voucher Batch methods
+  getVoucherBatch(id: string): Promise<EventVoucherBatch | undefined>;
+  getVoucherBatchesByEvent(eventId: string): Promise<EventVoucherBatch[]>;
+  createVoucherBatch(batch: InsertEventVoucherBatch): Promise<EventVoucherBatch>;
+  deleteVoucherBatch(id: string): Promise<boolean>;
+
+  // Voucher methods
+  getVoucher(id: string): Promise<EventVoucher | undefined>;
+  getVoucherByCode(eventId: string, code: string): Promise<EventVoucher | undefined>;
+  getVouchersByEvent(eventId: string): Promise<EventVoucher[]>;
+  getVouchersByBatch(batchId: string): Promise<EventVoucher[]>;
+  createVoucher(voucher: InsertEventVoucher): Promise<EventVoucher>;
+  createVouchersBulk(vouchers: InsertEventVoucher[]): Promise<EventVoucher[]>;
+  updateVoucher(id: string, data: Partial<InsertEventVoucher>): Promise<EventVoucher | undefined>;
+  deleteVoucher(id: string): Promise<boolean>;
+
+  // Voucher Usage methods
+  getVoucherUsage(voucherId: string): Promise<VoucherUsage | undefined>;
+  createVoucherUsage(usage: InsertVoucherUsage): Promise<VoucherUsage>;
+
+  // Coupon methods
+  getCoupon(id: string): Promise<EventCoupon | undefined>;
+  getCouponByCode(eventId: string, code: string): Promise<EventCoupon | undefined>;
+  getCouponsByEvent(eventId: string): Promise<EventCoupon[]>;
+  createCoupon(coupon: InsertEventCoupon): Promise<EventCoupon>;
+  updateCoupon(id: string, data: Partial<InsertEventCoupon>): Promise<EventCoupon | undefined>;
+  deleteCoupon(id: string): Promise<boolean>;
+  incrementCouponUsage(id: string): Promise<void>;
+
+  // Coupon Usage methods
+  getCouponUsagesByUser(couponId: string, userId: string): Promise<CouponUsage[]>;
+  createCouponUsage(usage: InsertCouponUsage): Promise<CouponUsage>;
 }
 
 export class DbStorage implements IStorage {
@@ -773,6 +812,136 @@ export class DbStorage implements IStorage {
   async createDocumentAcceptance(insertAcceptance: InsertDocumentAcceptance): Promise<DocumentAcceptance> {
     const [acceptance] = await db.insert(documentAcceptances).values(insertAcceptance).returning();
     return acceptance;
+  }
+
+  // Voucher Batch methods
+  async getVoucherBatch(id: string): Promise<EventVoucherBatch | undefined> {
+    const [batch] = await db.select().from(eventVoucherBatches).where(eq(eventVoucherBatches.id, id));
+    return batch;
+  }
+
+  async getVoucherBatchesByEvent(eventId: string): Promise<EventVoucherBatch[]> {
+    return db.select().from(eventVoucherBatches).where(eq(eventVoucherBatches.eventId, eventId));
+  }
+
+  async createVoucherBatch(batch: InsertEventVoucherBatch): Promise<EventVoucherBatch> {
+    const [created] = await db.insert(eventVoucherBatches).values(batch).returning();
+    return created;
+  }
+
+  async deleteVoucherBatch(id: string): Promise<boolean> {
+    const result = await db.delete(eventVoucherBatches).where(eq(eventVoucherBatches.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // Voucher methods
+  async getVoucher(id: string): Promise<EventVoucher | undefined> {
+    const [voucher] = await db.select().from(eventVouchers).where(eq(eventVouchers.id, id));
+    return voucher;
+  }
+
+  async getVoucherByCode(eventId: string, code: string): Promise<EventVoucher | undefined> {
+    const [voucher] = await db.select().from(eventVouchers)
+      .where(and(eq(eventVouchers.eventId, eventId), eq(eventVouchers.code, code.toUpperCase())));
+    return voucher;
+  }
+
+  async getVouchersByEvent(eventId: string): Promise<EventVoucher[]> {
+    return db.select().from(eventVouchers).where(eq(eventVouchers.eventId, eventId));
+  }
+
+  async getVouchersByBatch(batchId: string): Promise<EventVoucher[]> {
+    return db.select().from(eventVouchers).where(eq(eventVouchers.batchId, batchId));
+  }
+
+  async createVoucher(voucher: InsertEventVoucher): Promise<EventVoucher> {
+    const [created] = await db.insert(eventVouchers).values({
+      ...voucher,
+      code: voucher.code.toUpperCase()
+    }).returning();
+    return created;
+  }
+
+  async createVouchersBulk(vouchers: InsertEventVoucher[]): Promise<EventVoucher[]> {
+    if (vouchers.length === 0) return [];
+    const normalizedVouchers = vouchers.map(v => ({ ...v, code: v.code.toUpperCase() }));
+    return db.insert(eventVouchers).values(normalizedVouchers).returning();
+  }
+
+  async updateVoucher(id: string, data: Partial<InsertEventVoucher>): Promise<EventVoucher | undefined> {
+    const updateData = { ...data };
+    if (updateData.code) updateData.code = updateData.code.toUpperCase();
+    const [updated] = await db.update(eventVouchers).set(updateData).where(eq(eventVouchers.id, id)).returning();
+    return updated;
+  }
+
+  async deleteVoucher(id: string): Promise<boolean> {
+    const result = await db.delete(eventVouchers).where(eq(eventVouchers.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // Voucher Usage methods
+  async getVoucherUsage(voucherId: string): Promise<VoucherUsage | undefined> {
+    const [usage] = await db.select().from(voucherUsages).where(eq(voucherUsages.voucherId, voucherId));
+    return usage;
+  }
+
+  async createVoucherUsage(usage: InsertVoucherUsage): Promise<VoucherUsage> {
+    const [created] = await db.insert(voucherUsages).values(usage).returning();
+    return created;
+  }
+
+  // Coupon methods
+  async getCoupon(id: string): Promise<EventCoupon | undefined> {
+    const [coupon] = await db.select().from(eventCoupons).where(eq(eventCoupons.id, id));
+    return coupon;
+  }
+
+  async getCouponByCode(eventId: string, code: string): Promise<EventCoupon | undefined> {
+    const [coupon] = await db.select().from(eventCoupons)
+      .where(and(eq(eventCoupons.eventId, eventId), eq(eventCoupons.code, code.toUpperCase())));
+    return coupon;
+  }
+
+  async getCouponsByEvent(eventId: string): Promise<EventCoupon[]> {
+    return db.select().from(eventCoupons).where(eq(eventCoupons.eventId, eventId));
+  }
+
+  async createCoupon(coupon: InsertEventCoupon): Promise<EventCoupon> {
+    const [created] = await db.insert(eventCoupons).values({
+      ...coupon,
+      code: coupon.code.toUpperCase()
+    }).returning();
+    return created;
+  }
+
+  async updateCoupon(id: string, data: Partial<InsertEventCoupon>): Promise<EventCoupon | undefined> {
+    const updateData = { ...data };
+    if (updateData.code) updateData.code = updateData.code.toUpperCase();
+    const [updated] = await db.update(eventCoupons).set(updateData).where(eq(eventCoupons.id, id)).returning();
+    return updated;
+  }
+
+  async deleteCoupon(id: string): Promise<boolean> {
+    const result = await db.delete(eventCoupons).where(eq(eventCoupons.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async incrementCouponUsage(id: string): Promise<void> {
+    await db.update(eventCoupons)
+      .set({ currentUses: sql`${eventCoupons.currentUses} + 1` })
+      .where(eq(eventCoupons.id, id));
+  }
+
+  // Coupon Usage methods
+  async getCouponUsagesByUser(couponId: string, userId: string): Promise<CouponUsage[]> {
+    return db.select().from(couponUsages)
+      .where(and(eq(couponUsages.couponId, couponId), eq(couponUsages.userId, userId)));
+  }
+
+  async createCouponUsage(usage: InsertCouponUsage): Promise<CouponUsage> {
+    const [created] = await db.insert(couponUsages).values(usage).returning();
+    return created;
   }
 }
 
