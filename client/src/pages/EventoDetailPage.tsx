@@ -620,20 +620,14 @@ export default function EventoDetailPage() {
               Ver Resultados
             </Button>
           ) : canRegister ? (
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <p className="text-xs text-muted-foreground">A partir de</p>
-                <p className="text-lg font-bold">{getLowestPrice()}</p>
-              </div>
-              <Button
-                size="lg"
-                className="flex-1 font-semibold"
-                onClick={handleInscricao}
-                data-testid="button-inscricao-mobile"
-              >
-                Inscrever-se
-              </Button>
-            </div>
+            <Button
+              size="lg"
+              className="w-full font-semibold"
+              onClick={handleInscricao}
+              data-testid="button-inscricao-mobile"
+            >
+              Inscrever-se
+            </Button>
           ) : (
             <div className="flex items-center justify-between gap-4">
               <div className="flex-1">
