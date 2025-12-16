@@ -119,6 +119,23 @@ function formatDate(dateStr: string): string {
   return dateStr;
 }
 
+function formatDateTime(dateStr: string): string {
+  if (!dateStr) return "-";
+  try {
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return "-";
+    // Format to Sao Paulo timezone
+    return date.toLocaleDateString("pt-BR", {
+      timeZone: "America/Sao_Paulo",
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+  } catch {
+    return "-";
+  }
+}
+
 function formatPhone(phone: string): string {
   const cleaned = phone.replace(/\D/g, "");
   if (cleaned.length === 11) {
@@ -805,7 +822,7 @@ export default function AdminAthletesPage() {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Data de Cadastro</p>
-                  <p className="font-medium">{formatDate(viewingAthlete.dataCadastro?.toString() || "")}</p>
+                  <p className="font-medium">{formatDateTime(viewingAthlete.dataCadastro?.toString() || "")}</p>
                 </div>
               </div>
 
@@ -839,7 +856,7 @@ export default function AdminAthletesPage() {
                             <TableCell>{reg.eventoNome}</TableCell>
                             <TableCell>{reg.modalidadeNome}</TableCell>
                             <TableCell>{getStatusBadge(reg.status)}</TableCell>
-                            <TableCell>{formatDate(reg.dataInscricao?.toString() || "")}</TableCell>
+                            <TableCell>{formatDateTime(reg.dataInscricao?.toString() || "")}</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
