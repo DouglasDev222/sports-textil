@@ -116,6 +116,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const currentEvent = updatedEvent || event;
 
       const activeBatch = batches.find(b => b.ativo && b.status === 'active');
+      
+      // Get all active batches (ativo = true) for display
+      const activeBatches = batches.filter(b => b.ativo).sort((a, b) => a.ordem - b.ordem);
 
       // Add availability info to modalities
       const modalitiesWithAvailability = modalities.map(mod => {
@@ -158,6 +161,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           registrationMessage,
           modalities: modalitiesWithAvailability,
           activeBatch: activeBatch ? formatBatchForResponse(activeBatch) : null,
+          activeBatches: activeBatches.map(formatBatchForResponse),
           prices: prices.filter(p => p.batchId === activeBatch?.id),
           attachments
         }

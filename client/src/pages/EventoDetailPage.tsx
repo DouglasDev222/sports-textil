@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Calendar, MapPin, Clock, Award, Info, FileText, Download, Package, Map, AlertCircle, XCircle, CalendarClock, Trophy, CheckCircle } from "lucide-react";
+import { Calendar, MapPin, Award, Info, FileText, Download, Package, AlertCircle, XCircle, CalendarClock, Trophy, CheckCircle, Tag, Users, Timer } from "lucide-react";
 import heroImage from '@assets/generated_images/Marathon_runners_landscape_hero_b439e181.png';
 import { formatDateOnlyLong } from "@/lib/timezone";
 import type { Event, Modality, RegistrationBatch, Price, Attachment } from "@shared/schema";
@@ -19,6 +19,7 @@ interface ModalityWithAvailability extends Modality {
 interface EventWithDetails extends Event {
   modalities: ModalityWithAvailability[];
   activeBatch: RegistrationBatch | null;
+  activeBatches: RegistrationBatch[];
   prices: Price[];
   attachments: Attachment[];
   eventSoldOut?: boolean;
@@ -47,11 +48,10 @@ export default function EventoDetailPage() {
     return (
       <div className="min-h-screen bg-background">
         <Header />
-        <Skeleton className="w-full h-[300px] md:h-[500px]" />
         <div className="max-w-7xl mx-auto px-4 md:px-6 py-8">
+          <Skeleton className="w-full aspect-[4/3] md:aspect-[21/9] rounded-lg mb-8" />
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="lg:col-span-2 space-y-4">
-              <Skeleton className="h-32 w-full" />
               <Skeleton className="h-32 w-full" />
               <Skeleton className="h-64 w-full" />
             </div>
@@ -74,7 +74,7 @@ export default function EventoDetailPage() {
           <p className="text-muted-foreground mb-6">
             O evento que você está procurando não existe ou não está mais disponível.
           </p>
-          <Button onClick={() => setLocation("/")}>
+          <Button onClick={() => setLocation("/")} data-testid="button-voltar">
             Ver todos os eventos
           </Button>
         </div>
@@ -105,14 +105,36 @@ export default function EventoDetailPage() {
     return `R$ ${valor.toFixed(2).replace('.', ',')}`;
   };
 
+  const getLowestPrice = (): string => {
+    const paidModalities = modalities.filter(m => m.tipoAcesso !== "gratuita");
+    if (paidModalities.length === 0) return "Gratuito";
+    
+    const prices = paidModalities.map(mod => {
+      const price = event.prices?.find(p => p.modalityId === mod.id);
+      return price ? parseFloat(price.valor) : Infinity;
+    }).filter(p => p !== Infinity && p > 0);
+    
+    if (prices.length === 0) {
+      const hasFreeModalities = modalities.some(m => m.tipoAcesso === "gratuita");
+      return hasFreeModalities ? "Gratuito" : "Consulte";
+    }
+    
+    const minPrice = Math.min(...prices);
+    return `R$ ${minPrice.toFixed(2).replace('.', ',')}`;
+  };
+
   const modalities = event.modalities || [];
   const attachments = event.attachments || [];
+  const activeBatches = event.activeBatches || [];
   const eventSoldOut = event.eventSoldOut || event.status === 'esgotado';
   const isFinished = event.status === 'finalizado';
   const registrationStatus = event.registrationStatus || (isFinished ? 'finished' : eventSoldOut ? 'sold_out' : 'open');
   const registrationMessage = event.registrationMessage;
   
   const canRegister = registrationStatus === 'open';
+
+  // Get unique distances
+  const uniqueDistances = Array.from(new Set(modalities.map(mod => `${mod.distancia} ${mod.unidadeDistancia}`)));
   
   const getButtonText = () => {
     switch (registrationStatus) {
@@ -125,7 +147,7 @@ export default function EventoDetailPage() {
       case 'finished':
         return 'Ver Resultados';
       default:
-        return 'Inscrever-se Agora';
+        return 'Inscrever-se';
     }
   };
   
@@ -154,61 +176,72 @@ export default function EventoDetailPage() {
         );
       case 'finished':
         return (
-          <Badge className="text-sm px-3 py-1 bg-green-600 hover:bg-green-700">
+          <Badge className="text-sm px-3 py-1 bg-green-600">
             <CheckCircle className="h-4 w-4 mr-1" />
             Finalizado
           </Badge>
         );
       default:
-        return null;
+        return (
+          <Badge className="text-sm px-3 py-1 bg-green-600">
+            <CheckCircle className="h-4 w-4 mr-1" />
+            Inscrições Abertas
+          </Badge>
+        );
     }
+  };
+
+  const formatBatchDate = (dateStr: string | Date | null) => {
+    if (!dateStr) return null;
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
   };
 
   return (
     <div className="min-h-screen bg-background">
       <Header />
 
-      <div className="relative">
-        <div className="absolute inset-0 bg-gradient-to-r from-primary/95 to-primary/75 z-10"></div>
-        <img
-          src={event.bannerUrl || heroImage}
-          alt={event.nome}
-          className="w-full h-[300px] md:h-[500px] object-cover"
-        />
-        <div className="absolute inset-0 z-20 flex items-end">
-          <div className="w-full px-4 md:px-6 pb-8 md:pb-12">
-            <div className="max-w-5xl mx-auto">
-              <div className="flex flex-wrap items-center gap-3 mb-4">
-                <h1 className="text-3xl md:text-5xl font-bold text-white">
-                  {event.nome}
-                </h1>
-                {getStatusBadge()}
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {modalities.map((mod) => (
-                  <Badge key={mod.id} variant="secondary" className="text-sm">
-                    {mod.distancia} {mod.unidadeDistancia}
-                  </Badge>
-                ))}
-              </div>
+      <div className="max-w-7xl mx-auto px-4 md:px-6 py-6 md:py-8">
+        {/* Banner with 4:3 aspect ratio */}
+        <div className="relative rounded-lg overflow-hidden mb-8">
+          <div className="aspect-[4/3] md:aspect-[21/9]">
+            <img
+              src={event.bannerUrl || heroImage}
+              alt={event.nome}
+              className="w-full h-full object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent"></div>
+          </div>
+          <div className="absolute bottom-0 left-0 right-0 p-4 md:p-8">
+            <div className="flex flex-wrap items-center gap-3 mb-3">
+              {getStatusBadge()}
+            </div>
+            <h1 className="text-2xl md:text-4xl lg:text-5xl font-bold text-white mb-3">
+              {event.nome}
+            </h1>
+            <div className="flex flex-wrap gap-2">
+              {uniqueDistances.map((distance) => (
+                <Badge key={distance} variant="secondary" className="text-sm bg-white/20 text-white border-white/30">
+                  {distance}
+                </Badge>
+              ))}
             </div>
           </div>
         </div>
-      </div>
 
-      <div className="max-w-7xl mx-auto px-4 md:px-6 py-8 md:py-12">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 pb-24 md:pb-0">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+            {/* Event Info Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                     <Calendar className="h-4 w-4" />
-                    Data
+                    Data do Evento
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="font-semibold text-foreground">{formattedDate}</p>
+                  <p className="font-semibold text-foreground text-lg">{formattedDate}</p>
                 </CardContent>
               </Card>
 
@@ -224,26 +257,72 @@ export default function EventoDetailPage() {
                   <p className="text-sm text-muted-foreground">{event.cidade}, {event.estado}</p>
                 </CardContent>
               </Card>
+            </div>
 
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                    <Clock className="h-4 w-4" />
-                    Largadas
+            {/* Batches Card */}
+            {activeBatches.length > 0 && (
+              <Card className="mb-8">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Tag className="h-5 w-5" />
+                    Lotes de Inscrição
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="space-y-0.5">
-                    {modalities.map((mod) => (
-                      <div key={mod.id} className="flex items-center justify-between text-xs py-0.5">
-                        <span className="text-muted-foreground">{mod.distancia} {mod.unidadeDistancia}</span>
-                        <span className="font-medium text-foreground">{mod.horarioLargada}</span>
-                      </div>
-                    ))}
+                <CardContent>
+                  <div className="space-y-3">
+                    {activeBatches.map((batch, index) => {
+                      const isCurrentBatch = event.activeBatch?.id === batch.id;
+                      const isFuture = batch.status === 'future';
+                      const isClosed = batch.status === 'closed';
+                      
+                      return (
+                        <div 
+                          key={batch.id}
+                          className={`flex items-center justify-between p-4 rounded-lg border ${
+                            isCurrentBatch 
+                              ? 'bg-primary/5 border-primary' 
+                              : isClosed 
+                                ? 'bg-muted/50 opacity-60' 
+                                : 'bg-muted/30'
+                          }`}
+                          data-testid={`batch-item-${index}`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className={`w-2 h-2 rounded-full ${
+                              isCurrentBatch ? 'bg-primary' : isClosed ? 'bg-muted-foreground' : 'bg-muted-foreground/50'
+                            }`} />
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium">{batch.nome}</span>
+                                {isCurrentBatch && (
+                                  <Badge variant="default" className="text-xs">Ativo</Badge>
+                                )}
+                                {isFuture && (
+                                  <Badge variant="secondary" className="text-xs">Em breve</Badge>
+                                )}
+                                {isClosed && (
+                                  <Badge variant="outline" className="text-xs">Encerrado</Badge>
+                                )}
+                              </div>
+                              <p className="text-sm text-muted-foreground">
+                                {formatBatchDate(batch.dataInicio)}
+                                {batch.dataTermino && ` - ${formatBatchDate(batch.dataTermino)}`}
+                              </p>
+                            </div>
+                          </div>
+                          {batch.quantidadeMaxima && (
+                            <div className="text-right text-sm text-muted-foreground">
+                              <Users className="h-4 w-4 inline mr-1" />
+                              {batch.quantidadeUtilizada}/{batch.quantidadeMaxima}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </CardContent>
               </Card>
-            </div>
+            )}
 
             <Tabs defaultValue="sobre" className="space-y-6">
               <TabsList className="grid w-full grid-cols-4">
@@ -267,25 +346,6 @@ export default function EventoDetailPage() {
                     </p>
                   </CardContent>
                 </Card>
-
-                <Card className="lg:hidden">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                      <Clock className="h-4 w-4" />
-                      Valores
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="pt-0">
-                    <div className="space-y-0.5">
-                      {modalities.map((mod) => (
-                        <div key={mod.id} className="flex items-center justify-between text-xs py-0.5">
-                          <span className="text-muted-foreground">{mod.nome}</span>
-                          <span className="font-medium text-foreground">{getPrice(mod.id)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
               </TabsContent>
 
               <TabsContent value="modalidades" className="space-y-6">
@@ -298,42 +358,55 @@ export default function EventoDetailPage() {
                   </CardHeader>
                   <CardContent>
                     {modalities.length > 0 ? (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 gap-4">
                         {modalities.map((mod) => {
                           const isSoldOut = eventSoldOut || mod.isSoldOut;
                           return (
                             <div 
                               key={mod.id} 
-                              className={`p-4 border rounded-md space-y-2 ${isSoldOut ? 'opacity-60 bg-muted/30' : ''}`}
+                              className={`p-4 border rounded-lg ${isSoldOut ? 'opacity-60 bg-muted/30' : ''}`}
+                              data-testid={`modality-item-${mod.id}`}
                             >
-                              <div className="flex items-center justify-between gap-2 flex-wrap">
-                                <Badge variant="secondary" className="text-base">
-                                  {mod.distancia} {mod.unidadeDistancia}
-                                </Badge>
-                                <div className="flex items-center gap-2">
-                                  {isSoldOut ? (
-                                    <Badge variant="destructive" className="text-xs">
-                                      Esgotado
-                                    </Badge>
-                                  ) : (
-                                    <span className="font-semibold">{getPrice(mod.id)}</span>
+                              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <h3 className="font-semibold text-lg">{mod.nome}</h3>
+                                    {isSoldOut && (
+                                      <Badge variant="destructive" className="text-xs">
+                                        Esgotado
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+                                    <span className="flex items-center gap-1">
+                                      <Award className="h-4 w-4" />
+                                      {mod.distancia} {mod.unidadeDistancia}
+                                    </span>
+                                    <span className="flex items-center gap-1">
+                                      <Timer className="h-4 w-4" />
+                                      Largada: {mod.horarioLargada}
+                                    </span>
+                                    {mod.limiteVagas && (
+                                      <span className="flex items-center gap-1">
+                                        <Users className="h-4 w-4" />
+                                        {mod.limiteVagas} vagas
+                                      </span>
+                                    )}
+                                  </div>
+                                  {mod.descricao && (
+                                    <p className="text-sm text-muted-foreground mt-2">{mod.descricao}</p>
+                                  )}
+                                  {(mod.idadeMinima !== null && mod.idadeMinima !== undefined) || event.idadeMinimaEvento ? (
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                      Idade mínima: {mod.idadeMinima ?? event.idadeMinimaEvento} anos
+                                    </p>
+                                  ) : null}
+                                </div>
+                                <div className="text-right">
+                                  {!isSoldOut && (
+                                    <span className="text-xl font-bold text-primary">{getPrice(mod.id)}</span>
                                   )}
                                 </div>
-                              </div>
-                              <p className="font-medium">{mod.nome}</p>
-                              <p className="text-sm text-muted-foreground">
-                                Largada: {mod.horarioLargada}
-                              </p>
-                              {mod.descricao && (
-                                <p className="text-sm text-muted-foreground">{mod.descricao}</p>
-                              )}
-                              <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-                                {mod.limiteVagas && (
-                                  <span>Limite: {mod.limiteVagas} vagas</span>
-                                )}
-                                {(mod.idadeMinima !== null && mod.idadeMinima !== undefined) || event.idadeMinimaEvento ? (
-                                  <span>Idade mínima: {mod.idadeMinima ?? event.idadeMinimaEvento} anos</span>
-                                ) : null}
                               </div>
                             </div>
                           );
@@ -357,15 +430,21 @@ export default function EventoDetailPage() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-center py-8">
-                      <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                      <p className="text-muted-foreground font-medium mb-2">
-                        Informações em breve
+                    {event.informacoesRetiradaKit ? (
+                      <p className="text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                        {event.informacoesRetiradaKit}
                       </p>
-                      <p className="text-sm text-muted-foreground">
-                        As informações sobre retirada de kit serão divulgadas em breve.
-                      </p>
-                    </div>
+                    ) : (
+                      <div className="text-center py-8">
+                        <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                        <p className="text-muted-foreground font-medium mb-2">
+                          Informações em breve
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          As informações sobre retirada de kit serão divulgadas em breve.
+                        </p>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </TabsContent>
@@ -384,7 +463,7 @@ export default function EventoDetailPage() {
                         {attachments.map((doc, idx) => (
                           <div
                             key={doc.id}
-                            className="flex items-center justify-between p-4 border rounded-md hover-elevate transition-all"
+                            className="flex items-center justify-between p-4 border rounded-lg hover-elevate transition-all"
                           >
                             <div className="flex items-center gap-3">
                               <FileText className="h-5 w-5 text-muted-foreground" />
@@ -418,19 +497,14 @@ export default function EventoDetailPage() {
             </Tabs>
           </div>
 
+          {/* Sidebar - Registration Card */}
           <div className="lg:col-span-1 hidden lg:block">
             <div className="sticky top-8">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Clock className="h-5 w-5" />
-                    Valores
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {registrationStatus === 'finished' ? (
+              <Card className="overflow-hidden">
+                {registrationStatus === 'finished' ? (
+                  <div className="p-6">
                     <div className="text-center py-4">
-                      <div className="mb-4 p-4 rounded-md bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800">
+                      <div className="mb-4 p-4 rounded-lg bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800">
                         <Trophy className="h-12 w-12 mx-auto text-green-600 dark:text-green-400 mb-3" />
                         <p className="text-lg font-semibold text-green-700 dark:text-green-300 mb-1">
                           Evento Finalizado
@@ -441,7 +515,7 @@ export default function EventoDetailPage() {
                       </div>
                       <Button
                         size="lg"
-                        className="w-full font-semibold bg-green-600 hover:bg-green-700"
+                        className="w-full font-semibold bg-green-600"
                         onClick={() => setLocation(`/evento/${event.slug}/resultados`)}
                         data-testid="button-resultados"
                       >
@@ -449,10 +523,23 @@ export default function EventoDetailPage() {
                         Ver Resultados
                       </Button>
                     </div>
-                  ) : (
-                    <>
+                  </div>
+                ) : (
+                  <>
+                    {/* Price Header */}
+                    <div className="bg-primary p-6 text-primary-foreground">
+                      <p className="text-sm opacity-90 mb-1">A partir de</p>
+                      <p className="text-3xl font-bold">{getLowestPrice()}</p>
+                      {event.activeBatch && (
+                        <p className="text-sm opacity-90 mt-2">
+                          Lote: {event.activeBatch.nome}
+                        </p>
+                      )}
+                    </div>
+                    
+                    <div className="p-6">
                       {registrationMessage && (
-                        <div className={`mb-4 p-3 rounded-md ${
+                        <div className={`mb-4 p-3 rounded-lg ${
                           registrationStatus === 'not_started' 
                             ? 'bg-secondary/50 border border-secondary' 
                             : 'bg-destructive/10 border border-destructive/20'
@@ -473,28 +560,34 @@ export default function EventoDetailPage() {
                           </p>
                         </div>
                       )}
-                      <div className="space-y-3 mb-6">
+                      
+                      {/* Modalities Summary */}
+                      <div className="space-y-2 mb-6">
+                        <h4 className="text-sm font-medium text-muted-foreground mb-3">Modalidades</h4>
                         {modalities.map((mod) => {
                           const isSoldOut = eventSoldOut || mod.isSoldOut;
                           return (
                             <div 
                               key={mod.id} 
-                              className={`flex items-center justify-between py-2 border-b last:border-b-0 gap-2 ${isSoldOut ? 'opacity-60' : ''}`}
+                              className={`flex items-center justify-between py-2 ${isSoldOut ? 'opacity-60' : ''}`}
                             >
-                              <span className="text-sm text-muted-foreground">{mod.nome}</span>
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm">{mod.distancia} {mod.unidadeDistancia}</span>
+                                <span className="text-xs text-muted-foreground">- {mod.nome}</span>
+                              </div>
                               {isSoldOut ? (
                                 <Badge variant="destructive" className="text-xs">
                                   Esgotado
                                 </Badge>
                               ) : (
-                                <span className="font-semibold text-foreground">{getPrice(mod.id)}</span>
+                                <span className="font-semibold text-sm">{getPrice(mod.id)}</span>
                               )}
                             </div>
                           );
                         })}
                       </div>
+                      
                       <Button
-                        variant="secondary"
                         size="lg"
                         className="w-full font-semibold"
                         onClick={handleInscricao}
@@ -503,38 +596,77 @@ export default function EventoDetailPage() {
                       >
                         {getButtonText()}
                       </Button>
-                    </>
-                  )}
-                </CardContent>
+                      
+                      {canRegister && (
+                        <p className="text-xs text-muted-foreground text-center mt-3">
+                          Inscrição rápida e segura
+                        </p>
+                      )}
+                    </div>
+                  </>
+                )}
               </Card>
             </div>
           </div>
         </div>
       </div>
 
+      {/* Mobile Fixed Bottom Bar */}
       <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-background border-t shadow-lg z-50">
         <div className="px-4 py-3">
           {registrationStatus === 'finished' ? (
             <Button
               size="lg"
-              className="w-full font-semibold bg-green-600 hover:bg-green-700"
+              className="w-full font-semibold bg-green-600"
               onClick={() => setLocation(`/evento/${event.slug}/resultados`)}
               data-testid="button-resultados-mobile"
             >
               <Trophy className="h-4 w-4 mr-2" />
               Ver Resultados
             </Button>
+          ) : canRegister ? (
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-xs text-muted-foreground">A partir de</p>
+                <p className="text-lg font-bold">{getLowestPrice()}</p>
+              </div>
+              <Button
+                size="lg"
+                className="flex-1 font-semibold"
+                onClick={handleInscricao}
+                data-testid="button-inscricao-mobile"
+              >
+                Inscrever-se
+              </Button>
+            </div>
           ) : (
-            <Button
-              variant="secondary"
-              size="lg"
-              className="w-full font-semibold"
-              onClick={handleInscricao}
-              disabled={!canRegister}
-              data-testid="button-inscricao-mobile"
-            >
-              {getButtonText()}
-            </Button>
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  {registrationStatus === 'not_started' ? (
+                    <CalendarClock className="h-4 w-4 text-muted-foreground" />
+                  ) : (
+                    <XCircle className="h-4 w-4 text-destructive" />
+                  )}
+                  <span className={`text-sm font-medium ${registrationStatus === 'not_started' ? 'text-foreground' : 'text-destructive'}`}>
+                    {registrationStatus === 'not_started' ? 'Inscrições em Breve' : 
+                     registrationStatus === 'closed' ? 'Inscrições Encerradas' : 'Evento Esgotado'}
+                  </span>
+                </div>
+                {registrationMessage && (
+                  <p className="text-xs text-muted-foreground mt-1 truncate">{registrationMessage}</p>
+                )}
+              </div>
+              <Button
+                size="lg"
+                variant="secondary"
+                className="font-semibold"
+                disabled
+                data-testid="button-inscricao-mobile-disabled"
+              >
+                {getButtonText()}
+              </Button>
+            </div>
           )}
         </div>
       </div>
