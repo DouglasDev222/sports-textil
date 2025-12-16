@@ -49,6 +49,7 @@ export default function InscricaoResumoPage() {
   const searchParams = new URLSearchParams(searchString);
   const modalidadeId = searchParams.get("modalidade") || "";
   const tamanho = searchParams.get("tamanho") || "";
+  const voucherCode = searchParams.get("codigo") || "";
 
   useEffect(() => {
     if (!authLoading && !athlete) {
@@ -72,6 +73,7 @@ export default function InscricaoResumoPage() {
       modalityId: string;
       tamanhoCamisa?: string;
       equipe?: string;
+      voucherCode?: string;
     }) => {
       const response = await apiRequest("POST", "/api/registrations", registrationData);
       return response.json();
@@ -119,7 +121,8 @@ export default function InscricaoResumoPage() {
       eventId: data.data.event.id,
       modalityId: modalidadeId,
       tamanhoCamisa: tamanho || undefined,
-      equipe: equipe || undefined
+      equipe: equipe || undefined,
+      voucherCode: voucherCode || undefined
     });
   };
 

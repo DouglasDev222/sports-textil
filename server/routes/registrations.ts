@@ -11,7 +11,8 @@ const createRegistrationSchema = z.object({
   eventId: z.string().uuid(),
   modalityId: z.string().uuid(),
   tamanhoCamisa: z.string().optional(),
-  equipe: z.string().optional()
+  equipe: z.string().optional(),
+  voucherCode: z.string().optional()
 });
 
 router.get("/events/:slug/registration-info", async (req, res) => {
@@ -370,6 +371,66 @@ router.post("/", async (req, res) => {
       return res.status(404).json({ success: false, error: "Modalidade não encontrada" });
     }
 
+    // Voucher validation for voucher-type modalities
+    const { voucherCode } = parsed.data;
+    let validatedVoucher: { id: string; code: string } | null = null;
+    
+    if (modality.tipoAcesso === "voucher") {
+      if (!voucherCode) {
+        return res.status(400).json({ 
+          success: false, 
+          error: "Código de voucher obrigatório para esta modalidade",
+          errorCode: "VOUCHER_REQUIRED"
+        });
+      }
+
+      const voucher = await storage.getVoucherByCode(eventId, voucherCode);
+      
+      if (!voucher) {
+        return res.status(400).json({ 
+          success: false, 
+          error: "Voucher não encontrado para este evento",
+          errorCode: "VOUCHER_NOT_FOUND"
+        });
+      }
+
+      const voucherNow = new Date();
+      
+      if (new Date(voucher.validFrom) > voucherNow) {
+        return res.status(400).json({ 
+          success: false, 
+          error: "Este voucher ainda não está válido",
+          errorCode: "VOUCHER_NOT_VALID_YET"
+        });
+      }
+
+      if (new Date(voucher.validUntil) < voucherNow) {
+        return res.status(400).json({ 
+          success: false, 
+          error: "Este voucher expirou",
+          errorCode: "VOUCHER_EXPIRED"
+        });
+      }
+
+      if (voucher.status === "used") {
+        return res.status(400).json({ 
+          success: false, 
+          error: "Este voucher já foi utilizado",
+          errorCode: "VOUCHER_ALREADY_USED"
+        });
+      }
+
+      if (voucher.status === "expired") {
+        return res.status(400).json({ 
+          success: false, 
+          error: "Este voucher expirou",
+          errorCode: "VOUCHER_EXPIRED"
+        });
+      }
+
+      validatedVoucher = { id: voucher.id, code: voucher.code };
+    }
+
     const activeBatch = await storage.getActiveBatch(eventId);
     if (!activeBatch) {
       return res.status(400).json({ success: false, error: "Nenhum lote disponível" });
@@ -461,6 +522,26 @@ router.post("/", async (req, res) => {
         error: result.error,
         errorCode: result.errorCode
       });
+    }
+
+    // Mark voucher as used after successful registration
+    if (validatedVoucher && result.order && result.registration) {
+      try {
+        // Update voucher status to used
+        await storage.updateVoucher(validatedVoucher.id, { status: "used" });
+        // Create voucher usage record
+        await storage.createVoucherUsage({
+          voucherId: validatedVoucher.id,
+          userId: athleteId,
+          registrationId: result.registration.id,
+          ipAddress: req.ip || null
+        });
+        // Update order with voucher code
+        await storage.updateOrder(result.order.id, { codigoVoucher: validatedVoucher.code });
+      } catch (voucherError) {
+        console.error("Error marking voucher as used:", voucherError);
+        // Don't fail the registration if voucher marking fails
+      }
     }
 
     res.status(201).json({

@@ -31,6 +31,7 @@ import AdminAthletesPage from "@/pages/admin/AdminAthletesPage";
 import AdminNotFound from "@/pages/admin/AdminNotFound";
 import AdminEventManagePage from "@/pages/admin/AdminEventManagePage";
 import AdminEventInscritosPage from "@/pages/admin/AdminEventInscritosPage";
+import AdminEventVouchersPage from "@/pages/admin/AdminEventVouchersPage";
 import ProtectedAdminRoute from "@/pages/admin/ProtectedAdminRoute";
 
 import { OrganizerAuthProvider } from "@/contexts/OrganizerAuthContext";
@@ -87,6 +88,11 @@ function AdminRoutes() {
         <Route path="/admin/eventos/:id/inscritos">
           <ProtectedAdminRoute>
             <AdminEventInscritosPage />
+          </ProtectedAdminRoute>
+        </Route>
+        <Route path="/admin/eventos/:id/vouchers">
+          <ProtectedAdminRoute>
+            <AdminEventVouchersPage />
           </ProtectedAdminRoute>
         </Route>
         <Route path="/admin/eventos/:id">

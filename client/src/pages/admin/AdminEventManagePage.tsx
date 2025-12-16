@@ -53,7 +53,8 @@ import {
   RotateCcw,
   Eye,
   EyeOff,
-  Trash2
+  Trash2,
+  Ticket
 } from "lucide-react";
 import { formatDateOnlyBrazil, formatDateTimeBrazil, formatForInput } from "@/lib/timezone";
 import { useToast } from "@/hooks/use-toast";
@@ -484,6 +485,12 @@ export default function AdminEventManagePage() {
               <Button variant="outline" data-testid="button-edit-event">
                 <Pencil className="mr-2 h-4 w-4" />
                 Editar Evento
+              </Button>
+            </Link>
+            <Link href={`/admin/eventos/${id}/vouchers`}>
+              <Button variant="outline" data-testid="button-vouchers">
+                <Ticket className="mr-2 h-4 w-4" />
+                Vouchers e Cupons
               </Button>
             </Link>
           </div>
