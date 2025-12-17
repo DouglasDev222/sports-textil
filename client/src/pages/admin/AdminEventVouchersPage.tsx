@@ -134,14 +134,17 @@ export default function AdminEventVouchersPage() {
   const [voucherSearch, setVoucherSearch] = useState("");
   const [voucherStatusFilter, setVoucherStatusFilter] = useState<"all" | "available" | "used" | "expired">("all");
   const [bulkCouponDialogOpen, setBulkCouponDialogOpen] = useState(false);
+  const [bulkCouponMode, setBulkCouponMode] = useState<"manual" | "auto">("auto");
   const [bulkCouponForm, setBulkCouponForm] = useState({
     codes: "",
+    quantity: "10",
     discountType: "percentage" as "percentage" | "fixed" | "full",
     discountValue: "",
     maxUses: "",
     maxUsesPerUser: "1",
     validFrom: "",
     validUntil: "",
+    isActive: true,
   });
   const [editBatchForm, setEditBatchForm] = useState({ validFrom: "", validUntil: "" });
 
@@ -280,17 +283,26 @@ export default function AdminEventVouchersPage() {
   });
 
   const createBulkCouponsMutation = useMutation({
-    mutationFn: async (data: typeof bulkCouponForm) => {
-      const codes = data.codes.split(/[\n,;]+/).map(c => c.trim().toUpperCase()).filter(c => c.length >= 2);
-      const payload = {
-        codes,
+    mutationFn: async ({ data, mode }: { data: typeof bulkCouponForm; mode: "manual" | "auto" }) => {
+      const payload: Record<string, unknown> = {
         discountType: data.discountType,
         discountValue: data.discountType === "full" ? null : parseFloat(data.discountValue) || 0,
         maxUses: data.maxUses ? parseInt(data.maxUses) : null,
         maxUsesPerUser: parseInt(data.maxUsesPerUser) || 1,
         validFrom: data.validFrom,
-        validUntil: data.validUntil
+        validUntil: data.validUntil,
+        isActive: data.isActive
       };
+      
+      if (mode === "auto") {
+        // Use quantity for auto-generation
+        payload.quantity = parseInt(data.quantity) || 10;
+      } else {
+        // Use manual codes
+        const codes = data.codes.split(/[\n,;]+/).map(c => c.trim().toUpperCase()).filter(c => c.length >= 2);
+        payload.codes = codes;
+      }
+      
       const response = await apiRequest("POST", `/api/admin/events/${id}/coupons/bulk`, payload);
       const result = await response.json();
       if (!result.success) throw new Error(result.error?.message || "Erro ao criar cupons");
@@ -299,8 +311,17 @@ export default function AdminEventVouchersPage() {
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/events", id, "coupons"] });
       setBulkCouponDialogOpen(false);
-      setBulkCouponForm({ codes: "", discountType: "percentage", discountValue: "", maxUses: "", maxUsesPerUser: "1", validFrom: "", validUntil: "" });
-      toast({ title: `${result.data?.created || 0} cupons criados com sucesso` });
+      setBulkCouponMode("auto");
+      setBulkCouponForm({ codes: "", quantity: "10", discountType: "percentage", discountValue: "", maxUses: "", maxUsesPerUser: "1", validFrom: "", validUntil: "", isActive: true });
+      const codesGenerated = result.data?.generatedCodes;
+      if (codesGenerated && codesGenerated.length > 0) {
+        toast({ 
+          title: `${result.data?.created || 0} cupons criados com sucesso`,
+          description: `Codigos: ${codesGenerated.slice(0, 3).join(", ")}${codesGenerated.length > 3 ? ` e mais ${codesGenerated.length - 3}...` : ""}`
+        });
+      } else {
+        toast({ title: `${result.data?.created || 0} cupons criados com sucesso` });
+      }
     },
     onError: (error: Error) => {
       toast({ title: "Erro ao criar cupons", description: error.message, variant: "destructive" });
@@ -1192,33 +1213,77 @@ export default function AdminEventVouchersPage() {
       </Dialog>
 
       <Dialog open={bulkCouponDialogOpen} onOpenChange={setBulkCouponDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Package className="h-5 w-5" />
-              Criar Varios Cupons
+              Criar Cupons em Massa
             </DialogTitle>
             <DialogDescription>
-              Insira varios codigos de uma vez (um por linha ou separados por virgula).
+              Gere codigos automaticamente ou insira manualmente.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <div>
-              <Label htmlFor="bulk-coupon-codes">Codigos (um por linha ou separados por virgula)</Label>
-              <Textarea
-                id="bulk-coupon-codes"
-                value={bulkCouponForm.codes}
-                onChange={(e) => setBulkCouponForm({ ...bulkCouponForm, codes: e.target.value.toUpperCase() })}
-                placeholder="CUPOM10&#10;DESCONTO20&#10;PROMO30"
-                className="min-h-[100px] font-mono"
-                data-testid="input-bulk-coupon-codes"
-              />
-              {bulkCouponForm.codes && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  {bulkCouponForm.codes.split(/[\n,;]+/).filter(c => c.trim().length >= 2).length} codigo(s) detectado(s)
-                </p>
-              )}
+            {/* Mode Toggle */}
+            <div className="flex gap-2">
+              <Button 
+                type="button"
+                variant={bulkCouponMode === "auto" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setBulkCouponMode("auto")}
+                data-testid="button-bulk-mode-auto"
+              >
+                Gerar Automaticamente
+              </Button>
+              <Button 
+                type="button"
+                variant={bulkCouponMode === "manual" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setBulkCouponMode("manual")}
+                data-testid="button-bulk-mode-manual"
+              >
+                Codigos Manuais
+              </Button>
             </div>
+
+            {/* Code Input - depends on mode */}
+            {bulkCouponMode === "auto" ? (
+              <div>
+                <Label htmlFor="bulk-coupon-quantity">Quantidade de Cupons</Label>
+                <Input
+                  id="bulk-coupon-quantity"
+                  type="number"
+                  min={1}
+                  max={1000}
+                  value={bulkCouponForm.quantity}
+                  onChange={(e) => setBulkCouponForm({ ...bulkCouponForm, quantity: e.target.value })}
+                  placeholder="Ex: 10"
+                  data-testid="input-bulk-coupon-quantity"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Codigos aleatorios serao gerados automaticamente (max: 1000)
+                </p>
+              </div>
+            ) : (
+              <div>
+                <Label htmlFor="bulk-coupon-codes">Codigos (um por linha ou separados por virgula)</Label>
+                <Textarea
+                  id="bulk-coupon-codes"
+                  value={bulkCouponForm.codes}
+                  onChange={(e) => setBulkCouponForm({ ...bulkCouponForm, codes: e.target.value.toUpperCase() })}
+                  placeholder="CUPOM10&#10;DESCONTO20&#10;PROMO30"
+                  className="min-h-[100px] font-mono"
+                  data-testid="input-bulk-coupon-codes"
+                />
+                {bulkCouponForm.codes && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {bulkCouponForm.codes.split(/[\n,;]+/).filter(c => c.trim().length >= 2).length} codigo(s) detectado(s)
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Discount Type */}
             <div>
               <Label>Tipo de Desconto</Label>
               <Select 
@@ -1235,6 +1300,8 @@ export default function AdminEventVouchersPage() {
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Discount Value */}
             {bulkCouponForm.discountType !== "full" && (
               <div>
                 <Label htmlFor="bulk-coupon-discount-value">
@@ -1247,10 +1314,40 @@ export default function AdminEventVouchersPage() {
                   max={bulkCouponForm.discountType === "percentage" ? 100 : undefined}
                   value={bulkCouponForm.discountValue}
                   onChange={(e) => setBulkCouponForm({ ...bulkCouponForm, discountValue: e.target.value })}
+                  placeholder={bulkCouponForm.discountType === "percentage" ? "Ex: 20" : "Ex: 50.00"}
                   data-testid="input-bulk-coupon-discount-value"
                 />
               </div>
             )}
+
+            {/* Usage Limits */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="bulk-coupon-max-uses">Limite Total de Usos</Label>
+                <Input
+                  id="bulk-coupon-max-uses"
+                  type="number"
+                  min={1}
+                  value={bulkCouponForm.maxUses}
+                  onChange={(e) => setBulkCouponForm({ ...bulkCouponForm, maxUses: e.target.value })}
+                  placeholder="Sem limite"
+                  data-testid="input-bulk-coupon-max-uses"
+                />
+              </div>
+              <div>
+                <Label htmlFor="bulk-coupon-max-per-user">Limite por Usuario</Label>
+                <Input
+                  id="bulk-coupon-max-per-user"
+                  type="number"
+                  min={1}
+                  value={bulkCouponForm.maxUsesPerUser}
+                  onChange={(e) => setBulkCouponForm({ ...bulkCouponForm, maxUsesPerUser: e.target.value })}
+                  data-testid="input-bulk-coupon-max-per-user"
+                />
+              </div>
+            </div>
+
+            {/* Validity Dates */}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="bulk-coupon-valid-from">Valido a partir de</Label>
@@ -1273,12 +1370,33 @@ export default function AdminEventVouchersPage() {
                 />
               </div>
             </div>
+
+            {/* Active Status */}
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="bulk-coupon-active"
+                checked={bulkCouponForm.isActive}
+                onChange={(e) => setBulkCouponForm({ ...bulkCouponForm, isActive: e.target.checked })}
+                className="h-4 w-4 rounded border-gray-300"
+                data-testid="checkbox-bulk-coupon-active"
+              />
+              <Label htmlFor="bulk-coupon-active" className="cursor-pointer">
+                Cupom ativo (pode ser usado imediatamente)
+              </Label>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setBulkCouponDialogOpen(false)}>Cancelar</Button>
             <Button 
-              onClick={() => createBulkCouponsMutation.mutate(bulkCouponForm)}
-              disabled={createBulkCouponsMutation.isPending || !bulkCouponForm.codes || !bulkCouponForm.validFrom || !bulkCouponForm.validUntil}
+              onClick={() => createBulkCouponsMutation.mutate({ data: bulkCouponForm, mode: bulkCouponMode })}
+              disabled={
+                createBulkCouponsMutation.isPending || 
+                !bulkCouponForm.validFrom || 
+                !bulkCouponForm.validUntil ||
+                (bulkCouponMode === "manual" && !bulkCouponForm.codes) ||
+                (bulkCouponMode === "auto" && (!bulkCouponForm.quantity || parseInt(bulkCouponForm.quantity) < 1))
+              }
               data-testid="button-confirm-bulk-coupons"
             >
               {createBulkCouponsMutation.isPending ? "Criando..." : "Criar Cupons"}

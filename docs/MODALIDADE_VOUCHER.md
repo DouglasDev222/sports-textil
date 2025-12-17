@@ -560,6 +560,69 @@ Esta secao documenta o estado real das funcionalidades implementadas, apos audit
 | Formato exportacao | Apenas CSV | CSV + Excel (.xlsx) |
 | Exportacao por lote | Apenas backend | Backend + frontend com botao por lote |
 
+### 4. Correcoes de Frontend (Dezembro 2024)
+
+#### 4.1 Tratamento de Erros de Validacao de Voucher
+
+**Problema:** O frontend tratava erros HTTP 404/409/422 como "erro de conexao" ao inves de exibir a mensagem de erro retornada pelo backend.
+
+**Solucao:** A validacao de voucher agora utiliza `fetch` diretamente (ao inves de `apiRequest`) para poder tratar respostas HTTP nao-200 como erros de regra de negocio:
+
+```typescript
+// Tratamento correto de erros de negocio
+if (!response.ok) {
+  if (response.status === 404 || response.status === 409 || response.status === 422 || response.status === 400) {
+    return { 
+      valid: false, 
+      error: result.error?.code || "invalid",
+      message: result.error?.message || "Voucher invalido"
+    };
+  }
+}
+```
+
+**Comportamento atual:**
+- 404: Voucher nao encontrado - exibe mensagem do backend
+- 409: Voucher ja utilizado - exibe mensagem do backend
+- 422: Voucher expirado ou ainda nao valido - exibe mensagem do backend
+- 5xx: Erro de servidor - exibe mensagem generica
+- Erro de rede real: Exibe "Erro de conexao"
+
+#### 4.2 UI de Criacao de Cupons em Massa
+
+**Problema:** A UI de criacao de cupons em massa so permitia codigos manuais, sem opcao de geracao automatica.
+
+**Solucao:** Adicionado modo de alternancia entre:
+- **Geracao Automatica:** Informar quantidade (1-1000) para gerar codigos aleatorios
+- **Codigos Manuais:** Inserir codigos um por linha ou separados por virgula
+
+**Campos disponiveis na UI:**
+| Campo | Descricao |
+|-------|-----------|
+| Modo | Automatico ou Manual |
+| Quantidade | Numero de cupons (modo automatico) |
+| Codigos | Lista de codigos (modo manual) |
+| Tipo de Desconto | Porcentagem, Valor Fixo, 100% Gratuito |
+| Valor do Desconto | Valor ou percentual |
+| Limite Total de Usos | Maximo de usos por cupom |
+| Limite por Usuario | Maximo de usos por usuario |
+| Valido De/Ate | Periodo de validade |
+| Cupom Ativo | Se pode ser usado imediatamente |
+
+#### 4.3 Modalidade Voucher com Valor Zero
+
+**Status:** Funcionando corretamente.
+
+A regra de `isPaidModality` no backend ja exclui modalidades do tipo 'voucher':
+```typescript
+const isPaidModality = !['gratuita', 'voucher'].includes(mod.tipoAcesso);
+```
+
+Isso garante que:
+- Modalidades voucher com valor 0 NAO aparecem como "indisponivel"
+- Modalidades voucher sao sempre selecionaveis (desde que nao esgotadas)
+- O preco exibido sera "Gratuito" quando valor = 0
+
 ---
 
 ## Checklist de Implementacao
@@ -603,10 +666,13 @@ Esta secao documenta o estado real das funcionalidades implementadas, apos audit
 - [ ] Criar visualizacao de auditoria
 - [x] Criar pagina de gerenciamento de cupons (admin)
 - [x] Criar formulario de criacao de cupom
+- [x] Criar formulario de criacao de cupom em massa (com geracao automatica)
 - [x] Criar listagem de cupons
 - [x] Integrar cupom na tela de pagamento
 - [ ] Adicionar relatorios de uso
 - [x] Mensagens de erro de voucher detalhadas
+- [x] Tratamento correto de erros HTTP 404/409/422 na validacao
+- [x] UI de criacao em massa com modo automatico e manual
 
 ### Testes
 

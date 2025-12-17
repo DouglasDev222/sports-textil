@@ -98,26 +98,59 @@ export default function InscricaoModalidadePage() {
 
   const validateVoucherMutation = useMutation({
     mutationFn: async ({ code, eventId }: { code: string; eventId: string }) => {
-      const response = await apiRequest("POST", "/api/vouchers/validate", { code, eventId });
-      const result = await response.json();
-      if (result.success && result.data?.voucher) {
-        return { valid: true, voucher: result.data.voucher };
-      } else {
-        return { 
-          valid: false, 
-          error: result.error?.code || "invalid",
-          message: result.error?.message || "Voucher invalido"
-        };
+      try {
+        const response = await fetch("/api/vouchers/validate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code, eventId }),
+          credentials: "include"
+        });
+        
+        const result = await response.json();
+        
+        // Handle business logic errors (404, 409, 422) - these are NOT connection errors
+        if (!response.ok) {
+          // These are expected business errors from the backend
+          if (response.status === 404 || response.status === 409 || response.status === 422 || response.status === 400) {
+            return { 
+              valid: false, 
+              error: result.error?.code || "invalid",
+              message: result.error?.message || "Voucher invalido"
+            };
+          }
+          // 5xx errors are server errors
+          if (response.status >= 500) {
+            return {
+              valid: false,
+              error: "server_error",
+              message: "Erro no servidor. Por favor, tente novamente."
+            };
+          }
+        }
+        
+        if (result.success && result.data?.voucher) {
+          return { valid: true, voucher: result.data.voucher };
+        } else {
+          return { 
+            valid: false, 
+            error: result.error?.code || "invalid",
+            message: result.error?.message || "Voucher invalido"
+          };
+        }
+      } catch (error) {
+        // Only true network errors (timeout, no connection, etc) should reach here
+        throw error;
       }
     },
     onSuccess: (result) => {
       setVoucherValidado(result);
     },
     onError: () => {
+      // This only fires for real network failures (fetch threw an exception)
       setVoucherValidado({
         valid: false,
         error: "network_error",
-        message: "Erro de conexao. Tente novamente."
+        message: "Erro de conexao. Verifique sua internet e tente novamente."
       });
     }
   });
