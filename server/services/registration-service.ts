@@ -234,7 +234,8 @@ export async function registerForEventAtomic(
     }
     
     const modality = modalityResult.rows[0];
-    const isPaidModality = modality.tipo_acesso !== 'gratuita';
+    // Modalities with type 'gratuita' or 'voucher' can have zero price
+    const isPaidModality = !['gratuita', 'voucher'].includes(modality.tipo_acesso);
     
     if (modality.limite_vagas !== null && modality.vagas_ocupadas >= modality.limite_vagas) {
       await client.query('ROLLBACK');

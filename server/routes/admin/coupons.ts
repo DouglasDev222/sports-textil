@@ -1,10 +1,15 @@
 import { Router } from "express";
 import { z } from "zod";
+import crypto from "crypto";
 import { storage } from "../../storage";
 import { requireAuth, requireRole, checkEventOwnership } from "../../middleware/auth";
 import { utcToBrazilLocal, localToBrazilUTC } from "../../utils/timezone";
 
 const router = Router({ mergeParams: true });
+
+function generateCouponCode(length: number = 8): string {
+  return crypto.randomBytes(length / 2).toString("hex").toUpperCase();
+}
 
 function formatCouponForResponse(coupon: any) {
   return {
@@ -131,7 +136,8 @@ router.post("/", requireAuth, requireRole("superadmin", "admin"), async (req, re
 });
 
 const bulkCouponCreateSchema = z.object({
-  codes: z.array(z.string().min(2).max(50)).min(1, "Pelo menos um codigo e necessario"),
+  codes: z.array(z.string().min(2).max(50)).optional().default([]),
+  quantity: z.number().int().min(1).max(1000).optional(),
   discountType: z.enum(["percentage", "fixed", "full"]),
   discountValue: z.number().min(0).optional().nullable(),
   maxUses: z.number().int().min(1).optional().nullable(),
@@ -139,7 +145,13 @@ const bulkCouponCreateSchema = z.object({
   validFrom: z.string().refine(val => !isNaN(Date.parse(val)), "Data de inicio invalida"),
   validUntil: z.string().refine(val => !isNaN(Date.parse(val)), "Data de termino invalida"),
   isActive: z.boolean().default(true),
-});
+}).refine(
+  (data) => (data.codes && data.codes.length > 0) || (data.quantity && data.quantity > 0),
+  { message: "Informe os codigos manualmente ou a quantidade para gerar automaticamente" }
+).refine(
+  (data) => !((data.codes && data.codes.length > 0) && (data.quantity && data.quantity > 0)),
+  { message: "Informe apenas codigos OU quantidade, nao ambos" }
+);
 
 router.post("/bulk", requireAuth, requireRole("superadmin", "admin"), async (req, res) => {
   try {
@@ -169,36 +181,73 @@ router.post("/bulk", requireAuth, requireRole("superadmin", "admin"), async (req
       }
     }
 
-    const codes = [...new Set(validation.data.codes.map(c => c.toUpperCase().trim()).filter(c => c.length >= 2))];
+    // Determine codes to create - either from provided codes or auto-generate
+    let codes: string[] = [];
+    const existingCodes = new Set<string>();
     
-    const duplicates: string[] = [];
-    const voucherConflicts: string[] = [];
-    for (const code of codes) {
-      const uniqueCheck = await storage.isCodeGloballyUnique(eventId, code);
-      if (!uniqueCheck.isUnique) {
-        if (uniqueCheck.type === "voucher") {
-          voucherConflicts.push(code);
-        } else {
-          duplicates.push(code);
-        }
+    if (validation.data.codes && validation.data.codes.length > 0) {
+      // Use provided codes
+      const uniqueCodes = new Set(validation.data.codes.map(c => c.toUpperCase().trim()).filter(c => c.length >= 2));
+      codes = Array.from(uniqueCodes);
+    } else if (validation.data.quantity && validation.data.quantity > 0) {
+      // Auto-generate codes
+      for (let i = 0; i < validation.data.quantity; i++) {
+        let code: string;
+        let attempts = 0;
+        let isUnique = false;
+        
+        do {
+          code = generateCouponCode(8);
+          attempts++;
+          if (attempts > 100) {
+            return res.status(500).json({
+              success: false,
+              error: { code: "GENERATION_ERROR", message: "Falha ao gerar codigos unicos" }
+            });
+          }
+          if (!existingCodes.has(code)) {
+            const uniqueCheck = await storage.isCodeGloballyUnique(eventId, code);
+            isUnique = uniqueCheck.isUnique;
+          }
+        } while (existingCodes.has(code) || !isUnique);
+        
+        existingCodes.add(code);
+        codes.push(code);
       }
     }
     
-    if (voucherConflicts.length > 0) {
-      return res.status(400).json({
-        success: false,
-        error: { 
-          code: "VOUCHER_CONFLICT", 
-          message: `Codigos ja em uso como vouchers: ${voucherConflicts.slice(0, 5).join(", ")}${voucherConflicts.length > 5 ? ` e mais ${voucherConflicts.length - 5}` : ""}` 
-        }
-      });
-    }
+    // Validate provided codes for conflicts
+    const duplicates: string[] = [];
+    const voucherConflicts: string[] = [];
     
-    if (duplicates.length > 0) {
-      return res.status(400).json({
-        success: false,
-        error: { code: "DUPLICATE_CODES", message: `Codigos duplicados: ${duplicates.slice(0, 5).join(", ")}${duplicates.length > 5 ? ` e mais ${duplicates.length - 5}` : ""}` }
-      });
+    if (validation.data.codes && validation.data.codes.length > 0) {
+      for (const code of codes) {
+        const uniqueCheck = await storage.isCodeGloballyUnique(eventId, code);
+        if (!uniqueCheck.isUnique) {
+          if (uniqueCheck.type === "voucher") {
+            voucherConflicts.push(code);
+          } else {
+            duplicates.push(code);
+          }
+        }
+      }
+      
+      if (voucherConflicts.length > 0) {
+        return res.status(400).json({
+          success: false,
+          error: { 
+            code: "VOUCHER_CONFLICT", 
+            message: `Codigos ja em uso como vouchers: ${voucherConflicts.slice(0, 5).join(", ")}${voucherConflicts.length > 5 ? ` e mais ${voucherConflicts.length - 5}` : ""}` 
+          }
+        });
+      }
+      
+      if (duplicates.length > 0) {
+        return res.status(400).json({
+          success: false,
+          error: { code: "DUPLICATE_CODES", message: `Codigos duplicados: ${duplicates.slice(0, 5).join(", ")}${duplicates.length > 5 ? ` e mais ${duplicates.length - 5}` : ""}` }
+        });
+      }
     }
 
     const createdCoupons = [];
@@ -221,6 +270,7 @@ router.post("/bulk", requireAuth, requireRole("superadmin", "admin"), async (req
       success: true, 
       data: { 
         created: createdCoupons.length,
+        autoGenerated: !(validation.data.codes && validation.data.codes.length > 0),
         coupons: createdCoupons.map(formatCouponForResponse) 
       } 
     });

@@ -14,55 +14,51 @@ router.post("/validate", async (req, res) => {
     const validation = validateVoucherSchema.safeParse(req.body);
     if (!validation.success) {
       return res.status(400).json({
-        valid: false,
-        error: "validation_error",
-        message: validation.error.errors[0].message
+        success: false,
+        error: { code: "VALIDATION_ERROR", message: validation.error.errors[0].message }
       });
     }
 
     const { code, eventId } = validation.data;
     
-    const voucher = await storage.getVoucherByCode(eventId, code);
+    const voucher = await storage.getVoucherByCode(eventId, code.toUpperCase().trim());
     
     if (!voucher) {
       return res.status(400).json({
-        valid: false,
-        error: "voucher_not_found",
-        message: "Voucher nao encontrado para este evento"
+        success: false,
+        error: { code: "VOUCHER_NOT_FOUND", message: "Voucher nao encontrado. Verifique se o codigo esta correto e pertence a este evento." }
       });
     }
 
     const now = new Date();
     
     if (new Date(voucher.validFrom) > now) {
+      const validFromDate = new Date(voucher.validFrom).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
       return res.status(400).json({
-        valid: false,
-        error: "voucher_not_valid_yet",
-        message: "Este voucher ainda nao esta valido"
+        success: false,
+        error: { code: "VOUCHER_NOT_VALID_YET", message: `Este voucher ainda nao esta valido. Valido a partir de ${validFromDate}.` }
       });
     }
 
     if (new Date(voucher.validUntil) < now) {
+      const validUntilDate = new Date(voucher.validUntil).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
       return res.status(400).json({
-        valid: false,
-        error: "voucher_expired",
-        message: "Este voucher expirou"
+        success: false,
+        error: { code: "VOUCHER_EXPIRED", message: `Este voucher expirou em ${validUntilDate}.` }
       });
     }
 
     if (voucher.status === "used") {
       return res.status(400).json({
-        valid: false,
-        error: "voucher_already_used",
-        message: "Este voucher ja foi utilizado"
+        success: false,
+        error: { code: "VOUCHER_ALREADY_USED", message: "Este voucher ja foi utilizado em outra inscricao." }
       });
     }
 
     if (voucher.status === "expired") {
       return res.status(400).json({
-        valid: false,
-        error: "voucher_expired",
-        message: "Este voucher expirou"
+        success: false,
+        error: { code: "VOUCHER_EXPIRED", message: "Este voucher expirou e nao pode mais ser utilizado." }
       });
     }
 
@@ -73,20 +69,21 @@ router.post("/validate", async (req, res) => {
     }
 
     res.json({
-      valid: true,
-      voucher: {
-        id: voucher.id,
-        code: voucher.code,
-        batchName,
-        validUntil: voucher.validUntil,
+      success: true,
+      data: {
+        voucher: {
+          id: voucher.id,
+          code: voucher.code,
+          batchName,
+          validUntil: voucher.validUntil,
+        }
       }
     });
   } catch (error) {
     console.error("Validate voucher error:", error);
     res.status(500).json({
-      valid: false,
-      error: "internal_error",
-      message: "Erro interno do servidor"
+      success: false,
+      error: { code: "INTERNAL_ERROR", message: "Erro ao validar voucher. Por favor, tente novamente." }
     });
   }
 });

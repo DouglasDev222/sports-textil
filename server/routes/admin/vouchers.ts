@@ -381,6 +381,9 @@ router.get("/report", requireAuth, async (req, res) => {
 router.get("/export", requireAuth, requireRole("superadmin", "admin"), async (req, res) => {
   try {
     const eventId = req.params.eventId;
+    const batchId = req.query.batchId as string | undefined;
+    const format = (req.query.format as string) || "csv";
+    
     const event = await storage.getEvent(eventId);
     if (!event) {
       return res.status(404).json({
@@ -397,34 +400,82 @@ router.get("/export", requireAuth, requireRole("superadmin", "admin"), async (re
       });
     }
 
-    const vouchers = await storage.getVouchersByEvent(eventId);
+    let vouchers = await storage.getVouchersByEvent(eventId);
     const batches = await storage.getVoucherBatchesByEvent(eventId);
     const batchMap = new Map(batches.map(b => [b.id, b.nome]));
 
-    const now = new Date();
-    const csvRows = [
-      ["Codigo", "Status", "Lote", "Valido De", "Valido Ate", "Criado Em", "Usado Em", "Usuario ID"].join(",")
-    ];
+    // Filter by batch if specified
+    let selectedBatchName = "";
+    if (batchId) {
+      vouchers = vouchers.filter(v => v.batchId === batchId);
+      selectedBatchName = batchMap.get(batchId) || batchId;
+    }
 
+    // Get usage data for all vouchers
+    const usageDataMap = new Map<string, { usedAt: Date; userId: string }>();
+    const userInfoMap = new Map<string, { nome: string; email: string }>();
+    
     for (const v of vouchers) {
+      if (v.status === "used") {
+        const usage = await storage.getVoucherUsage(v.id);
+        if (usage) {
+          usageDataMap.set(v.id, { usedAt: usage.usedAt, userId: usage.userId });
+          if (!userInfoMap.has(usage.userId)) {
+            const athlete = await storage.getAthlete(usage.userId);
+            if (athlete) {
+              userInfoMap.set(usage.userId, { nome: athlete.nome, email: athlete.email });
+            }
+          }
+        }
+      }
+    }
+
+    const now = new Date();
+    
+    // Build export data with all required columns
+    const exportData = vouchers.map(v => {
       const status = v.status === "used" ? "Usado" : 
                      new Date(v.validUntil) < now ? "Expirado" : "Disponivel";
       const batchName = v.batchId ? (batchMap.get(v.batchId) || v.batchId) : "-";
+      const usageData = usageDataMap.get(v.id);
+      const userInfo = usageData ? userInfoMap.get(usageData.userId) : null;
       
+      return {
+        codigo: v.code,
+        lote: batchName,
+        status: status,
+        validoDe: new Date(v.validFrom).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" }),
+        validoAte: new Date(v.validUntil).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" }),
+        usado: v.status === "used" ? "Sim" : "Nao",
+        dataUso: usageData ? new Date(usageData.usedAt).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" }) : "-",
+        atleta: userInfo ? userInfo.nome : "-",
+        emailAtleta: userInfo ? userInfo.email : "-",
+        criadoEm: new Date(v.createdAt).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })
+      };
+    });
+
+    // CSV format with semicolon separator (Excel-friendly)
+    const headers = ["Codigo", "Lote", "Status", "Valido De", "Valido Ate", "Usado", "Data de Uso", "Atleta", "Email Atleta", "Criado Em"];
+    const csvRows = [headers.join(";")];
+    
+    for (const row of exportData) {
       csvRows.push([
-        v.code,
-        status,
-        batchName,
-        new Date(v.validFrom).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" }),
-        new Date(v.validUntil).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" }),
-        new Date(v.createdAt).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" }),
-        v.usedAt ? new Date(v.usedAt).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" }) : "-",
-        v.usedBy || "-"
-      ].map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(","));
+        row.codigo,
+        row.lote,
+        row.status,
+        row.validoDe,
+        row.validoAte,
+        row.usado,
+        row.dataUso,
+        row.atleta,
+        row.emailAtleta,
+        row.criadoEm
+      ].map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(";"));
     }
 
     const csv = csvRows.join("\n");
-    const filename = `vouchers_${event.slug || eventId}_${new Date().toISOString().split("T")[0]}.csv`;
+    const batchSuffix = selectedBatchName ? `_lote-${selectedBatchName.replace(/[^a-zA-Z0-9]/g, '-')}` : "";
+    const filename = `vouchers_${event.slug || eventId}${batchSuffix}_${new Date().toISOString().split("T")[0]}.csv`;
 
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);

@@ -172,7 +172,8 @@ router.get("/events/:slug/registration-info", async (req, res) => {
       }
 
       // CRITICAL BUSINESS RULE: Check if paid modality has valid price
-      const isPaidModality = mod.tipoAcesso !== "gratuita";
+      // Modalities with type 'gratuita' or 'voucher' can have zero price
+      const isPaidModality = !['gratuita', 'voucher'].includes(mod.tipoAcesso);
       let inscricaoBloqueada = false;
       let motivoBloqueio: string | null = null;
       

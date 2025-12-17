@@ -403,33 +403,114 @@ Em caso de falha no pagamento, o voucher deve permanecer disponivel.
 
 ---
 
+## Correcoes e Melhorias (Dezembro 2024)
+
+### 1. Modalidade Voucher com Valor Zero
+
+**Problema:** Modalidades do tipo 'voucher' com valor 0 ou nulo apareciam como INDISPONIVEL.
+
+**Solucao:** Atualizado a logica de `isPaidModality` para considerar tanto 'gratuita' quanto 'voucher' como tipos que podem ter valor zero.
+
+```typescript
+// Antes
+const isPaidModality = modality.tipo_acesso !== 'gratuita';
+
+// Depois
+const isPaidModality = !['gratuita', 'voucher'].includes(modality.tipo_acesso);
+```
+
+**Arquivos alterados:**
+- `server/services/registration-service.ts`
+- `server/routes/registrations.ts`
+
+### 2. Exportacao de Vouchers por Lote
+
+**Melhorias implementadas:**
+- Adicionado parametro `?batchId=` para filtrar por lote especifico
+- Formato CSV com separador ponto-e-virgula (compativel com Excel)
+- Colunas adicionais: Nome do Atleta, Email do Atleta
+- Nome do arquivo inclui nome do lote quando filtrado
+
+**Endpoint:** `GET /api/admin/events/:eventId/vouchers/export?batchId=XXX`
+
+**Colunas exportadas:**
+| Coluna | Descricao |
+|--------|-----------|
+| Codigo | Codigo do voucher |
+| Lote | Nome do lote |
+| Status | Disponivel / Usado / Expirado |
+| Valido De | Data de inicio |
+| Valido Ate | Data de expiracao |
+| Usado | Sim / Nao |
+| Data de Uso | Data em que foi usado |
+| Atleta | Nome do atleta que usou |
+| Email Atleta | Email do atleta |
+| Criado Em | Data de criacao |
+
+### 3. Criacao de Cupons em Massa com Codigos Automaticos
+
+**Novos campos no endpoint bulk:**
+- `quantity` (opcional): Numero de cupons a gerar automaticamente
+- `codes` (opcional): Lista de codigos manuais
+
+**Regra:** Deve informar `codes` OU `quantity`, nao ambos.
+
+**Exemplo - Gerar 10 cupons automaticos:**
+```json
+{
+  "quantity": 10,
+  "discountType": "percentage",
+  "discountValue": 20,
+  "maxUses": 50,
+  "maxUsesPerUser": 1,
+  "validFrom": "2024-01-01T00:00:00Z",
+  "validUntil": "2024-12-31T23:59:59Z",
+  "isActive": true
+}
+```
+
+### 4. Mensagens de Erro de Validacao de Voucher
+
+**Mensagens melhoradas:**
+| Erro | Mensagem |
+|------|----------|
+| VOUCHER_NOT_FOUND | Voucher nao encontrado. Verifique se o codigo esta correto e pertence a este evento. |
+| VOUCHER_EXPIRED | Este voucher expirou em {data}. |
+| VOUCHER_NOT_VALID_YET | Este voucher ainda nao esta valido. Valido a partir de {data}. |
+| VOUCHER_ALREADY_USED | Este voucher ja foi utilizado em outra inscricao. |
+| INTERNAL_ERROR | Erro ao validar voucher. Por favor, tente novamente. |
+
+---
+
 ## Checklist de Implementacao
 
 ### Backend
 
-- [ ] Criar tabela `event_voucher_batches` (schema Drizzle)
-- [ ] Criar tabela `event_vouchers` (schema Drizzle)
-- [ ] Criar tabela `voucher_usages` (schema Drizzle)
-- [ ] Criar tabela `event_coupons` (schema Drizzle)
-- [ ] Criar tabela `coupon_usages` (schema Drizzle)
-- [ ] Adicionar campo `access_type` na tabela `modalities`
-- [ ] Implementar endpoint POST `/api/events/:eventId/vouchers/batch`
-- [ ] Implementar endpoint POST `/api/events/:eventId/vouchers`
-- [ ] Implementar endpoint GET `/api/events/:eventId/vouchers`
+- [x] Criar tabela `event_voucher_batches` (schema Drizzle)
+- [x] Criar tabela `event_vouchers` (schema Drizzle)
+- [x] Criar tabela `voucher_usages` (schema Drizzle)
+- [x] Criar tabela `event_coupons` (schema Drizzle)
+- [x] Criar tabela `coupon_usages` (schema Drizzle)
+- [x] Adicionar campo `access_type` na tabela `modalities`
+- [x] Implementar endpoint POST `/api/events/:eventId/vouchers/batch`
+- [x] Implementar endpoint POST `/api/events/:eventId/vouchers`
+- [x] Implementar endpoint GET `/api/events/:eventId/vouchers`
 - [x] Implementar endpoint POST `/api/vouchers/validate`
-- [ ] Implementar endpoint DELETE `/api/vouchers/:id`
-- [ ] Implementar endpoint GET `/api/events/:eventId/vouchers/batches`
-- [ ] Implementar endpoint GET `/api/events/:eventId/vouchers/report`
+- [x] Implementar endpoint DELETE `/api/vouchers/:id`
+- [x] Implementar endpoint GET `/api/events/:eventId/vouchers/batches`
+- [x] Implementar endpoint GET `/api/events/:eventId/vouchers/report`
 - [x] Implementar endpoint POST `/api/events/:eventId/coupons`
 - [x] Implementar endpoint GET `/api/events/:eventId/coupons`
 - [x] Implementar endpoint POST `/api/coupons/validate`
 - [x] Implementar endpoint PATCH `/api/coupons/:id`
-- [ ] Implementar endpoint DELETE `/api/coupons/:id`
+- [x] Implementar endpoint DELETE `/api/coupons/:id`
 - [x] Implementar funcao de geracao de codigo seguro
 - [ ] Implementar rate limiting nos endpoints de validacao
 - [x] Implementar registro de auditoria
 - [x] Adicionar logica de voucher no fluxo de inscricao
 - [x] Adicionar logica de cupom no fluxo de pagamento
+- [x] Exportacao de vouchers por lote
+- [x] Geracao automatica de codigos de cupons em massa
 
 ### Frontend
 
@@ -445,6 +526,7 @@ Em caso de falha no pagamento, o voucher deve permanecer disponivel.
 - [x] Criar listagem de cupons
 - [x] Integrar cupom na tela de pagamento
 - [ ] Adicionar relatorios de uso
+- [x] Mensagens de erro de voucher detalhadas
 
 ### Testes
 
