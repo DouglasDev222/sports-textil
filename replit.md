@@ -72,5 +72,7 @@ Complete implementation of the voucher system as documented in `docs/MODALIDADE_
 - **Batch Validity Updates**: Admins can update validity dates for entire voucher batches at once
 - **CSV Export**: One-click export of all vouchers to CSV format with status, batch info, and usage details
 - **Search & Filter**: Real-time search by code and filter by status (available, used, expired) for vouchers list
-- **Bulk Coupon Creation**: Create multiple discount coupons at once with the same settings
+- **Bulk Coupon Creation**: Create multiple discount coupons at once with the same settings, supporting both manual code entry and automatic code generation (1-1000 codes)
 - **Global Code Uniqueness**: Voucher and coupon codes are validated to be unique across both systems per event
+- **Improved Error Handling**: Frontend now correctly distinguishes HTTP 404/409/422 as business logic errors (showing specific messages from backend) vs network errors
+- **Voucher Modality Display**: Voucher-type modalities with zero value correctly show as "Gratuito" and are always selectable (not blocked)
