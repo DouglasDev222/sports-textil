@@ -482,6 +482,86 @@ const isPaidModality = !['gratuita', 'voucher'].includes(modality.tipo_acesso);
 
 ---
 
+## Auditoria Tecnica - Estado Real do Sistema (Dezembro 2024)
+
+### Resumo da Auditoria
+
+Esta secao documenta o estado real das funcionalidades implementadas, apos auditoria tecnica realizada em dezembro de 2024.
+
+### 1. Validacao de Voucher (POST /api/vouchers/validate)
+
+**Status: IMPLEMENTADO COM CORRECOES**
+
+- **Arquivo:** `server/routes/vouchers.ts`
+- **Funcao:** `router.post("/validate", ...)`
+- **Rota:** `POST /api/vouchers/validate`
+
+**Codigos HTTP utilizados:**
+| Cenario | Codigo HTTP | Codigo de Erro |
+|---------|-------------|----------------|
+| Dados invalidos | 400 | VALIDATION_ERROR |
+| Voucher nao encontrado | 404 | VOUCHER_NOT_FOUND |
+| Voucher ainda nao valido | 422 | VOUCHER_NOT_VALID_YET |
+| Voucher expirado | 422 | VOUCHER_EXPIRED |
+| Voucher ja utilizado | 409 | VOUCHER_ALREADY_USED |
+| Erro interno | 500 | INTERNAL_ERROR |
+| Voucher valido | 200 | - (success: true) |
+
+**Frontend:** `client/src/pages/InscricaoModalidadePage.tsx` trata corretamente os codigos de erro e exibe mensagens especificas.
+
+### 2. Exportacao de Vouchers
+
+**Status: IMPLEMENTADO**
+
+- **Arquivo:** `server/routes/admin/vouchers.ts`
+- **Funcao:** `router.get("/export", ...)`
+- **Rota:** `GET /api/admin/events/:eventId/vouchers/export`
+
+**Parametros suportados:**
+- `batchId` (opcional): Filtra vouchers por lote especifico
+- `format` (opcional): "xlsx" (padrao) ou "csv"
+
+**Colunas exportadas:**
+- Codigo, Lote, Status, Valido De, Valido Ate, Usado, Data de Uso, Atleta, Email Atleta, Criado Em
+
+**Frontend:** `client/src/pages/admin/AdminEventVouchersPage.tsx`
+- Botao "Exportar Excel" (todos os vouchers)
+- Botao "CSV" (todos os vouchers)
+- Botao de download por lote na tabela de lotes
+
+### 3. Criacao de Cupons em Massa
+
+**Status: IMPLEMENTADO**
+
+- **Arquivo:** `server/routes/admin/coupons.ts`
+- **Funcao:** `router.post("/bulk", ...)`
+- **Rota:** `POST /api/admin/events/:eventId/coupons/bulk`
+
+**Campos suportados:**
+- `quantity`: Quantidade de cupons a gerar automaticamente (1-1000)
+- `codes`: Lista de codigos manuais (alternativa a quantity)
+- `discountType`: percentage | fixed | full
+- `discountValue`: Valor do desconto
+- `maxUses`: Limite total de usos
+- `maxUsesPerUser`: Limite por usuario
+- `validFrom`, `validUntil`: Datas de validade
+- `isActive`: Status do cupom
+
+**Validacoes implementadas:**
+- Unicidade global de codigos (voucher + cupom)
+- Validacao de porcentagem <= 100%
+- Impedimento de criar codes E quantity simultaneamente
+
+### Divergencias Corrigidas
+
+| Item | Estado Anterior | Estado Atual |
+|------|-----------------|--------------|
+| HTTP codes validacao voucher | Todos HTTP 400 | 404/409/422 conforme tipo de erro |
+| Formato exportacao | Apenas CSV | CSV + Excel (.xlsx) |
+| Exportacao por lote | Apenas backend | Backend + frontend com botao por lote |
+
+---
+
 ## Checklist de Implementacao
 
 ### Backend

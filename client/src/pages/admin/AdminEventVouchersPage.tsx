@@ -356,8 +356,12 @@ export default function AdminEventVouchersPage() {
     toast({ title: "Codigo copiado!" });
   };
 
-  const handleExportVouchers = () => {
-    window.open(`/api/admin/events/${id}/vouchers/export`, "_blank");
+  const handleExportVouchers = (batchId?: string, format: "xlsx" | "csv" = "xlsx") => {
+    const params = new URLSearchParams();
+    if (batchId) params.set("batchId", batchId);
+    params.set("format", format);
+    const queryString = params.toString();
+    window.open(`/api/admin/events/${id}/vouchers/export${queryString ? `?${queryString}` : ""}`, "_blank");
   };
 
   const now = new Date();
@@ -553,14 +557,25 @@ export default function AdminEventVouchersPage() {
                             {formatDateTimeBrazil(batch.createdAt)}
                           </TableCell>
                           <TableCell>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => handleOpenEditBatch(batch)}
-                              data-testid={`button-edit-batch-${batch.id}`}
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
+                            <div className="flex items-center gap-1">
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => handleExportVouchers(batch.id, "xlsx")}
+                                title="Exportar vouchers deste lote"
+                                data-testid={`button-export-batch-${batch.id}`}
+                              >
+                                <Download className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => handleOpenEditBatch(batch)}
+                                data-testid={`button-edit-batch-${batch.id}`}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -575,15 +590,26 @@ export default function AdminEventVouchersPage() {
                 <CardTitle className="text-lg flex items-center justify-between gap-2 flex-wrap">
                   <span>Vouchers ({vouchers.length})</span>
                   {vouchers.length > 0 && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleExportVouchers}
-                      data-testid="button-export-vouchers"
-                    >
-                      <Download className="h-4 w-4 mr-2" />
-                      Exportar CSV
-                    </Button>
+                    <div className="flex gap-2 flex-wrap">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleExportVouchers(undefined, "xlsx")}
+                        data-testid="button-export-vouchers-xlsx"
+                      >
+                        <Download className="h-4 w-4 mr-2" />
+                        Exportar Excel
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleExportVouchers(undefined, "csv")}
+                        data-testid="button-export-vouchers-csv"
+                      >
+                        <Download className="h-4 w-4 mr-2" />
+                        CSV
+                      </Button>
+                    </div>
                   )}
                 </CardTitle>
               </CardHeader>

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import crypto from "crypto";
+import ExcelJS from "exceljs";
 import { storage } from "../../storage";
 import { requireAuth, requireRole, checkEventOwnership } from "../../middleware/auth";
 import { utcToBrazilLocal, localToBrazilUTC } from "../../utils/timezone";
@@ -382,7 +383,7 @@ router.get("/export", requireAuth, requireRole("superadmin", "admin"), async (re
   try {
     const eventId = req.params.eventId;
     const batchId = req.query.batchId as string | undefined;
-    const format = (req.query.format as string) || "csv";
+    const format = (req.query.format as string) || "xlsx";
     
     const event = await storage.getEvent(eventId);
     if (!event) {
@@ -404,14 +405,12 @@ router.get("/export", requireAuth, requireRole("superadmin", "admin"), async (re
     const batches = await storage.getVoucherBatchesByEvent(eventId);
     const batchMap = new Map(batches.map(b => [b.id, b.nome]));
 
-    // Filter by batch if specified
     let selectedBatchName = "";
     if (batchId) {
       vouchers = vouchers.filter(v => v.batchId === batchId);
       selectedBatchName = batchMap.get(batchId) || batchId;
     }
 
-    // Get usage data for all vouchers
     const usageDataMap = new Map<string, { usedAt: Date; userId: string }>();
     const userInfoMap = new Map<string, { nome: string; email: string }>();
     
@@ -432,7 +431,6 @@ router.get("/export", requireAuth, requireRole("superadmin", "admin"), async (re
 
     const now = new Date();
     
-    // Build export data with all required columns
     const exportData = vouchers.map(v => {
       const status = v.status === "used" ? "Usado" : 
                      new Date(v.validUntil) < now ? "Expirado" : "Disponivel";
@@ -454,32 +452,90 @@ router.get("/export", requireAuth, requireRole("superadmin", "admin"), async (re
       };
     });
 
-    // CSV format with semicolon separator (Excel-friendly)
-    const headers = ["Codigo", "Lote", "Status", "Valido De", "Valido Ate", "Usado", "Data de Uso", "Atleta", "Email Atleta", "Criado Em"];
-    const csvRows = [headers.join(";")];
-    
-    for (const row of exportData) {
-      csvRows.push([
-        row.codigo,
-        row.lote,
-        row.status,
-        row.validoDe,
-        row.validoAte,
-        row.usado,
-        row.dataUso,
-        row.atleta,
-        row.emailAtleta,
-        row.criadoEm
-      ].map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(";"));
-    }
-
-    const csv = csvRows.join("\n");
     const batchSuffix = selectedBatchName ? `_lote-${selectedBatchName.replace(/[^a-zA-Z0-9]/g, '-')}` : "";
-    const filename = `vouchers_${event.slug || eventId}${batchSuffix}_${new Date().toISOString().split("T")[0]}.csv`;
+    const baseFilename = `vouchers_${event.slug || eventId}${batchSuffix}_${new Date().toISOString().split("T")[0]}`;
 
-    res.setHeader("Content-Type", "text/csv; charset=utf-8");
-    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-    res.send("\uFEFF" + csv);
+    if (format === "xlsx") {
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = "ST Eventos";
+      workbook.created = new Date();
+      
+      const worksheet = workbook.addWorksheet("Vouchers");
+      
+      worksheet.columns = [
+        { header: "Codigo", key: "codigo", width: 15 },
+        { header: "Lote", key: "lote", width: 25 },
+        { header: "Status", key: "status", width: 12 },
+        { header: "Valido De", key: "validoDe", width: 20 },
+        { header: "Valido Ate", key: "validoAte", width: 20 },
+        { header: "Usado", key: "usado", width: 8 },
+        { header: "Data de Uso", key: "dataUso", width: 20 },
+        { header: "Atleta", key: "atleta", width: 30 },
+        { header: "Email Atleta", key: "emailAtleta", width: 35 },
+        { header: "Criado Em", key: "criadoEm", width: 20 }
+      ];
+      
+      const headerRow = worksheet.getRow(1);
+      headerRow.font = { bold: true };
+      headerRow.fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FF1E3A5F" }
+      };
+      headerRow.font = { bold: true, color: { argb: "FFFFFFFF" } };
+      
+      for (const row of exportData) {
+        const addedRow = worksheet.addRow(row);
+        if (row.status === "Usado") {
+          addedRow.getCell("status").fill = {
+            type: "pattern",
+            pattern: "solid",
+            fgColor: { argb: "FFD4EDDA" }
+          };
+        } else if (row.status === "Expirado") {
+          addedRow.getCell("status").fill = {
+            type: "pattern",
+            pattern: "solid",
+            fgColor: { argb: "FFF8D7DA" }
+          };
+        }
+      }
+      
+      worksheet.autoFilter = {
+        from: { row: 1, column: 1 },
+        to: { row: exportData.length + 1, column: 10 }
+      };
+      
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.setHeader("Content-Disposition", `attachment; filename="${baseFilename}.xlsx"`);
+      
+      await workbook.xlsx.write(res);
+      res.end();
+    } else {
+      const headers = ["Codigo", "Lote", "Status", "Valido De", "Valido Ate", "Usado", "Data de Uso", "Atleta", "Email Atleta", "Criado Em"];
+      const csvRows = [headers.join(";")];
+      
+      for (const row of exportData) {
+        csvRows.push([
+          row.codigo,
+          row.lote,
+          row.status,
+          row.validoDe,
+          row.validoAte,
+          row.usado,
+          row.dataUso,
+          row.atleta,
+          row.emailAtleta,
+          row.criadoEm
+        ].map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(";"));
+      }
+
+      const csv = csvRows.join("\n");
+
+      res.setHeader("Content-Type", "text/csv; charset=utf-8");
+      res.setHeader("Content-Disposition", `attachment; filename="${baseFilename}.csv"`);
+      res.send("\uFEFF" + csv);
+    }
   } catch (error) {
     console.error("Export vouchers error:", error);
     res.status(500).json({
