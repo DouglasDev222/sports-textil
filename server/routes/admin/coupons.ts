@@ -95,11 +95,16 @@ router.post("/", requireAuth, requireRole("superadmin", "admin"), async (req, re
       }
     }
 
-    const existingCoupon = await storage.getCouponByCode(eventId, validation.data.code);
-    if (existingCoupon) {
+    const uniqueCheck = await storage.isCodeGloballyUnique(eventId, validation.data.code);
+    if (!uniqueCheck.isUnique) {
       return res.status(400).json({
         success: false,
-        error: { code: "DUPLICATE_CODE", message: "Codigo de cupom ja existe para este evento" }
+        error: { 
+          code: "DUPLICATE_CODE", 
+          message: uniqueCheck.type === "voucher" 
+            ? "Este codigo ja esta em uso como voucher" 
+            : "Codigo de cupom ja existe para este evento" 
+        }
       });
     }
 
@@ -118,6 +123,109 @@ router.post("/", requireAuth, requireRole("superadmin", "admin"), async (req, re
     res.status(201).json({ success: true, data: formatCouponForResponse(coupon) });
   } catch (error) {
     console.error("Create coupon error:", error);
+    res.status(500).json({
+      success: false,
+      error: { code: "INTERNAL_ERROR", message: "Erro interno do servidor" }
+    });
+  }
+});
+
+const bulkCouponCreateSchema = z.object({
+  codes: z.array(z.string().min(2).max(50)).min(1, "Pelo menos um codigo e necessario"),
+  discountType: z.enum(["percentage", "fixed", "full"]),
+  discountValue: z.number().min(0).optional().nullable(),
+  maxUses: z.number().int().min(1).optional().nullable(),
+  maxUsesPerUser: z.number().int().min(1).default(1),
+  validFrom: z.string().refine(val => !isNaN(Date.parse(val)), "Data de inicio invalida"),
+  validUntil: z.string().refine(val => !isNaN(Date.parse(val)), "Data de termino invalida"),
+  isActive: z.boolean().default(true),
+});
+
+router.post("/bulk", requireAuth, requireRole("superadmin", "admin"), async (req, res) => {
+  try {
+    const eventId = req.params.eventId;
+    const event = await storage.getEvent(eventId);
+    if (!event) {
+      return res.status(404).json({
+        success: false,
+        error: { code: "NOT_FOUND", message: "Evento nao encontrado" }
+      });
+    }
+
+    const validation = bulkCouponCreateSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({
+        success: false,
+        error: { code: "VALIDATION_ERROR", message: validation.error.errors[0].message }
+      });
+    }
+
+    if (validation.data.discountType === "percentage" && validation.data.discountValue) {
+      if (validation.data.discountValue > 100) {
+        return res.status(400).json({
+          success: false,
+          error: { code: "VALIDATION_ERROR", message: "Porcentagem de desconto nao pode exceder 100%" }
+        });
+      }
+    }
+
+    const codes = [...new Set(validation.data.codes.map(c => c.toUpperCase().trim()).filter(c => c.length >= 2))];
+    
+    const duplicates: string[] = [];
+    const voucherConflicts: string[] = [];
+    for (const code of codes) {
+      const uniqueCheck = await storage.isCodeGloballyUnique(eventId, code);
+      if (!uniqueCheck.isUnique) {
+        if (uniqueCheck.type === "voucher") {
+          voucherConflicts.push(code);
+        } else {
+          duplicates.push(code);
+        }
+      }
+    }
+    
+    if (voucherConflicts.length > 0) {
+      return res.status(400).json({
+        success: false,
+        error: { 
+          code: "VOUCHER_CONFLICT", 
+          message: `Codigos ja em uso como vouchers: ${voucherConflicts.slice(0, 5).join(", ")}${voucherConflicts.length > 5 ? ` e mais ${voucherConflicts.length - 5}` : ""}` 
+        }
+      });
+    }
+    
+    if (duplicates.length > 0) {
+      return res.status(400).json({
+        success: false,
+        error: { code: "DUPLICATE_CODES", message: `Codigos duplicados: ${duplicates.slice(0, 5).join(", ")}${duplicates.length > 5 ? ` e mais ${duplicates.length - 5}` : ""}` }
+      });
+    }
+
+    const createdCoupons = [];
+    for (const code of codes) {
+      const coupon = await storage.createCoupon({
+        eventId,
+        code,
+        discountType: validation.data.discountType,
+        discountValue: validation.data.discountValue?.toString(),
+        maxUses: validation.data.maxUses,
+        maxUsesPerUser: validation.data.maxUsesPerUser,
+        validFrom: localToBrazilUTC(validation.data.validFrom),
+        validUntil: localToBrazilUTC(validation.data.validUntil),
+        isActive: validation.data.isActive,
+      });
+      createdCoupons.push(coupon);
+    }
+
+    res.status(201).json({ 
+      success: true, 
+      data: { 
+        created: createdCoupons.length,
+        coupons: createdCoupons.map(formatCouponForResponse) 
+      } 
+    });
+  } catch (error) {
+    console.error("Bulk create coupons error:", error);
     res.status(500).json({
       success: false,
       error: { code: "INTERNAL_ERROR", message: "Erro interno do servidor" }

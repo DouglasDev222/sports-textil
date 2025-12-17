@@ -55,7 +55,15 @@ import {
   Clock,
   Package,
   Percent,
-  DollarSign
+  DollarSign,
+  User,
+  Calendar,
+  FileText,
+  Eye,
+  Edit,
+  Download,
+  Search,
+  Filter
 } from "lucide-react";
 import { formatDateTimeBrazil, formatForInput } from "@/lib/timezone";
 import { useToast } from "@/hooks/use-toast";
@@ -121,6 +129,21 @@ export default function AdminEventVouchersPage() {
   const [couponDialogOpen, setCouponDialogOpen] = useState(false);
   const [deleteVoucherDialog, setDeleteVoucherDialog] = useState<{ open: boolean; id: string; code: string } | null>(null);
   const [deleteCouponDialog, setDeleteCouponDialog] = useState<{ open: boolean; id: string; code: string } | null>(null);
+  const [voucherDetailDialog, setVoucherDetailDialog] = useState<Voucher | null>(null);
+  const [editBatchDialog, setEditBatchDialog] = useState<VoucherBatch | null>(null);
+  const [voucherSearch, setVoucherSearch] = useState("");
+  const [voucherStatusFilter, setVoucherStatusFilter] = useState<"all" | "available" | "used" | "expired">("all");
+  const [bulkCouponDialogOpen, setBulkCouponDialogOpen] = useState(false);
+  const [bulkCouponForm, setBulkCouponForm] = useState({
+    codes: "",
+    discountType: "percentage" as "percentage" | "fixed" | "full",
+    discountValue: "",
+    maxUses: "",
+    maxUsesPerUser: "1",
+    validFrom: "",
+    validUntil: "",
+  });
+  const [editBatchForm, setEditBatchForm] = useState({ validFrom: "", validUntil: "" });
 
   const [batchForm, setBatchForm] = useState({
     nome: "",
@@ -256,6 +279,34 @@ export default function AdminEventVouchersPage() {
     }
   });
 
+  const createBulkCouponsMutation = useMutation({
+    mutationFn: async (data: typeof bulkCouponForm) => {
+      const codes = data.codes.split(/[\n,;]+/).map(c => c.trim().toUpperCase()).filter(c => c.length >= 2);
+      const payload = {
+        codes,
+        discountType: data.discountType,
+        discountValue: data.discountType === "full" ? null : parseFloat(data.discountValue) || 0,
+        maxUses: data.maxUses ? parseInt(data.maxUses) : null,
+        maxUsesPerUser: parseInt(data.maxUsesPerUser) || 1,
+        validFrom: data.validFrom,
+        validUntil: data.validUntil
+      };
+      const response = await apiRequest("POST", `/api/admin/events/${id}/coupons/bulk`, payload);
+      const result = await response.json();
+      if (!result.success) throw new Error(result.error?.message || "Erro ao criar cupons");
+      return result;
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/events", id, "coupons"] });
+      setBulkCouponDialogOpen(false);
+      setBulkCouponForm({ codes: "", discountType: "percentage", discountValue: "", maxUses: "", maxUsesPerUser: "1", validFrom: "", validUntil: "" });
+      toast({ title: `${result.data?.created || 0} cupons criados com sucesso` });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erro ao criar cupons", description: error.message, variant: "destructive" });
+    }
+  });
+
   const deleteCouponMutation = useMutation({
     mutationFn: async (couponId: string) => {
       const response = await apiRequest("DELETE", `/api/admin/events/${id}/coupons/${couponId}`);
@@ -273,10 +324,53 @@ export default function AdminEventVouchersPage() {
     }
   });
 
+  const updateBatchMutation = useMutation({
+    mutationFn: async ({ batchId, data }: { batchId: string; data: { validFrom?: string; validUntil?: string } }) => {
+      const response = await apiRequest("PATCH", `/api/admin/events/${id}/vouchers/batches/${batchId}`, data);
+      const result = await response.json();
+      if (!result.success) throw new Error(result.error?.message || "Erro ao atualizar lote");
+      return result;
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/events", id, "vouchers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/events", id, "vouchers/batches"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/events", id, "vouchers/report"] });
+      setEditBatchDialog(null);
+      toast({ title: `Lote atualizado. ${result.data?.vouchersUpdated || 0} vouchers afetados.` });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erro ao atualizar lote", description: error.message, variant: "destructive" });
+    }
+  });
+
+  const handleOpenEditBatch = (batch: VoucherBatch) => {
+    setEditBatchForm({
+      validFrom: formatForInput(batch.validFrom),
+      validUntil: formatForInput(batch.validUntil)
+    });
+    setEditBatchDialog(batch);
+  };
+
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     toast({ title: "Codigo copiado!" });
   };
+
+  const handleExportVouchers = () => {
+    window.open(`/api/admin/events/${id}/vouchers/export`, "_blank");
+  };
+
+  const now = new Date();
+  const filteredVouchers = vouchers.filter(v => {
+    const matchesSearch = !voucherSearch || v.code.toLowerCase().includes(voucherSearch.toLowerCase());
+    if (!matchesSearch) return false;
+    
+    if (voucherStatusFilter === "all") return true;
+    if (voucherStatusFilter === "used") return v.status === "used";
+    if (voucherStatusFilter === "expired") return v.status === "expired" || (v.status === "available" && new Date(v.validUntil) < now);
+    if (voucherStatusFilter === "available") return v.status === "available" && new Date(v.validUntil) >= now;
+    return true;
+  });
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -444,6 +538,7 @@ export default function AdminEventVouchersPage() {
                         <TableHead>Quantidade</TableHead>
                         <TableHead>Validade</TableHead>
                         <TableHead>Criado em</TableHead>
+                        <TableHead>Acoes</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -457,6 +552,16 @@ export default function AdminEventVouchersPage() {
                           <TableCell className="text-sm text-muted-foreground">
                             {formatDateTimeBrazil(batch.createdAt)}
                           </TableCell>
+                          <TableCell>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => handleOpenEditBatch(batch)}
+                              data-testid={`button-edit-batch-${batch.id}`}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -467,7 +572,20 @@ export default function AdminEventVouchersPage() {
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Vouchers ({vouchers.length})</CardTitle>
+                <CardTitle className="text-lg flex items-center justify-between gap-2 flex-wrap">
+                  <span>Vouchers ({vouchers.length})</span>
+                  {vouchers.length > 0 && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleExportVouchers}
+                      data-testid="button-export-vouchers"
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      Exportar CSV
+                    </Button>
+                  )}
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 {vouchersLoading ? (
@@ -475,26 +593,61 @@ export default function AdminEventVouchersPage() {
                 ) : vouchers.length === 0 ? (
                   <p className="text-muted-foreground text-center py-8">Nenhum voucher criado ainda.</p>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Codigo</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Validade</TableHead>
-                          <TableHead>Acoes</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {vouchers.slice(0, 100).map((voucher) => (
-                          <TableRow key={voucher.id} data-testid={`row-voucher-${voucher.id}`}>
+                  <div className="space-y-4">
+                    <div className="flex flex-wrap gap-3 items-center">
+                      <div className="relative flex-1 min-w-[200px] max-w-[300px]">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          placeholder="Buscar por codigo..."
+                          value={voucherSearch}
+                          onChange={(e) => setVoucherSearch(e.target.value)}
+                          className="pl-9"
+                          data-testid="input-voucher-search"
+                        />
+                      </div>
+                      <Select value={voucherStatusFilter} onValueChange={(v) => setVoucherStatusFilter(v as typeof voucherStatusFilter)}>
+                        <SelectTrigger className="w-[150px]" data-testid="select-voucher-status-filter">
+                          <Filter className="h-4 w-4 mr-2" />
+                          <SelectValue placeholder="Status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Todos</SelectItem>
+                          <SelectItem value="available">Disponiveis</SelectItem>
+                          <SelectItem value="used">Utilizados</SelectItem>
+                          <SelectItem value="expired">Expirados</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {(voucherSearch || voucherStatusFilter !== "all") && (
+                        <span className="text-sm text-muted-foreground">
+                          Mostrando {filteredVouchers.length} de {vouchers.length}
+                        </span>
+                      )}
+                    </div>
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Codigo</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead>Validade</TableHead>
+                            <TableHead>Acoes</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {filteredVouchers.slice(0, 100).map((voucher) => (
+                            <TableRow 
+                              key={voucher.id} 
+                              data-testid={`row-voucher-${voucher.id}`}
+                              className="cursor-pointer hover-elevate"
+                              onClick={() => setVoucherDetailDialog(voucher)}
+                          >
                             <TableCell>
                               <div className="flex items-center gap-2">
                                 <code className="font-mono bg-muted px-2 py-1 rounded text-sm">{voucher.code}</code>
                                 <Button 
                                   size="icon" 
                                   variant="ghost" 
-                                  onClick={() => copyToClipboard(voucher.code)}
+                                  onClick={(e) => { e.stopPropagation(); copyToClipboard(voucher.code); }}
                                   data-testid={`button-copy-${voucher.id}`}
                                 >
                                   <Copy className="h-3 w-3" />
@@ -506,26 +659,35 @@ export default function AdminEventVouchersPage() {
                               {formatDateTimeBrazil(voucher.validUntil)}
                             </TableCell>
                             <TableCell>
-                              {voucher.status === "available" && (
-                                <Button
-                                  size="icon"
-                                  variant="ghost"
-                                  onClick={() => setDeleteVoucherDialog({ open: true, id: voucher.id, code: voucher.code })}
-                                  data-testid={`button-delete-${voucher.id}`}
-                                >
-                                  <Trash2 className="h-4 w-4 text-destructive" />
-                                </Button>
-                              )}
+                              <div className="flex items-center gap-1">
+                                {voucher.usage && (
+                                  <Badge variant="outline" className="text-xs">
+                                    <CheckCircle className="h-3 w-3 mr-1" />
+                                    Uso registrado
+                                  </Badge>
+                                )}
+                                {voucher.status === "available" && (
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    onClick={(e) => { e.stopPropagation(); setDeleteVoucherDialog({ open: true, id: voucher.id, code: voucher.code }); }}
+                                    data-testid={`button-delete-${voucher.id}`}
+                                  >
+                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                  </Button>
+                                )}
+                              </div>
                             </TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
                     </Table>
-                    {vouchers.length > 100 && (
-                      <p className="text-sm text-muted-foreground mt-4 text-center">
-                        Exibindo 100 de {vouchers.length} vouchers
-                      </p>
-                    )}
+                    {filteredVouchers.length > 100 && (
+                        <p className="text-sm text-muted-foreground mt-4 text-center">
+                          Exibindo 100 de {filteredVouchers.length} vouchers
+                        </p>
+                      )}
+                    </div>
                   </div>
                 )}
               </CardContent>
@@ -533,10 +695,16 @@ export default function AdminEventVouchersPage() {
           </TabsContent>
 
           <TabsContent value="coupons" className="space-y-4">
-            <Button onClick={() => setCouponDialogOpen(true)} data-testid="button-create-coupon">
-              <Plus className="h-4 w-4 mr-2" />
-              Criar Cupom
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={() => setCouponDialogOpen(true)} data-testid="button-create-coupon">
+                <Plus className="h-4 w-4 mr-2" />
+                Criar Cupom
+              </Button>
+              <Button variant="outline" onClick={() => setBulkCouponDialogOpen(true)} data-testid="button-bulk-create-coupons">
+                <Package className="h-4 w-4 mr-2" />
+                Criar Varios Cupons
+              </Button>
+            </div>
 
             <Card>
               <CardHeader>
@@ -898,6 +1066,254 @@ export default function AdminEventVouchersPage() {
               className="bg-destructive text-destructive-foreground"
             >
               Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <Dialog open={!!voucherDetailDialog} onOpenChange={(open) => !open && setVoucherDetailDialog(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Ticket className="h-5 w-5" />
+              Detalhes do Voucher
+            </DialogTitle>
+          </DialogHeader>
+          {voucherDetailDialog && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between gap-4 flex-wrap p-4 bg-muted rounded-md">
+                <div>
+                  <p className="text-xs text-muted-foreground">Codigo</p>
+                  <code className="font-mono text-lg font-bold">{voucherDetailDialog.code}</code>
+                </div>
+                <div>
+                  {getStatusBadge(voucherDetailDialog.status)}
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Calendar className="h-4 w-4" />
+                    <span className="text-xs">Validade</span>
+                  </div>
+                  <p className="text-sm">
+                    {formatDateTimeBrazil(voucherDetailDialog.validFrom)} ate {formatDateTimeBrazil(voucherDetailDialog.validUntil)}
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <FileText className="h-4 w-4" />
+                    <span className="text-xs">Criado em</span>
+                  </div>
+                  <p className="text-sm">{formatDateTimeBrazil(voucherDetailDialog.createdAt)}</p>
+                </div>
+              </div>
+
+              {voucherDetailDialog.batchId && (
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Package className="h-4 w-4" />
+                    <span className="text-xs">Lote</span>
+                  </div>
+                  <p className="text-sm">
+                    {batches.find(b => b.id === voucherDetailDialog.batchId)?.nome || `ID: ${voucherDetailDialog.batchId}`}
+                  </p>
+                </div>
+              )}
+
+              <div className="border-t pt-4">
+                <h4 className="font-medium flex items-center gap-2 mb-3">
+                  <Eye className="h-4 w-4" />
+                  Auditoria de Uso
+                </h4>
+                {voucherDetailDialog.usage ? (
+                  <div className="bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-md p-4 space-y-3">
+                    <div className="flex items-center gap-2 text-green-700 dark:text-green-300">
+                      <CheckCircle className="h-5 w-5" />
+                      <span className="font-medium">Voucher Utilizado</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <p className="text-muted-foreground text-xs">Data/Hora do Uso</p>
+                        <p>{formatDateTimeBrazil(voucherDetailDialog.usage.usedAt)}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground text-xs">ID do Usuario</p>
+                        <p className="font-mono">{voucherDetailDialog.usage.userId}</p>
+                      </div>
+                    </div>
+                    {voucherDetailDialog.usage.registrationId && (
+                      <div>
+                        <p className="text-muted-foreground text-xs">Inscricao Associada</p>
+                        <p className="font-mono text-sm">#{voucherDetailDialog.usage.registrationId}</p>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center py-6 text-muted-foreground">
+                    <Clock className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">Este voucher ainda nao foi utilizado.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setVoucherDetailDialog(null)}>Fechar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={bulkCouponDialogOpen} onOpenChange={setBulkCouponDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Package className="h-5 w-5" />
+              Criar Varios Cupons
+            </DialogTitle>
+            <DialogDescription>
+              Insira varios codigos de uma vez (um por linha ou separados por virgula).
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="bulk-coupon-codes">Codigos (um por linha ou separados por virgula)</Label>
+              <Textarea
+                id="bulk-coupon-codes"
+                value={bulkCouponForm.codes}
+                onChange={(e) => setBulkCouponForm({ ...bulkCouponForm, codes: e.target.value.toUpperCase() })}
+                placeholder="CUPOM10&#10;DESCONTO20&#10;PROMO30"
+                className="min-h-[100px] font-mono"
+                data-testid="input-bulk-coupon-codes"
+              />
+              {bulkCouponForm.codes && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  {bulkCouponForm.codes.split(/[\n,;]+/).filter(c => c.trim().length >= 2).length} codigo(s) detectado(s)
+                </p>
+              )}
+            </div>
+            <div>
+              <Label>Tipo de Desconto</Label>
+              <Select 
+                value={bulkCouponForm.discountType} 
+                onValueChange={(v: "percentage" | "fixed" | "full") => setBulkCouponForm({ ...bulkCouponForm, discountType: v })}
+              >
+                <SelectTrigger data-testid="select-bulk-coupon-discount-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="percentage">Porcentagem (%)</SelectItem>
+                  <SelectItem value="fixed">Valor Fixo (R$)</SelectItem>
+                  <SelectItem value="full">100% Gratuito</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {bulkCouponForm.discountType !== "full" && (
+              <div>
+                <Label htmlFor="bulk-coupon-discount-value">
+                  Valor do Desconto {bulkCouponForm.discountType === "percentage" ? "(%)" : "(R$)"}
+                </Label>
+                <Input
+                  id="bulk-coupon-discount-value"
+                  type="number"
+                  min="0"
+                  max={bulkCouponForm.discountType === "percentage" ? 100 : undefined}
+                  value={bulkCouponForm.discountValue}
+                  onChange={(e) => setBulkCouponForm({ ...bulkCouponForm, discountValue: e.target.value })}
+                  data-testid="input-bulk-coupon-discount-value"
+                />
+              </div>
+            )}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="bulk-coupon-valid-from">Valido a partir de</Label>
+                <Input
+                  id="bulk-coupon-valid-from"
+                  type="datetime-local"
+                  value={bulkCouponForm.validFrom}
+                  onChange={(e) => setBulkCouponForm({ ...bulkCouponForm, validFrom: e.target.value })}
+                  data-testid="input-bulk-coupon-valid-from"
+                />
+              </div>
+              <div>
+                <Label htmlFor="bulk-coupon-valid-until">Valido ate</Label>
+                <Input
+                  id="bulk-coupon-valid-until"
+                  type="datetime-local"
+                  value={bulkCouponForm.validUntil}
+                  onChange={(e) => setBulkCouponForm({ ...bulkCouponForm, validUntil: e.target.value })}
+                  data-testid="input-bulk-coupon-valid-until"
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBulkCouponDialogOpen(false)}>Cancelar</Button>
+            <Button 
+              onClick={() => createBulkCouponsMutation.mutate(bulkCouponForm)}
+              disabled={createBulkCouponsMutation.isPending || !bulkCouponForm.codes || !bulkCouponForm.validFrom || !bulkCouponForm.validUntil}
+              data-testid="button-confirm-bulk-coupons"
+            >
+              {createBulkCouponsMutation.isPending ? "Criando..." : "Criar Cupons"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={!!editBatchDialog} onOpenChange={(open) => !open && setEditBatchDialog(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Edit className="h-5 w-5" />
+              Alterar Validade do Lote
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {editBatchDialog && (
+                <span>
+                  Esta alteracao afetara <strong>{editBatchDialog.quantidade}</strong> vouchers do lote "{editBatchDialog.nome}".
+                </span>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="edit-batch-valid-from">Valido a partir de</Label>
+                <Input
+                  id="edit-batch-valid-from"
+                  type="datetime-local"
+                  value={editBatchForm.validFrom}
+                  onChange={(e) => setEditBatchForm({ ...editBatchForm, validFrom: e.target.value })}
+                  data-testid="input-edit-batch-valid-from"
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-batch-valid-until">Valido ate</Label>
+                <Input
+                  id="edit-batch-valid-until"
+                  type="datetime-local"
+                  value={editBatchForm.validUntil}
+                  onChange={(e) => setEditBatchForm({ ...editBatchForm, validUntil: e.target.value })}
+                  data-testid="input-edit-batch-valid-until"
+                />
+              </div>
+            </div>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => editBatchDialog && updateBatchMutation.mutate({
+                batchId: editBatchDialog.id,
+                data: {
+                  validFrom: editBatchForm.validFrom || undefined,
+                  validUntil: editBatchForm.validUntil || undefined
+                }
+              })}
+              disabled={updateBatchMutation.isPending || (!editBatchForm.validFrom && !editBatchForm.validUntil)}
+              data-testid="button-confirm-update-batch"
+            >
+              {updateBatchMutation.isPending ? "Atualizando..." : "Confirmar Alteracao"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

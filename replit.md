@@ -61,3 +61,16 @@ Preferred communication style: Simple, everyday language.
 ### Design Assets
 - Google Fonts (Inter).
 - Generated running/marathon images (`attached_assets/generated_images/`).
+
+## Recent Changes (December 2024)
+
+### Voucher & Coupon System
+Complete implementation of the voucher system as documented in `docs/MODALIDADE_VOUCHER.md`:
+
+- **Immediate Voucher Validation**: Voucher codes are validated immediately on the modality selection page with real-time feedback (success/error states)
+- **Voucher Audit Trail**: Admin panel shows detailed usage information including user ID, timestamps, and associated registration IDs
+- **Batch Validity Updates**: Admins can update validity dates for entire voucher batches at once
+- **CSV Export**: One-click export of all vouchers to CSV format with status, batch info, and usage details
+- **Search & Filter**: Real-time search by code and filter by status (available, used, expired) for vouchers list
+- **Bulk Coupon Creation**: Create multiple discount coupons at once with the same settings
+- **Global Code Uniqueness**: Voucher and coupon codes are validated to be unique across both systems per event

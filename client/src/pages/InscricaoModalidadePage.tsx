@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRoute, useLocation } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -9,9 +9,10 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ChevronLeft, ShieldCheck, AlertCircle, Loader2, CheckCircle, XCircle, CalendarClock } from "lucide-react";
+import { ChevronLeft, ShieldCheck, AlertCircle, Loader2, CheckCircle, XCircle, CalendarClock, Ticket } from "lucide-react";
 import Header from "@/components/Header";
 import { useAthleteAuth } from "@/contexts/AthleteAuthContext";
+import { apiRequest } from "@/lib/queryClient";
 
 interface ModalityInfo {
   id: string;
@@ -70,6 +71,12 @@ export default function InscricaoModalidadePage() {
   const [modalidadeSelecionada, setModalidadeSelecionada] = useState("");
   const [tamanhoSelecionado, setTamanhoSelecionado] = useState("");
   const [codigoComprovacao, setCodigoComprovacao] = useState("");
+  const [voucherValidado, setVoucherValidado] = useState<{
+    valid: boolean;
+    voucher?: { id: string; code: string; batchName?: string | null; validUntil: string };
+    error?: string;
+    message?: string;
+  } | null>(null);
 
   useEffect(() => {
     if (!authLoading && !athlete) {
@@ -87,6 +94,52 @@ export default function InscricaoModalidadePage() {
     enabled: !!slug && !!athlete,
   });
 
+  const eventId = data?.data?.event?.id;
+
+  const validateVoucherMutation = useMutation({
+    mutationFn: async ({ code, eventId }: { code: string; eventId: string }) => {
+      const response = await apiRequest("POST", "/api/vouchers/validate", { code, eventId });
+      const result = await response.json();
+      if (result.success && result.data?.voucher) {
+        return { valid: true, voucher: result.data.voucher };
+      } else {
+        return { 
+          valid: false, 
+          error: result.error?.code || "invalid",
+          message: result.error?.message || "Voucher invalido"
+        };
+      }
+    },
+    onSuccess: (result) => {
+      setVoucherValidado(result);
+    },
+    onError: () => {
+      setVoucherValidado({
+        valid: false,
+        error: "network_error",
+        message: "Erro de conexao. Tente novamente."
+      });
+    }
+  });
+
+  const handleVoucherCodeChange = useCallback((value: string) => {
+    setCodigoComprovacao(value);
+    setVoucherValidado(null);
+  }, []);
+
+  const handleValidateVoucher = useCallback(() => {
+    if (!codigoComprovacao.trim() || !eventId) return;
+    validateVoucherMutation.mutate({
+      code: codigoComprovacao.trim(),
+      eventId: eventId
+    });
+  }, [codigoComprovacao, eventId, validateVoucherMutation]);
+
+  useEffect(() => {
+    setVoucherValidado(null);
+    setCodigoComprovacao("");
+  }, [modalidadeSelecionada]);
+
   const handleVoltar = () => {
     setLocation(`/evento/${slug}/inscricao/participante`);
   };
@@ -97,7 +150,7 @@ export default function InscricaoModalidadePage() {
     const modality = data?.data?.modalities.find(m => m.id === modalidadeSelecionada);
     if (!modality) return;
     
-    if (modality.tipoAcesso === "voucher" && !codigoComprovacao) {
+    if (modality.tipoAcesso === "voucher" && !voucherValidado?.valid) {
       return;
     }
     
@@ -107,8 +160,8 @@ export default function InscricaoModalidadePage() {
     if (tamanhoSelecionado) {
       params.set('tamanho', tamanhoSelecionado);
     }
-    if (codigoComprovacao) {
-      params.set('codigo', codigoComprovacao);
+    if (voucherValidado?.voucher?.code) {
+      params.set('codigo', voucherValidado.voucher.code);
     }
     
     const url = `/evento/${slug}/inscricao/resumo?${params.toString()}`;
@@ -199,9 +252,13 @@ export default function InscricaoModalidadePage() {
   
   const requiresShirtSize = availableSizes.length > 0;
   
+  const voucherIsValid = voucherValidado?.valid === true;
+  const voucherHasError = voucherValidado?.valid === false;
+  const isValidatingVoucher = validateVoucherMutation.isPending;
+  
   const podeAvancar = modalidadeSelecionada && 
     (!requiresShirtSize || tamanhoSelecionado) && 
-    (!requiresCode || codigoComprovacao.trim() !== "") &&
+    (!requiresCode || voucherIsValid) &&
     !isEventSoldOut &&
     !cannotRegister;
 
@@ -341,26 +398,71 @@ export default function InscricaoModalidadePage() {
           </Card>
 
           {requiresCode && (
-            <Alert className="border-primary/50 bg-primary/5">
+            <Alert className={`border-primary/50 ${voucherIsValid ? 'bg-green-50 dark:bg-green-950/30 border-green-500/50' : voucherHasError ? 'bg-destructive/10 border-destructive/50' : 'bg-primary/5'}`}>
               <div className="flex gap-2">
-                <ShieldCheck className="h-5 w-5 text-primary" />
+                {voucherIsValid ? (
+                  <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
+                ) : voucherHasError ? (
+                  <XCircle className="h-5 w-5 text-destructive" />
+                ) : (
+                  <Ticket className="h-5 w-5 text-primary" />
+                )}
                 <div className="flex-1">
                   <AlertDescription className="text-sm">
-                    Esta modalidade requer um código de acesso. Insira o código fornecido para continuar.
+                    {voucherIsValid ? (
+                      <span className="text-green-700 dark:text-green-300 font-medium">
+                        Voucher validado com sucesso!
+                        {voucherValidado?.voucher?.batchName && (
+                          <span className="block text-xs mt-1 font-normal">
+                            Lote: {voucherValidado.voucher.batchName}
+                          </span>
+                        )}
+                      </span>
+                    ) : voucherHasError ? (
+                      <span className="text-destructive font-medium">
+                        {voucherValidado?.message || 'Voucher invalido'}
+                      </span>
+                    ) : (
+                      'Esta modalidade requer um codigo de acesso. Insira o codigo fornecido e valide para continuar.'
+                    )}
                   </AlertDescription>
                   
-                  <div className="mt-3">
-                    <Label htmlFor="codigo-comprovacao" className="text-sm font-medium mb-2 block">
-                      Código de Acesso
-                    </Label>
-                    <Input
-                      id="codigo-comprovacao"
-                      placeholder="Ex: VOUCHER2025-ABC123"
-                      value={codigoComprovacao}
-                      onChange={(e) => setCodigoComprovacao(e.target.value)}
-                      className="max-w-xs"
-                      data-testid="input-codigo-comprovacao"
-                    />
+                  <div className="mt-3 flex gap-2 items-end flex-wrap">
+                    <div className="flex-1 min-w-[200px] max-w-xs">
+                      <Label htmlFor="codigo-comprovacao" className="text-sm font-medium mb-2 block">
+                        Codigo de Acesso (Voucher)
+                      </Label>
+                      <Input
+                        id="codigo-comprovacao"
+                        placeholder="Ex: A7F3B2"
+                        value={codigoComprovacao}
+                        onChange={(e) => handleVoucherCodeChange(e.target.value.toUpperCase())}
+                        className={voucherIsValid ? 'border-green-500' : voucherHasError ? 'border-destructive' : ''}
+                        disabled={isValidatingVoucher}
+                        data-testid="input-codigo-comprovacao"
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant={voucherIsValid ? "secondary" : "default"}
+                      onClick={handleValidateVoucher}
+                      disabled={!codigoComprovacao.trim() || isValidatingVoucher}
+                      data-testid="button-validar-voucher"
+                    >
+                      {isValidatingVoucher ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Validando...
+                        </>
+                      ) : voucherIsValid ? (
+                        <>
+                          <CheckCircle className="h-4 w-4 mr-2" />
+                          Validado
+                        </>
+                      ) : (
+                        'Validar'
+                      )}
+                    </Button>
                   </div>
                 </div>
               </div>

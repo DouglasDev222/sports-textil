@@ -110,13 +110,18 @@ router.post("/batches", requireAuth, requireRole("superadmin", "admin"), async (
     for (let i = 0; i < validation.data.quantidade; i++) {
       let code: string;
       let attempts = 0;
+      let isUnique = false;
       do {
         code = generateVoucherCode(8);
         attempts++;
         if (attempts > 100) {
           throw new Error("Falha ao gerar codigos unicos");
         }
-      } while (existingCodes.has(code));
+        if (!existingCodes.has(code)) {
+          const uniqueCheck = await storage.isCodeGloballyUnique(eventId, code);
+          isUnique = uniqueCheck.isUnique;
+        }
+      } while (existingCodes.has(code) || !isUnique);
       
       existingCodes.add(code);
       vouchers.push({
@@ -139,6 +144,67 @@ router.post("/batches", requireAuth, requireRole("superadmin", "admin"), async (
     });
   } catch (error) {
     console.error("Create voucher batch error:", error);
+    res.status(500).json({
+      success: false,
+      error: { code: "INTERNAL_ERROR", message: "Erro interno do servidor" }
+    });
+  }
+});
+
+const batchUpdateSchema = z.object({
+  validFrom: z.string().refine(val => !isNaN(Date.parse(val)), "Data de inicio invalida").optional(),
+  validUntil: z.string().refine(val => !isNaN(Date.parse(val)), "Data de termino invalida").optional(),
+});
+
+router.patch("/batches/:batchId", requireAuth, requireRole("superadmin", "admin"), async (req, res) => {
+  try {
+    const eventId = req.params.eventId;
+    const batchId = req.params.batchId;
+    
+    const batch = await storage.getVoucherBatch(batchId);
+    if (!batch || batch.eventId !== eventId) {
+      return res.status(404).json({
+        success: false,
+        error: { code: "NOT_FOUND", message: "Lote nao encontrado" }
+      });
+    }
+
+    const validation = batchUpdateSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({
+        success: false,
+        error: { code: "VALIDATION_ERROR", message: validation.error.errors[0].message }
+      });
+    }
+
+    const updateData: any = {};
+    if (validation.data.validFrom) {
+      updateData.validFrom = localToBrazilUTC(validation.data.validFrom);
+    }
+    if (validation.data.validUntil) {
+      updateData.validUntil = localToBrazilUTC(validation.data.validUntil);
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: { code: "VALIDATION_ERROR", message: "Nenhum campo para atualizar" }
+      });
+    }
+
+    const updatedBatch = await storage.updateVoucherBatch(batchId, updateData);
+    
+    const vouchersUpdated = await storage.updateVouchersByBatch(batchId, updateData);
+
+    res.json({ 
+      success: true, 
+      data: {
+        batch: updatedBatch ? formatVoucherBatchForResponse(updatedBatch) : null,
+        vouchersUpdated
+      }
+    });
+  } catch (error) {
+    console.error("Update voucher batch error:", error);
     res.status(500).json({
       success: false,
       error: { code: "INTERNAL_ERROR", message: "Erro interno do servidor" }
@@ -212,11 +278,16 @@ router.post("/", requireAuth, requireRole("superadmin", "admin"), async (req, re
 
     const code = validation.data.code || generateVoucherCode(8);
     
-    const existingVoucher = await storage.getVoucherByCode(eventId, code);
-    if (existingVoucher) {
+    const uniqueCheck = await storage.isCodeGloballyUnique(eventId, code);
+    if (!uniqueCheck.isUnique) {
       return res.status(400).json({
         success: false,
-        error: { code: "DUPLICATE_CODE", message: "Codigo de voucher ja existe para este evento" }
+        error: { 
+          code: "DUPLICATE_CODE", 
+          message: uniqueCheck.type === "coupon" 
+            ? "Este codigo ja esta em uso como cupom de desconto" 
+            : "Codigo de voucher ja existe para este evento" 
+        }
       });
     }
 
@@ -300,6 +371,66 @@ router.get("/report", requireAuth, async (req, res) => {
     res.json({ success: true, data: report });
   } catch (error) {
     console.error("Get voucher report error:", error);
+    res.status(500).json({
+      success: false,
+      error: { code: "INTERNAL_ERROR", message: "Erro interno do servidor" }
+    });
+  }
+});
+
+router.get("/export", requireAuth, requireRole("superadmin", "admin"), async (req, res) => {
+  try {
+    const eventId = req.params.eventId;
+    const event = await storage.getEvent(eventId);
+    if (!event) {
+      return res.status(404).json({
+        success: false,
+        error: { code: "NOT_FOUND", message: "Evento nao encontrado" }
+      });
+    }
+
+    const hasAccess = await checkEventOwnership(req, res, eventId);
+    if (!hasAccess) {
+      return res.status(403).json({
+        success: false,
+        error: { code: "FORBIDDEN", message: "Sem permissao para acessar este evento" }
+      });
+    }
+
+    const vouchers = await storage.getVouchersByEvent(eventId);
+    const batches = await storage.getVoucherBatchesByEvent(eventId);
+    const batchMap = new Map(batches.map(b => [b.id, b.nome]));
+
+    const now = new Date();
+    const csvRows = [
+      ["Codigo", "Status", "Lote", "Valido De", "Valido Ate", "Criado Em", "Usado Em", "Usuario ID"].join(",")
+    ];
+
+    for (const v of vouchers) {
+      const status = v.status === "used" ? "Usado" : 
+                     new Date(v.validUntil) < now ? "Expirado" : "Disponivel";
+      const batchName = v.batchId ? (batchMap.get(v.batchId) || v.batchId) : "-";
+      
+      csvRows.push([
+        v.code,
+        status,
+        batchName,
+        new Date(v.validFrom).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" }),
+        new Date(v.validUntil).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" }),
+        new Date(v.createdAt).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" }),
+        v.usedAt ? new Date(v.usedAt).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" }) : "-",
+        v.usedBy || "-"
+      ].map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(","));
+    }
+
+    const csv = csvRows.join("\n");
+    const filename = `vouchers_${event.slug || eventId}_${new Date().toISOString().split("T")[0]}.csv`;
+
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.send("\uFEFF" + csv);
+  } catch (error) {
+    console.error("Export vouchers error:", error);
     res.status(500).json({
       success: false,
       error: { code: "INTERNAL_ERROR", message: "Erro interno do servidor" }

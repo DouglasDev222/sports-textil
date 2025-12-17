@@ -134,6 +134,8 @@ export interface IStorage {
   getVoucherBatch(id: string): Promise<EventVoucherBatch | undefined>;
   getVoucherBatchesByEvent(eventId: string): Promise<EventVoucherBatch[]>;
   createVoucherBatch(batch: InsertEventVoucherBatch): Promise<EventVoucherBatch>;
+  updateVoucherBatch(id: string, data: Partial<InsertEventVoucherBatch>): Promise<EventVoucherBatch | undefined>;
+  updateVouchersByBatch(batchId: string, data: { validFrom?: Date; validUntil?: Date }): Promise<number>;
   deleteVoucherBatch(id: string): Promise<boolean>;
 
   // Voucher methods
@@ -832,6 +834,25 @@ export class DbStorage implements IStorage {
     return created;
   }
 
+  async updateVoucherBatch(id: string, data: Partial<InsertEventVoucherBatch>): Promise<EventVoucherBatch | undefined> {
+    const [updated] = await db.update(eventVoucherBatches).set(data).where(eq(eventVoucherBatches.id, id)).returning();
+    return updated;
+  }
+
+  async updateVouchersByBatch(batchId: string, data: { validFrom?: Date; validUntil?: Date }): Promise<number> {
+    const updateData: any = {};
+    if (data.validFrom) updateData.validFrom = data.validFrom;
+    if (data.validUntil) updateData.validUntil = data.validUntil;
+    
+    if (Object.keys(updateData).length === 0) return 0;
+    
+    const result = await db.update(eventVouchers)
+      .set(updateData)
+      .where(eq(eventVouchers.batchId, batchId))
+      .returning();
+    return result.length;
+  }
+
   async deleteVoucherBatch(id: string): Promise<boolean> {
     const result = await db.delete(eventVoucherBatches).where(eq(eventVoucherBatches.id, id)).returning();
     return result.length > 0;
@@ -904,6 +925,19 @@ export class DbStorage implements IStorage {
     const [coupon] = await db.select().from(eventCoupons)
       .where(and(eq(eventCoupons.eventId, eventId), eq(eventCoupons.code, code.toUpperCase())));
     return coupon;
+  }
+
+  async isCodeGloballyUnique(eventId: string, code: string): Promise<{ isUnique: boolean; type?: "voucher" | "coupon" }> {
+    const upperCode = code.toUpperCase();
+    const existingVoucher = await this.getVoucherByCode(eventId, upperCode);
+    if (existingVoucher) {
+      return { isUnique: false, type: "voucher" };
+    }
+    const existingCoupon = await this.getCouponByCode(eventId, upperCode);
+    if (existingCoupon) {
+      return { isUnique: false, type: "coupon" };
+    }
+    return { isUnique: true };
   }
 
   async getCouponsByEvent(eventId: string): Promise<EventCoupon[]> {
