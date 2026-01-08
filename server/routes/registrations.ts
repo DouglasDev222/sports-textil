@@ -445,9 +445,9 @@ router.post("/", async (req, res) => {
     const price = await storage.getPrice(modalityId, activeBatch.id);
     const taxaComodidade = parseFloat(modality.taxaComodidade) || 0;
     
-    // CRITICAL BUSINESS RULE: Paid modalities MUST have a valid price
-    // NEVER allow registration with price 0 for paid modalities
-    // Note: "voucher" type modalities are free (access granted by voucher, not price)
+    // CRITICAL BUSINESS RULE: Only "paga" modalities MUST have a valid price > 0
+    // "voucher" modalities can be free or paid (depends on configured price)
+    // "gratuita" modalities are always free
     const isPaidModality = modality.tipoAcesso === "paga";
     
     if (isPaidModality) {
@@ -471,9 +471,12 @@ router.post("/", async (req, res) => {
     const valorInscricao = price ? parseFloat(price.valor) : 0;
     const valorTotal = valorInscricao + taxaComodidade;
 
-    // isGratuita is true for "gratuita" and "voucher" modalities (both are free)
-    // Never derive gratuita status from price being 0 (that was the bug!)
-    const isGratuita = modality.tipoAcesso === "gratuita" || modality.tipoAcesso === "voucher";
+    // isGratuita is true for:
+    // - "gratuita" modalities (always free)
+    // - "voucher" modalities with price 0 or no price (free access via voucher)
+    // For "paga" modalities, never derive gratuita from price (that was the bug!)
+    const isGratuita = modality.tipoAcesso === "gratuita" || 
+                       (modality.tipoAcesso === "voucher" && valorInscricao === 0);
 
     const orderNumber = await storage.getNextOrderNumber();
     const registrationNumber = await storage.getNextRegistrationNumber();
