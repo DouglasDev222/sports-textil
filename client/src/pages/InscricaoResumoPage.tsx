@@ -363,7 +363,7 @@ export default function InscricaoResumoPage() {
               size="lg"
               onClick={handleConfirmar}
               disabled={createRegistrationMutation.isPending}
-              className="font-semibold"
+              className="font-semibold pl-[15px] pr-[15px]"
               data-testid="button-confirmar"
             >
               {createRegistrationMutation.isPending ? (
