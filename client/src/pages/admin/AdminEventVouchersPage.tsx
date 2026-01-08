@@ -473,17 +473,19 @@ export default function AdminEventVouchersPage() {
     return true;
   });
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "available":
-        return <Badge variant="secondary"><CheckCircle className="h-3 w-3 mr-1" />Disponivel</Badge>;
-      case "used":
-        return <Badge variant="default"><Clock className="h-3 w-3 mr-1" />Utilizado</Badge>;
-      case "expired":
-        return <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />Expirado</Badge>;
-      default:
-        return <Badge variant="outline">{status}</Badge>;
+  const getStatusBadge = (status: string, validUntil?: string) => {
+    const isExpired = validUntil && new Date(validUntil) < now;
+    
+    if (status === "used") {
+      return <Badge variant="default"><Clock className="h-3 w-3 mr-1" />Utilizado</Badge>;
     }
+    if (status === "expired" || (status === "available" && isExpired)) {
+      return <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />Expirado</Badge>;
+    }
+    if (status === "available") {
+      return <Badge variant="secondary"><CheckCircle className="h-3 w-3 mr-1" />Disponivel</Badge>;
+    }
+    return <Badge variant="outline">{status}</Badge>;
   };
 
   const getDiscountLabel = (type: string, value?: string | null) => {
@@ -777,7 +779,7 @@ export default function AdminEventVouchersPage() {
                                 </Button>
                               </div>
                             </TableCell>
-                            <TableCell>{getStatusBadge(voucher.status)}</TableCell>
+                            <TableCell>{getStatusBadge(voucher.status, voucher.validUntil)}</TableCell>
                             <TableCell className="text-sm">
                               {formatDateTimeBrazil(voucher.validUntil)}
                             </TableCell>
