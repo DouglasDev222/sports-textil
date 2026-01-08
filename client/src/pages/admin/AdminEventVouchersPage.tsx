@@ -129,6 +129,8 @@ export default function AdminEventVouchersPage() {
   const [couponDialogOpen, setCouponDialogOpen] = useState(false);
   const [deleteVoucherDialog, setDeleteVoucherDialog] = useState<{ open: boolean; id: string; code: string } | null>(null);
   const [deleteCouponDialog, setDeleteCouponDialog] = useState<{ open: boolean; id: string; code: string } | null>(null);
+  const [editCouponDialog, setEditCouponDialog] = useState<Coupon | null>(null);
+  const [autoGenerateCouponCode, setAutoGenerateCouponCode] = useState(false);
   const [voucherDetailDialog, setVoucherDetailDialog] = useState<Voucher | null>(null);
   const [editBatchDialog, setEditBatchDialog] = useState<VoucherBatch | null>(null);
   const [voucherSearch, setVoucherSearch] = useState("");
@@ -169,7 +171,19 @@ export default function AdminEventVouchersPage() {
     maxUses: "",
     maxUsesPerUser: "1",
     validFrom: "",
-    validUntil: ""
+    validUntil: "",
+    isActive: true
+  });
+
+  const [editCouponForm, setEditCouponForm] = useState({
+    code: "",
+    discountType: "percentage" as "percentage" | "fixed" | "full",
+    discountValue: "",
+    maxUses: "",
+    maxUsesPerUser: "1",
+    validFrom: "",
+    validUntil: "",
+    isActive: true
   });
 
   const { data: eventData, isLoading: eventLoading } = useQuery<{ success: boolean; data: Event }>({
@@ -264,21 +278,55 @@ export default function AdminEventVouchersPage() {
         maxUses: data.maxUses ? parseInt(data.maxUses) : null,
         maxUsesPerUser: parseInt(data.maxUsesPerUser) || 1,
         validFrom: data.validFrom,
-        validUntil: data.validUntil
+        validUntil: data.validUntil,
+        isActive: data.isActive
       };
       const response = await apiRequest("POST", `/api/admin/events/${id}/coupons`, payload);
       const result = await response.json();
       if (!result.success) throw new Error(result.error?.message || "Erro ao criar cupom");
       return result;
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/events", id, "coupons"] });
       setCouponDialogOpen(false);
-      setCouponForm({ code: "", discountType: "percentage", discountValue: "", maxUses: "", maxUsesPerUser: "1", validFrom: "", validUntil: "" });
-      toast({ title: "Cupom criado com sucesso" });
+      setAutoGenerateCouponCode(false);
+      const createdCode = result.data?.code;
+      setCouponForm({ code: "", discountType: "percentage", discountValue: "", maxUses: "", maxUsesPerUser: "1", validFrom: "", validUntil: "", isActive: true });
+      toast({ 
+        title: "Cupom criado com sucesso",
+        description: createdCode ? `Codigo: ${createdCode}` : undefined
+      });
     },
     onError: (error: Error) => {
       toast({ title: "Erro ao criar cupom", description: error.message, variant: "destructive" });
+    }
+  });
+
+  const updateCouponMutation = useMutation({
+    mutationFn: async ({ couponId, data }: { couponId: string; data: typeof editCouponForm }) => {
+      const payload: Record<string, unknown> = {
+        isActive: data.isActive,
+        code: data.code || undefined,
+        discountType: data.discountType || undefined,
+        discountValue: data.discountType === "full" ? null : (data.discountValue ? parseFloat(data.discountValue) : null),
+        maxUses: data.maxUses ? parseInt(data.maxUses) : null,
+        maxUsesPerUser: data.maxUsesPerUser ? parseInt(data.maxUsesPerUser) : 1,
+        validFrom: data.validFrom || undefined,
+        validUntil: data.validUntil || undefined
+      };
+      
+      const response = await apiRequest("PATCH", `/api/admin/events/${id}/coupons/${couponId}`, payload);
+      const result = await response.json();
+      if (!result.success) throw new Error(result.error?.message || "Erro ao atualizar cupom");
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/events", id, "coupons"] });
+      setEditCouponDialog(null);
+      toast({ title: "Cupom atualizado com sucesso" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erro ao atualizar cupom", description: error.message, variant: "destructive" });
     }
   });
 
@@ -370,6 +418,34 @@ export default function AdminEventVouchersPage() {
       validUntil: formatForInput(batch.validUntil)
     });
     setEditBatchDialog(batch);
+  };
+
+  const handleOpenEditCoupon = (coupon: Coupon) => {
+    setEditCouponForm({
+      code: coupon.code,
+      discountType: coupon.discountType,
+      discountValue: coupon.discountValue || "",
+      maxUses: coupon.maxUses?.toString() || "",
+      maxUsesPerUser: coupon.maxUsesPerUser.toString(),
+      validFrom: formatForInput(coupon.validFrom),
+      validUntil: formatForInput(coupon.validUntil),
+      isActive: coupon.isActive
+    });
+    setEditCouponDialog(coupon);
+  };
+
+  const generateCouponCode = () => {
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    let code = "";
+    for (let i = 0; i < 8; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return code;
+  };
+
+  const handleAutoGenerateCode = () => {
+    const code = generateCouponCode();
+    setCouponForm({ ...couponForm, code });
   };
 
   const copyToClipboard = (text: string) => {
@@ -813,13 +889,24 @@ export default function AdminEventVouchersPage() {
                             )}
                           </TableCell>
                           <TableCell>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => setDeleteCouponDialog({ open: true, id: coupon.id, code: coupon.code })}
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
+                            <div className="flex items-center gap-1">
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => handleOpenEditCoupon(coupon)}
+                                data-testid={`button-edit-coupon-${coupon.id}`}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => setDeleteCouponDialog({ open: true, id: coupon.id, code: coupon.code })}
+                                data-testid={`button-delete-coupon-${coupon.id}`}
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -965,7 +1052,12 @@ export default function AdminEventVouchersPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={couponDialogOpen} onOpenChange={setCouponDialogOpen}>
+      <Dialog open={couponDialogOpen} onOpenChange={(open) => {
+        setCouponDialogOpen(open);
+        if (!open) {
+          setAutoGenerateCouponCode(false);
+        }
+      }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Criar Cupom de Desconto</DialogTitle>
@@ -975,14 +1067,64 @@ export default function AdminEventVouchersPage() {
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="coupon-code">Codigo do Cupom</Label>
-              <Input
-                id="coupon-code"
-                value={couponForm.code}
-                onChange={(e) => setCouponForm({ ...couponForm, code: e.target.value.toUpperCase() })}
-                placeholder="Ex: DESCONTO50"
-                data-testid="input-coupon-code"
-              />
+              <div className="flex items-center justify-between mb-2">
+                <Label htmlFor="coupon-code">Codigo do Cupom</Label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="auto-generate-code"
+                    checked={autoGenerateCouponCode}
+                    onChange={(e) => {
+                      setAutoGenerateCouponCode(e.target.checked);
+                      if (e.target.checked) {
+                        handleAutoGenerateCode();
+                      } else {
+                        setCouponForm({ ...couponForm, code: "" });
+                      }
+                    }}
+                    className="h-4 w-4 rounded border-gray-300"
+                    data-testid="checkbox-auto-generate-code"
+                  />
+                  <Label htmlFor="auto-generate-code" className="text-sm cursor-pointer">
+                    Gerar automaticamente
+                  </Label>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Input
+                  id="coupon-code"
+                  value={couponForm.code}
+                  onChange={(e) => setCouponForm({ ...couponForm, code: e.target.value.toUpperCase() })}
+                  placeholder={autoGenerateCouponCode ? "Codigo gerado" : "Ex: DESCONTO50"}
+                  readOnly={autoGenerateCouponCode}
+                  className={autoGenerateCouponCode ? "bg-muted font-mono" : ""}
+                  data-testid="input-coupon-code"
+                />
+                {autoGenerateCouponCode && couponForm.code && (
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="outline"
+                    onClick={() => copyToClipboard(couponForm.code)}
+                    title="Copiar codigo"
+                    data-testid="button-copy-generated-code"
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                )}
+                {autoGenerateCouponCode && (
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="outline"
+                    onClick={handleAutoGenerateCode}
+                    title="Gerar novo codigo"
+                    data-testid="button-regenerate-code"
+                  >
+                    <Tag className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -1064,6 +1206,19 @@ export default function AdminEventVouchersPage() {
                 />
               </div>
             </div>
+            <div className="flex items-center gap-2 pt-2 border-t">
+              <input
+                type="checkbox"
+                id="coupon-is-active"
+                checked={couponForm.isActive}
+                onChange={(e) => setCouponForm({ ...couponForm, isActive: e.target.checked })}
+                className="h-4 w-4 rounded border-gray-300"
+                data-testid="checkbox-coupon-is-active"
+              />
+              <Label htmlFor="coupon-is-active" className="cursor-pointer">
+                Cupom ativo (pode ser usado imediatamente)
+              </Label>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setCouponDialogOpen(false)}>Cancelar</Button>
@@ -1117,6 +1272,149 @@ export default function AdminEventVouchersPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={!!editCouponDialog} onOpenChange={(open) => !open && setEditCouponDialog(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Edit className="h-5 w-5" />
+              Editar Cupom
+            </DialogTitle>
+            <DialogDescription>
+              Edite as configuracoes do cupom "{editCouponDialog?.code}".
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between p-4 rounded-md border">
+              <div>
+                <p className="font-medium">Status do Cupom</p>
+                <p className="text-sm text-muted-foreground">
+                  {editCouponForm.isActive ? "Cupom esta ativo e pode ser usado" : "Cupom esta inativo e nao pode ser usado"}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Label htmlFor="edit-coupon-active" className="text-sm">
+                  {editCouponForm.isActive ? "Ativo" : "Inativo"}
+                </Label>
+                <input
+                  type="checkbox"
+                  id="edit-coupon-active"
+                  checked={editCouponForm.isActive}
+                  onChange={(e) => setEditCouponForm({ ...editCouponForm, isActive: e.target.checked })}
+                  className="h-5 w-5 rounded border-gray-300"
+                  data-testid="checkbox-edit-coupon-active"
+                />
+              </div>
+            </div>
+            <div>
+              <Label htmlFor="edit-coupon-code">Codigo do Cupom</Label>
+              <Input
+                id="edit-coupon-code"
+                value={editCouponForm.code}
+                onChange={(e) => setEditCouponForm({ ...editCouponForm, code: e.target.value.toUpperCase() })}
+                data-testid="input-edit-coupon-code"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="edit-coupon-type">Tipo de Desconto</Label>
+                <Select 
+                  value={editCouponForm.discountType} 
+                  onValueChange={(v: "percentage" | "fixed" | "full") => setEditCouponForm({ ...editCouponForm, discountType: v })}
+                >
+                  <SelectTrigger data-testid="select-edit-coupon-type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="percentage">Porcentagem (%)</SelectItem>
+                    <SelectItem value="fixed">Valor Fixo (R$)</SelectItem>
+                    <SelectItem value="full">Gratuidade Total</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {editCouponForm.discountType !== "full" && (
+                <div>
+                  <Label htmlFor="edit-coupon-value">Valor do Desconto</Label>
+                  <Input
+                    id="edit-coupon-value"
+                    type="number"
+                    min={0}
+                    max={editCouponForm.discountType === "percentage" ? 100 : undefined}
+                    value={editCouponForm.discountValue}
+                    onChange={(e) => setEditCouponForm({ ...editCouponForm, discountValue: e.target.value })}
+                    data-testid="input-edit-coupon-value"
+                  />
+                </div>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="edit-coupon-max-uses">Limite de Usos (total)</Label>
+                <Input
+                  id="edit-coupon-max-uses"
+                  type="number"
+                  min={1}
+                  value={editCouponForm.maxUses}
+                  onChange={(e) => setEditCouponForm({ ...editCouponForm, maxUses: e.target.value })}
+                  placeholder="Sem limite"
+                  data-testid="input-edit-coupon-max-uses"
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-coupon-max-per-user">Limite por Usuario</Label>
+                <Input
+                  id="edit-coupon-max-per-user"
+                  type="number"
+                  min={1}
+                  value={editCouponForm.maxUsesPerUser}
+                  onChange={(e) => setEditCouponForm({ ...editCouponForm, maxUsesPerUser: e.target.value })}
+                  data-testid="input-edit-coupon-max-per-user"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="edit-coupon-valid-from">Valido a partir de</Label>
+                <Input
+                  id="edit-coupon-valid-from"
+                  type="datetime-local"
+                  value={editCouponForm.validFrom}
+                  onChange={(e) => setEditCouponForm({ ...editCouponForm, validFrom: e.target.value })}
+                  data-testid="input-edit-coupon-valid-from"
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-coupon-valid-until">Valido ate</Label>
+                <Input
+                  id="edit-coupon-valid-until"
+                  type="datetime-local"
+                  value={editCouponForm.validUntil}
+                  onChange={(e) => setEditCouponForm({ ...editCouponForm, validUntil: e.target.value })}
+                  data-testid="input-edit-coupon-valid-until"
+                />
+              </div>
+            </div>
+            {editCouponDialog && (
+              <div className="text-sm text-muted-foreground pt-2 border-t">
+                <p>Usos atuais: {editCouponDialog.currentUses}/{editCouponDialog.maxUses || "Ilimitado"}</p>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditCouponDialog(null)}>Cancelar</Button>
+            <Button 
+              onClick={() => editCouponDialog && updateCouponMutation.mutate({ 
+                couponId: editCouponDialog.id, 
+                data: editCouponForm 
+              })}
+              disabled={updateCouponMutation.isPending}
+              data-testid="button-submit-edit-coupon"
+            >
+              {updateCouponMutation.isPending ? "Salvando..." : "Salvar Alteracoes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!voucherDetailDialog} onOpenChange={(open) => !open && setVoucherDetailDialog(null)}>
         <DialogContent>
