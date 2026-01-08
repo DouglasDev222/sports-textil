@@ -452,7 +452,7 @@ export default function InscricaoDetailPage() {
                 <Button 
                   variant="outline" 
                   size="sm"
-                  onClick={() => setLocation(`/pedido/${registration.id.split('-')[0]}`)}
+                  onClick={() => setLocation(`/pedido/${registration.pedido.id}`)}
                   data-testid="button-ver-pedido"
                 >
                   Ver Pedido
