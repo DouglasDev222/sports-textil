@@ -709,6 +709,7 @@ router.get("/my-registrations", async (req, res) => {
             unidadeDistancia: modality.unidadeDistancia
           } : null,
           pedido: order ? {
+            id: order.id,
             numeroPedido: order.numeroPedido,
             status: order.status
           } : null
