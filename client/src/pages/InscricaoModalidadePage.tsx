@@ -544,7 +544,6 @@ export default function InscricaoModalidadePage() {
           )}
         </div>
       </div>
-
       <div className="fixed bottom-0 left-0 right-0 bg-background border-t shadow-lg z-50">
         <div className="max-w-2xl mx-auto px-4 py-3">
           <div className="flex items-center justify-between gap-4 mb-3">
@@ -561,7 +560,7 @@ export default function InscricaoModalidadePage() {
                       </p>
                     </>
                   ) : (
-                    <p className="text-lg md:text-xl font-bold text-green-600 dark:text-green-400 flex items-center gap-2">
+                    <p className="md:text-xl font-bold text-green-600 dark:text-green-400 flex items-center gap-2 text-[16px]">
                       <CheckCircle className="h-5 w-5" />
                       Inscrição Gratuita
                     </p>
