@@ -187,7 +187,8 @@ router.post("/create", async (req, res) => {
         issuerId || "",
         externalReference,
         payerIdentification,
-        cardholderName
+        cardholderName,
+        description
       );
 
       if (!result.success) {

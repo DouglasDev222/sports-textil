@@ -97,7 +97,8 @@ export async function createCardPayment(
   issuerId: string,
   externalReference?: string,
   payerIdentification?: { type: string; number: string },
-  cardholderName?: string
+  cardholderName?: string,
+  description?: string
 ): Promise<CardPaymentResult> {
   if (!paymentClient) {
     return {
@@ -110,6 +111,7 @@ export async function createCardPayment(
     const paymentBody: any = {
       transaction_amount: amount,
       token: token,
+      description: description || `Pagamento pedido ${orderId}`,
       installments: installments,
       payment_method_id: paymentMethodId,
       payer: {
@@ -135,8 +137,24 @@ export async function createCardPayment(
       paymentBody.issuer_id = parseInt(issuerId, 10);
     }
 
+    console.log('[mercadopago-service] Enviando pagamento cartão:', {
+      transaction_amount: paymentBody.transaction_amount,
+      payment_method_id: paymentBody.payment_method_id,
+      installments: paymentBody.installments,
+      issuer_id: paymentBody.issuer_id,
+      has_token: !!paymentBody.token,
+      has_identification: !!paymentBody.payer?.identification,
+      payer_email: paymentBody.payer?.email
+    });
+
     const payment = await paymentClient.create({
       body: paymentBody
+    });
+
+    console.log('[mercadopago-service] Resposta pagamento:', {
+      id: payment.id,
+      status: payment.status,
+      status_detail: payment.status_detail
     });
 
     return {
@@ -147,6 +165,10 @@ export async function createCardPayment(
     };
   } catch (error: any) {
     console.error('[mercadopago-service] Erro ao criar pagamento com cartão:', error);
+    // Log full error details for debugging
+    if (error.cause) {
+      console.error('[mercadopago-service] Detalhes do erro:', JSON.stringify(error.cause, null, 2));
+    }
     return {
       success: false,
       error: error.message || 'Erro ao criar pagamento com cartão'
