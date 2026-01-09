@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import Header from "@/components/Header";
@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
+import { Input } from "@/components/ui/input";
 import { 
   Calendar, 
   MapPin, 
@@ -18,9 +19,14 @@ import {
   Clock,
   Shirt,
   Loader2,
-  XCircle
+  XCircle,
+  Search,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react";
 import { useAthleteAuth } from "@/contexts/AthleteAuthContext";
+
+const ITEMS_PER_PAGE = 5;
 
 interface Modalidade {
   id: string;
@@ -217,6 +223,9 @@ function PedidoCard({ pedido }: { pedido: Pedido }) {
 
 export default function MinhasInscricoesPage() {
   const [activeTab, setActiveTab] = useState("proximas");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [currentPageProximas, setCurrentPageProximas] = useState(1);
+  const [currentPageConcluidas, setCurrentPageConcluidas] = useState(1);
   const [, setLocation] = useLocation();
   const { athlete, isLoading: isAuthLoading } = useAthleteAuth();
 
@@ -231,21 +240,90 @@ export default function MinhasInscricoesPage() {
     }
   }, [isAuthLoading, athlete, setLocation]);
 
+  // Reset pagination when search changes
+  useEffect(() => {
+    setCurrentPageProximas(1);
+    setCurrentPageConcluidas(1);
+  }, [searchTerm]);
+
+  // Reset pagination when changing tabs
+  useEffect(() => {
+    if (activeTab === "proximas") {
+      setCurrentPageConcluidas(1);
+    } else {
+      setCurrentPageProximas(1);
+    }
+  }, [activeTab]);
+
   const isLoading = isAuthLoading || isOrdersLoading;
   const pedidos = ordersData?.data || [];
   
+  // Sort by date (most recent first)
+  const pedidosOrdenados = useMemo(() => {
+    return [...pedidos].sort((a, b) => {
+      const dateA = new Date(a.dataPedido).getTime();
+      const dateB = new Date(b.dataPedido).getTime();
+      return dateB - dateA;
+    });
+  }, [pedidos]);
+
+  // Filter by search term
+  const pedidosFiltrados = useMemo(() => {
+    if (!searchTerm.trim()) return pedidosOrdenados;
+    
+    const term = searchTerm.toLowerCase().trim();
+    return pedidosOrdenados.filter(p => {
+      const matchEvento = p.evento?.nome?.toLowerCase().includes(term);
+      const matchNumero = p.numeroPedido.toString().includes(term);
+      const matchParticipante = p.inscricoes.some(i => 
+        i.participanteNome?.toLowerCase().includes(term)
+      );
+      const matchModalidade = p.inscricoes.some(i => 
+        i.modalidade?.nome?.toLowerCase().includes(term)
+      );
+      return matchEvento || matchNumero || matchParticipante || matchModalidade;
+    });
+  }, [pedidosOrdenados, searchTerm]);
+
   const now = new Date();
-  const pedidosProximos = pedidos.filter(p => {
+  const pedidosProximos = pedidosFiltrados.filter(p => {
     if (!p.evento?.dataEvento) return true;
     const eventDate = new Date(p.evento.dataEvento);
     return eventDate >= now;
   });
   
-  const pedidosConcluidos = pedidos.filter(p => {
+  const pedidosConcluidos = pedidosFiltrados.filter(p => {
     if (!p.evento?.dataEvento) return false;
     const eventDate = new Date(p.evento.dataEvento);
     return eventDate < now;
   });
+
+  // Pagination logic
+  const totalPagesProximas = Math.ceil(pedidosProximos.length / ITEMS_PER_PAGE) || 1;
+  const totalPagesConcluidas = Math.ceil(pedidosConcluidos.length / ITEMS_PER_PAGE) || 1;
+
+  // Clamp current page if it exceeds total pages (when results decrease)
+  useEffect(() => {
+    if (currentPageProximas > totalPagesProximas) {
+      setCurrentPageProximas(Math.max(1, totalPagesProximas));
+    }
+  }, [currentPageProximas, totalPagesProximas]);
+
+  useEffect(() => {
+    if (currentPageConcluidas > totalPagesConcluidas) {
+      setCurrentPageConcluidas(Math.max(1, totalPagesConcluidas));
+    }
+  }, [currentPageConcluidas, totalPagesConcluidas]);
+
+  const pedidosProximosPaginados = pedidosProximos.slice(
+    (currentPageProximas - 1) * ITEMS_PER_PAGE,
+    currentPageProximas * ITEMS_PER_PAGE
+  );
+
+  const pedidosConcluidosPaginados = pedidosConcluidos.slice(
+    (currentPageConcluidas - 1) * ITEMS_PER_PAGE,
+    currentPageConcluidas * ITEMS_PER_PAGE
+  );
 
   const totalInscricoesProximas = pedidosProximos.reduce((acc, p) => acc + p.inscricoes.length, 0);
   const totalInscricoesConcluidas = pedidosConcluidos.reduce((acc, p) => acc + p.inscricoes.length, 0);
@@ -279,6 +357,17 @@ export default function MinhasInscricoesPage() {
           </p>
         </div>
 
+        <div className="relative mb-6">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por evento, participante, modalidade ou n° do pedido..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+            data-testid="input-search-inscricoes"
+          />
+        </div>
+
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="grid w-full max-w-md grid-cols-2">
             <TabsTrigger value="proximas" data-testid="tab-proximas">
@@ -290,34 +379,86 @@ export default function MinhasInscricoesPage() {
           </TabsList>
 
           <TabsContent value="proximas" className="space-y-6">
-            {pedidosProximos.map((pedido) => (
+            {pedidosProximosPaginados.map((pedido) => (
               <PedidoCard key={pedido.id} pedido={pedido} />
             ))}
             {pedidosProximos.length === 0 && (
               <div className="text-center py-12">
                 <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                 <p className="text-muted-foreground">
-                  Você não possui inscrições em eventos próximos
+                  {searchTerm ? "Nenhuma inscrição encontrada para sua busca" : "Você não possui inscrições em eventos próximos"}
                 </p>
-                <Link href="/">
-                  <Button className="mt-4" data-testid="button-ver-eventos">
-                    Ver Eventos Disponíveis
-                  </Button>
-                </Link>
+                {!searchTerm && (
+                  <Link href="/">
+                    <Button className="mt-4" data-testid="button-ver-eventos">
+                      Ver Eventos Disponíveis
+                    </Button>
+                  </Link>
+                )}
+              </div>
+            )}
+            {totalPagesProximas > 1 && (
+              <div className="flex items-center justify-center gap-2 pt-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPageProximas(p => Math.max(1, p - 1))}
+                  disabled={currentPageProximas === 1}
+                  data-testid="button-prev-page-proximas"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="text-sm text-muted-foreground px-2">
+                  Página {currentPageProximas} de {totalPagesProximas}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPageProximas(p => Math.min(totalPagesProximas, p + 1))}
+                  disabled={currentPageProximas === totalPagesProximas}
+                  data-testid="button-next-page-proximas"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
               </div>
             )}
           </TabsContent>
 
           <TabsContent value="concluidas" className="space-y-6">
-            {pedidosConcluidos.map((pedido) => (
+            {pedidosConcluidosPaginados.map((pedido) => (
               <PedidoCard key={pedido.id} pedido={pedido} />
             ))}
             {pedidosConcluidos.length === 0 && (
               <div className="text-center py-12">
                 <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                 <p className="text-muted-foreground">
-                  Você ainda não participou de nenhum evento
+                  {searchTerm ? "Nenhuma inscrição encontrada para sua busca" : "Você ainda não participou de nenhum evento"}
                 </p>
+              </div>
+            )}
+            {totalPagesConcluidas > 1 && (
+              <div className="flex items-center justify-center gap-2 pt-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPageConcluidas(p => Math.max(1, p - 1))}
+                  disabled={currentPageConcluidas === 1}
+                  data-testid="button-prev-page-concluidas"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="text-sm text-muted-foreground px-2">
+                  Página {currentPageConcluidas} de {totalPagesConcluidas}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPageConcluidas(p => Math.min(totalPagesConcluidas, p + 1))}
+                  disabled={currentPageConcluidas === totalPagesConcluidas}
+                  data-testid="button-next-page-concluidas"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
               </div>
             )}
           </TabsContent>
