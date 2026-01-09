@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { 
   ChevronLeft, 
   Tag, 
@@ -28,6 +29,7 @@ import Header from "@/components/Header";
 import { useToast } from "@/hooks/use-toast";
 import { useAthleteAuth } from "@/contexts/AthleteAuthContext";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import CreditCardForm from "@/components/CreditCardForm";
 
 interface OrderData {
   order: {
@@ -135,6 +137,8 @@ export default function InscricaoPagamentoPage() {
   } | null>(null);
   const [copied, setCopied] = useState(false);
   const [paymentConfirmed, setPaymentConfirmed] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<"pix" | "credit_card">("pix");
+  const [isProcessingCard, setIsProcessingCard] = useState(false);
 
   const searchParams = new URLSearchParams(searchString);
   const orderId = searchParams.get("orderId");
@@ -157,6 +161,17 @@ export default function InscricaoPagamentoPage() {
     },
     enabled: !!orderId && !!athlete,
   });
+
+  const { data: paymentConfig } = useQuery<{ success: boolean; data: { publicKey: string | null; configured: boolean } }>({
+    queryKey: ["/api/payments/config"],
+    queryFn: async () => {
+      const response = await fetch("/api/payments/config", { credentials: "include" });
+      return response.json();
+    },
+  });
+
+  const mpPublicKey = paymentConfig?.data?.publicKey || "";
+  const mpConfigured = paymentConfig?.data?.configured || false;
 
   useEffect(() => {
     if (!pixData || !orderId || paymentConfirmed || isExpired) return;
@@ -267,6 +282,93 @@ export default function InscricaoPagamentoPage() {
       });
     }
   });
+
+  const handleCardPayment = async (cardData: {
+    token: string;
+    paymentMethodId: string;
+    issuerId: string;
+    installments: number;
+  }) => {
+    if (isExpired) {
+      toast({
+        title: "Tempo esgotado",
+        description: "O tempo para pagamento expirou. Por favor, faça uma nova inscrição.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsProcessingCard(true);
+    try {
+      const response = await apiRequest("POST", "/api/payments/create", {
+        orderId,
+        paymentMethod: "credit_card",
+        cardToken: cardData.token,
+        paymentMethodId: cardData.paymentMethodId,
+        issuerId: cardData.issuerId,
+        installments: cardData.installments,
+      });
+      const result = await response.json();
+
+      if (result.success && result.data) {
+        if (result.data.status === "approved") {
+          setPaymentConfirmed(true);
+          queryClient.invalidateQueries({ queryKey: ["/api/registrations/orders", orderId] });
+          toast({
+            title: "Pagamento aprovado!",
+            description: "Sua inscrição foi confirmada com sucesso.",
+          });
+        } else if (result.data.status === "in_process" || result.data.status === "pending") {
+          toast({
+            title: "Pagamento em processamento",
+            description: "Seu pagamento está sendo analisado. Você receberá uma confirmação em breve.",
+          });
+        } else {
+          toast({
+            title: "Pagamento não aprovado",
+            description: getCardErrorMessage(result.data.statusDetail),
+            variant: "destructive",
+          });
+        }
+      } else {
+        if (result.errorCode === "ORDER_EXPIRED") {
+          setIsExpired(true);
+        }
+        toast({
+          title: "Erro no pagamento",
+          description: result.error || "Não foi possível processar o pagamento. Tente novamente.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Erro no pagamento",
+        description: "Não foi possível processar o pagamento. Verifique os dados e tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessingCard(false);
+    }
+  };
+
+  const getCardErrorMessage = (statusDetail: string): string => {
+    const errorMessages: Record<string, string> = {
+      cc_rejected_bad_filled_card_number: "Verifique o número do cartão.",
+      cc_rejected_bad_filled_date: "Verifique a data de validade.",
+      cc_rejected_bad_filled_other: "Verifique os dados do cartão.",
+      cc_rejected_bad_filled_security_code: "Verifique o código de segurança.",
+      cc_rejected_blacklist: "Não foi possível processar o pagamento.",
+      cc_rejected_call_for_authorize: "Você deve autorizar o pagamento junto ao seu banco.",
+      cc_rejected_card_disabled: "Ligue para sua operadora de cartão para ativar seu cartão.",
+      cc_rejected_duplicated_payment: "Você já fez um pagamento com esse valor.",
+      cc_rejected_high_risk: "Seu pagamento foi recusado.",
+      cc_rejected_insufficient_amount: "Seu cartão não possui saldo suficiente.",
+      cc_rejected_invalid_installments: "Seu cartão não processa parcelas.",
+      cc_rejected_max_attempts: "Você excedeu o limite de tentativas.",
+      cc_rejected_other_reason: "Não foi possível processar o pagamento.",
+    };
+    return errorMessages[statusDetail] || "Não foi possível processar o pagamento. Tente novamente ou use outro método.";
+  };
 
   const orderData = data?.data;
 
@@ -868,29 +970,79 @@ export default function InscricaoPagamentoPage() {
                   Forma de Pagamento
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2 p-4 border rounded-md">
+              <CardContent className="space-y-4">
+                <RadioGroup 
+                  value={paymentMethod} 
+                  onValueChange={(v) => setPaymentMethod(v as "pix" | "credit_card")}
+                  className="space-y-3"
+                >
+                  <div 
+                    className={`flex items-center gap-3 p-4 border rounded-md cursor-pointer transition-colors ${
+                      paymentMethod === "pix" ? "border-primary bg-primary/5" : "hover:bg-muted/50"
+                    }`}
+                    onClick={() => setPaymentMethod("pix")}
+                  >
+                    <RadioGroupItem value="pix" id="pix" data-testid="radio-pix" />
                     <QrCode className="h-6 w-6 text-primary" />
                     <div className="flex-1">
-                      <p className="font-medium">PIX</p>
+                      <Label htmlFor="pix" className="font-medium cursor-pointer">PIX</Label>
                       <p className="text-sm text-muted-foreground">
                         Pagamento instantâneo via QR Code
                       </p>
                     </div>
                     <Badge variant="secondary">Recomendado</Badge>
                   </div>
+
+                  <div 
+                    className={`flex items-center gap-3 p-4 border rounded-md cursor-pointer transition-colors ${
+                      paymentMethod === "credit_card" ? "border-primary bg-primary/5" : "hover:bg-muted/50"
+                    }`}
+                    onClick={() => setPaymentMethod("credit_card")}
+                  >
+                    <RadioGroupItem value="credit_card" id="credit_card" data-testid="radio-credit-card" />
+                    <CreditCard className="h-6 w-6 text-primary" />
+                    <div className="flex-1">
+                      <Label htmlFor="credit_card" className="font-medium cursor-pointer">Cartão de Crédito</Label>
+                      <p className="text-sm text-muted-foreground">
+                        Pague em até 12x
+                      </p>
+                    </div>
+                  </div>
+                </RadioGroup>
+
+                {paymentMethod === "pix" && (
                   <p className="text-sm text-muted-foreground">
                     Clique no botão abaixo para gerar o código PIX e finalizar o pagamento.
                   </p>
-                </div>
+                )}
+
+                {paymentMethod === "credit_card" && mpConfigured && mpPublicKey && (
+                  <div className="pt-4">
+                    <Separator className="mb-4" />
+                    <CreditCardForm
+                      amount={valorFinal}
+                      onSubmit={handleCardPayment}
+                      isProcessing={isProcessingCard}
+                      publicKey={mpPublicKey}
+                    />
+                  </div>
+                )}
+
+                {paymentMethod === "credit_card" && !mpConfigured && (
+                  <div className="flex items-center gap-2 p-3 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800 rounded-md">
+                    <AlertCircle className="h-4 w-4 text-yellow-600" />
+                    <span className="text-sm text-yellow-800 dark:text-yellow-200">
+                      Pagamento com cartão temporariamente indisponível. Use PIX.
+                    </span>
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}
         </div>
       </div>
 
-      {!pixData && (
+      {!pixData && (isPedidoGratuito || paymentMethod === "pix") && (
         <div className="fixed bottom-0 left-0 right-0 bg-background border-t shadow-lg z-50">
           <div className="max-w-2xl mx-auto px-4 py-3">
             {isPedidoGratuito ? (

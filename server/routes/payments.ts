@@ -5,6 +5,23 @@ import { createPixPayment, createCardPayment, getPaymentStatus, isConfigured } f
 
 const router = Router();
 
+router.get("/config", async (req, res) => {
+  try {
+    const publicKey = process.env.MERCADOPAGO_PUBLIC_KEY;
+    
+    return res.json({
+      success: true,
+      data: {
+        publicKey: publicKey || null,
+        configured: isConfigured() && !!publicKey
+      }
+    });
+  } catch (error) {
+    console.error("[payments] Erro ao obter configuração:", error);
+    return res.status(500).json({ success: false, error: "Erro interno do servidor" });
+  }
+});
+
 const createPaymentSchema = z.object({
   orderId: z.string().uuid(),
   paymentMethod: z.enum(["pix", "credit_card"]),

@@ -104,18 +104,23 @@ export async function createCardPayment(
   }
 
   try {
+    const paymentBody: any = {
+      transaction_amount: amount,
+      token: token,
+      installments: installments,
+      payment_method_id: paymentMethodId,
+      payer: {
+        email: buyerEmail
+      },
+      external_reference: externalReference || orderId
+    };
+
+    if (issuerId && issuerId.trim() !== "") {
+      paymentBody.issuer_id = parseInt(issuerId, 10);
+    }
+
     const payment = await paymentClient.create({
-      body: {
-        transaction_amount: amount,
-        token: token,
-        installments: installments,
-        payment_method_id: paymentMethodId,
-        issuer_id: issuerId,
-        payer: {
-          email: buyerEmail
-        },
-        external_reference: externalReference || orderId
-      }
+      body: paymentBody
     });
 
     return {
