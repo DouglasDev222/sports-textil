@@ -1,6 +1,9 @@
 import { Router } from "express";
 import { z } from "zod";
 import { storage } from "../storage";
+import { toZonedTime } from "date-fns-tz";
+
+const SAO_PAULO_TZ = "America/Sao_Paulo";
 
 const router = Router();
 
@@ -42,9 +45,12 @@ router.post("/validate", async (req, res) => {
       });
     }
 
-    const now = new Date();
+    // Use São Paulo timezone for validation (UTC-3)
+    const nowSaoPaulo = toZonedTime(new Date(), SAO_PAULO_TZ);
+    const validFromSP = toZonedTime(new Date(coupon.validFrom), SAO_PAULO_TZ);
+    const validUntilSP = toZonedTime(new Date(coupon.validUntil), SAO_PAULO_TZ);
     
-    if (new Date(coupon.validFrom) > now) {
+    if (validFromSP > nowSaoPaulo) {
       return res.status(400).json({
         valid: false,
         error: "coupon_not_valid_yet",
@@ -52,7 +58,7 @@ router.post("/validate", async (req, res) => {
       });
     }
 
-    if (new Date(coupon.validUntil) < now) {
+    if (validUntilSP < nowSaoPaulo) {
       return res.status(400).json({
         valid: false,
         error: "coupon_expired",
@@ -171,11 +177,15 @@ router.post("/apply", async (req, res) => {
       return res.status(400).json({ success: false, error: "Cupom inativo" });
     }
 
-    const now = new Date();
-    if (new Date(coupon.validFrom) > now) {
+    // Use São Paulo timezone for validation (UTC-3)
+    const nowSaoPaulo = toZonedTime(new Date(), SAO_PAULO_TZ);
+    const validFromSP = toZonedTime(new Date(coupon.validFrom), SAO_PAULO_TZ);
+    const validUntilSP = toZonedTime(new Date(coupon.validUntil), SAO_PAULO_TZ);
+    
+    if (validFromSP > nowSaoPaulo) {
       return res.status(400).json({ success: false, error: "Cupom ainda nao esta valido" });
     }
-    if (new Date(coupon.validUntil) < now) {
+    if (validUntilSP < nowSaoPaulo) {
       return res.status(400).json({ success: false, error: "Cupom expirado" });
     }
 
@@ -242,6 +252,7 @@ router.post("/apply", async (req, res) => {
         couponId: coupon.id,
         userId: athleteId,
         orderId: orderId,
+        discountApplied: discountAmount.toFixed(2),
       });
     } catch (usageError) {
       console.error("Error recording coupon usage, rolling back:", usageError);
