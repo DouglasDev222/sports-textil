@@ -693,10 +693,16 @@ export class DbStorage implements IStorage {
   }
 
   async confirmOrderPayment(orderId: string, paymentId: string): Promise<void> {
+    const [order] = await db.select().from(orders).where(eq(orders.id, orderId));
+    
+    if (order && order.status === 'pago') {
+      return;
+    }
+
     await db.update(orders)
       .set({ 
         status: 'pago',
-        dataPagamento: new Date().toISOString(),
+        dataPagamento: new Date(),
         idPagamentoGateway: paymentId
       })
       .where(eq(orders.id, orderId));
@@ -704,6 +710,24 @@ export class DbStorage implements IStorage {
     await db.update(registrations)
       .set({ status: 'confirmada' })
       .where(eq(registrations.orderId, orderId));
+
+    if (order && order.cupomId) {
+      const existingUsage = await db.select().from(couponUsages)
+        .where(eq(couponUsages.orderId, orderId));
+      
+      if (existingUsage.length === 0) {
+        await db.update(eventCoupons)
+          .set({ currentUses: sql`${eventCoupons.currentUses} + 1` })
+          .where(eq(eventCoupons.id, order.cupomId));
+        
+        await db.insert(couponUsages).values({
+          couponId: order.cupomId,
+          userId: order.compradorId,
+          orderId: orderId,
+          discountApplied: order.valorDesconto,
+        });
+      }
+    }
   }
 
   async getPendingOrdersWithPayment(): Promise<Order[]> {

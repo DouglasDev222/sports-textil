@@ -242,37 +242,8 @@ router.post("/apply", async (req, res) => {
       valorDesconto: discountAmount.toFixed(2),
       valorTotal: valorFinal.toFixed(2),
       codigoCupom: coupon.code,
+      cupomId: coupon.id,
     });
-
-    let usageIncremented = false;
-    try {
-      await storage.incrementCouponUsage(coupon.id);
-      usageIncremented = true;
-      await storage.createCouponUsage({
-        couponId: coupon.id,
-        userId: athleteId,
-        orderId: orderId,
-        discountApplied: discountAmount.toFixed(2),
-      });
-    } catch (usageError) {
-      console.error("Error recording coupon usage, rolling back:", usageError);
-      if (usageIncremented) {
-        try {
-          await storage.decrementCouponUsage(coupon.id);
-        } catch (decrementError) {
-          console.error("Failed to rollback coupon usage increment:", decrementError);
-        }
-      }
-      await storage.updateOrder(orderId, {
-        valorDesconto: "0",
-        valorTotal: valorOriginal.toFixed(2),
-        codigoCupom: null,
-      });
-      return res.status(500).json({
-        success: false,
-        error: "Erro ao registrar uso do cupom. Tente novamente."
-      });
-    }
 
     res.json({
       success: true,
@@ -347,27 +318,12 @@ router.post("/remove", async (req, res) => {
       });
     }
 
-    const couponUsage = await storage.getCouponUsageByOrder(orderId);
-    let usageCleanedUp = true;
-    if (couponUsage) {
-      try {
-        await storage.deleteCouponUsageByOrder(orderId);
-        await storage.decrementCouponUsage(couponUsage.couponId);
-      } catch (usageError) {
-        console.error("Error removing coupon usage record:", usageError);
-        usageCleanedUp = false;
-      }
-    }
-
     await storage.updateOrder(orderId, {
       valorDesconto: "0",
       valorTotal: valorOriginal.toFixed(2),
       codigoCupom: null,
+      cupomId: null,
     });
-
-    if (!usageCleanedUp) {
-      console.warn(`Coupon removed from order ${orderId} but usage record cleanup failed`);
-    }
 
     res.json({
       success: true,

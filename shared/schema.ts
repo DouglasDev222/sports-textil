@@ -167,6 +167,7 @@ export const orders = pgTable("orders", {
   valorDesconto: decimal("valor_desconto", { precision: 10, scale: 2 }).default("0").notNull(),
   codigoVoucher: text("codigo_voucher"),
   codigoCupom: text("codigo_cupom"),
+  cupomId: varchar("cupom_id"),
   status: orderStatusEnum("status").default("pendente").notNull(),
   idPagamentoGateway: text("id_pagamento_gateway"),
   metodoPagamento: text("metodo_pagamento"),
