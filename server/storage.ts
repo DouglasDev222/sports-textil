@@ -736,7 +736,7 @@ export class DbStorage implements IStorage {
         and(
           eq(orders.status, 'pendente'),
           isNotNull(orders.idPagamentoGateway),
-          gt(orders.dataExpiracao, new Date().toISOString())
+          gt(orders.dataExpiracao, new Date())
         )
       );
   }
@@ -747,7 +747,7 @@ export class DbStorage implements IStorage {
         and(
           eq(orders.status, 'pendente'),
           isNotNull(orders.dataExpiracao),
-          lt(orders.dataExpiracao, new Date().toISOString())
+          lt(orders.dataExpiracao, new Date())
         )
       );
   }
