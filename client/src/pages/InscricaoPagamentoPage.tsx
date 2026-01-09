@@ -273,7 +273,7 @@ export default function InscricaoPagamentoPage() {
   }, [orderData?.order.dataExpiracao]);
 
   const valorTotal = orderData?.order.valorTotal || 0;
-  const valorDescontoFromOrder = parseFloat(orderData?.order.valorDesconto || "0");
+  const valorDescontoFromOrder = parseFloat(String(orderData?.order.valorDesconto || "0"));
   
   const valorDesconto = cupomAplicado ? parseFloat(cupomAplicado.discountAmount) : valorDescontoFromOrder;
   const valorFinal = valorTotal;
@@ -287,21 +287,37 @@ export default function InscricaoPagamentoPage() {
     if (!orderId || !cupom.trim()) {
       toast({
         title: "Erro",
-        description: "Dados incompletos para aplicar o cupom.",
+        description: "Digite um código de cupom para aplicar.",
         variant: "destructive",
       });
       return;
     }
 
+    if (!athlete) {
+      toast({
+        title: "Sessão expirada",
+        description: "Faça login novamente para aplicar o cupom.",
+        variant: "destructive",
+      });
+      const redirectUrl = `/evento/${slug}/inscricao/pagamento?orderId=${orderId}`;
+      setLocation(`/login?redirect=${encodeURIComponent(redirectUrl)}`);
+      return;
+    }
+
     setCupomValidando(true);
     try {
-      const response = await apiRequest("POST", "/api/coupons/apply", {
-        orderId,
-        couponCode: cupom.trim().toUpperCase(),
+      const response = await fetch("/api/coupons/apply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderId,
+          couponCode: cupom.trim().toUpperCase(),
+        }),
+        credentials: "include",
       });
       const result = await response.json();
       
-      if (result.success && result.data) {
+      if (response.ok && result.success && result.data) {
         setCupomAplicado({
           id: "",
           code: result.data.couponCode,
@@ -313,19 +329,28 @@ export default function InscricaoPagamentoPage() {
         await refetch();
         toast({
           title: "Cupom aplicado!",
-          description: `Desconto de R$ ${parseFloat(result.data.discountAmount).toFixed(2)} aplicado.`,
+          description: `Desconto de R$ ${parseFloat(result.data.discountAmount).toFixed(2).replace('.', ',')} aplicado.`,
         });
+      } else if (response.status === 401) {
+        toast({
+          title: "Sessão expirada",
+          description: "Faça login novamente para aplicar o cupom.",
+          variant: "destructive",
+        });
+        const redirectUrl = `/evento/${slug}/inscricao/pagamento?orderId=${orderId}`;
+        setLocation(`/login?redirect=${encodeURIComponent(redirectUrl)}`);
       } else {
+        const errorMessage = getErrorMessage(result.error);
         toast({
           title: "Cupom inválido",
-          description: result.error || "O cupom informado não existe ou expirou.",
+          description: errorMessage,
           variant: "destructive",
         });
       }
     } catch (error) {
       toast({
-        title: "Erro ao aplicar cupom",
-        description: "Tente novamente.",
+        title: "Erro de conexão",
+        description: "Não foi possível aplicar o cupom. Verifique sua conexão e tente novamente.",
         variant: "destructive",
       });
     } finally {
@@ -333,15 +358,45 @@ export default function InscricaoPagamentoPage() {
     }
   };
 
+  const getErrorMessage = (error: string | undefined): string => {
+    const errorMessages: Record<string, string> = {
+      "Cupom nao encontrado para este evento": "Este cupom não existe ou não é válido para este evento.",
+      "Cupom inativo": "Este cupom está desativado e não pode ser utilizado.",
+      "Cupom expirado": "Este cupom já expirou e não pode mais ser utilizado.",
+      "Cupom esgotado": "Este cupom já atingiu o limite de utilizações.",
+      "Ja existe um cupom aplicado neste pedido. Remova-o antes de aplicar outro.": "Já existe um cupom aplicado. Remova-o antes de aplicar outro.",
+      "Cupom so pode ser aplicado em pedidos pendentes": "Cupom só pode ser aplicado em pedidos pendentes.",
+      "Pedido nao encontrado": "Pedido não encontrado.",
+      "Acesso nao autorizado": "Você não tem permissão para aplicar cupom neste pedido.",
+    };
+    return errorMessages[error || ""] || error || "O cupom informado não é válido.";
+  };
+
   const handleRemoverCupom = async () => {
     if (!orderId) return;
     
+    if (!athlete) {
+      toast({
+        title: "Sessão expirada",
+        description: "Faça login novamente para remover o cupom.",
+        variant: "destructive",
+      });
+      const redirectUrl = `/evento/${slug}/inscricao/pagamento?orderId=${orderId}`;
+      setLocation(`/login?redirect=${encodeURIComponent(redirectUrl)}`);
+      return;
+    }
+    
     setCupomValidando(true);
     try {
-      const response = await apiRequest("POST", "/api/coupons/remove", { orderId });
+      const response = await fetch("/api/coupons/remove", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId }),
+        credentials: "include",
+      });
       const result = await response.json();
       
-      if (result.success) {
+      if (response.ok && result.success) {
         setCupomAplicado(null);
         setCupom("");
         await refetch();
@@ -349,17 +404,25 @@ export default function InscricaoPagamentoPage() {
           title: "Cupom removido",
           description: "O desconto foi removido do pedido.",
         });
+      } else if (response.status === 401) {
+        toast({
+          title: "Sessão expirada",
+          description: "Faça login novamente para remover o cupom.",
+          variant: "destructive",
+        });
+        const redirectUrl = `/evento/${slug}/inscricao/pagamento?orderId=${orderId}`;
+        setLocation(`/login?redirect=${encodeURIComponent(redirectUrl)}`);
       } else {
         toast({
           title: "Erro ao remover cupom",
-          description: result.error || "Tente novamente.",
+          description: getErrorMessage(result.error) || "Não foi possível remover o cupom. Tente novamente.",
           variant: "destructive",
         });
       }
     } catch (error) {
       toast({
-        title: "Erro ao remover cupom",
-        description: "Tente novamente.",
+        title: "Erro de conexão",
+        description: "Não foi possível remover o cupom. Verifique sua conexão e tente novamente.",
         variant: "destructive",
       });
     } finally {
