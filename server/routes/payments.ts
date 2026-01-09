@@ -100,6 +100,32 @@ router.post("/create", async (req, res) => {
     const externalReference = `order_${order.id}`;
 
     if (paymentMethod === "pix") {
+      // Verificar se já existe um PIX válido para este pedido
+      if (order.pixQrCode && order.pixQrCodeBase64 && order.pixExpiracao && order.idPagamentoGateway) {
+        const pixExpiration = new Date(order.pixExpiracao);
+        const now = new Date();
+        
+        // Se o PIX ainda não expirou, reutilizar o código existente
+        if (pixExpiration > now) {
+          console.log(`[payments] Reutilizando PIX existente para pedido ${order.id}`);
+          return res.json({
+            success: true,
+            data: {
+              paymentId: order.idPagamentoGateway,
+              status: "pending",
+              qrCode: order.pixQrCode,
+              qrCodeBase64: order.pixQrCodeBase64,
+              expirationDate: order.pixExpiracao,
+              orderId: order.id,
+              dataExpiracao: order.dataExpiracao,
+              reutilizado: true
+            }
+          });
+        } else {
+          console.log(`[payments] PIX anterior expirado para pedido ${order.id}, criando novo`);
+        }
+      }
+
       const result = await createPixPayment(
         order.id,
         amount,
@@ -134,7 +160,8 @@ router.post("/create", async (req, res) => {
           qrCodeBase64: result.qrCodeBase64,
           expirationDate: result.expirationDate,
           orderId: order.id,
-          dataExpiracao: order.dataExpiracao
+          dataExpiracao: order.dataExpiracao,
+          reutilizado: false
         }
       });
     } else if (paymentMethod === "credit_card") {
