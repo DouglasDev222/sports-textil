@@ -228,6 +228,46 @@ export default function InscricaoPagamentoPage() {
     }
   });
 
+  const confirmFreeMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/payments/confirm-free", {
+        orderId
+      });
+      return response.json();
+    },
+    onSuccess: (response) => {
+      if (response.success && response.data) {
+        setPaymentConfirmed(true);
+        queryClient.invalidateQueries({ queryKey: ["/api/registrations/orders", orderId] });
+        toast({
+          title: "Inscrição confirmada!",
+          description: "Sua inscrição foi realizada com sucesso.",
+        });
+        if (response.data.registrationId) {
+          setLocation(`/inscricao/${response.data.registrationId}?sucesso=1`);
+        } else {
+          setLocation("/minhas-inscricoes");
+        }
+      } else {
+        if (response.errorCode === "ORDER_EXPIRED") {
+          setIsExpired(true);
+        }
+        toast({
+          title: "Erro ao confirmar inscrição",
+          description: response.error || "Tente novamente.",
+          variant: "destructive",
+        });
+      }
+    },
+    onError: () => {
+      toast({
+        title: "Erro ao confirmar inscrição",
+        description: "Tente novamente.",
+        variant: "destructive",
+      });
+    }
+  });
+
   const orderData = data?.data;
 
   useEffect(() => {
@@ -278,6 +318,7 @@ export default function InscricaoPagamentoPage() {
   const valorDesconto = cupomAplicado ? parseFloat(cupomAplicado.discountAmount) : valorDescontoFromOrder;
   const valorFinal = valorTotal;
   const valorOriginalSemDesconto = valorTotal + valorDescontoFromOrder;
+  const isPedidoGratuito = valorFinal === 0;
 
   const handleVoltar = () => {
     setLocation(`/evento/${slug}`);
@@ -749,7 +790,21 @@ export default function InscricaoPagamentoPage() {
             </CardContent>
           </Card>
 
-          {pixData ? (
+          {isPedidoGratuito ? (
+            <Card className="border-green-500/50 bg-green-50/50 dark:bg-green-950/20">
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2 text-green-700 dark:text-green-300">
+                  <CheckCircle2 className="h-5 w-5" />
+                  Inscrição Gratuita
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground">
+                  Sua inscrição é gratuita! Clique no botão abaixo para confirmar sua participação no evento.
+                </p>
+              </CardContent>
+            </Card>
+          ) : pixData ? (
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
@@ -838,24 +893,48 @@ export default function InscricaoPagamentoPage() {
       {!pixData && (
         <div className="fixed bottom-0 left-0 right-0 bg-background border-t shadow-lg z-50">
           <div className="max-w-2xl mx-auto px-4 py-3">
-            <Button
-              size="lg"
-              onClick={handleGerarPix}
-              disabled={createPaymentMutation.isPending || isExpired}
-              className="w-full font-semibold"
-              data-testid="button-gerar-pix"
-            >
-              {createPaymentMutation.isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Gerando PIX...
-                </>
-              ) : isExpired ? (
-                "Tempo esgotado"
-              ) : (
-                `Gerar PIX - R$ ${valorFinal.toFixed(2).replace('.', ',')}`
-              )}
-            </Button>
+            {isPedidoGratuito ? (
+              <Button
+                size="lg"
+                onClick={() => confirmFreeMutation.mutate()}
+                disabled={confirmFreeMutation.isPending || isExpired}
+                className="w-full font-semibold bg-green-600 hover:bg-green-700"
+                data-testid="button-confirmar-inscricao"
+              >
+                {confirmFreeMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Confirmando...
+                  </>
+                ) : isExpired ? (
+                  "Tempo esgotado"
+                ) : (
+                  <>
+                    <CheckCircle2 className="h-4 w-4 mr-2" />
+                    Confirmar Inscrição
+                  </>
+                )}
+              </Button>
+            ) : (
+              <Button
+                size="lg"
+                onClick={handleGerarPix}
+                disabled={createPaymentMutation.isPending || isExpired}
+                className="w-full font-semibold"
+                data-testid="button-gerar-pix"
+              >
+                {createPaymentMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Gerando PIX...
+                  </>
+                ) : isExpired ? (
+                  "Tempo esgotado"
+                ) : (
+                  `Gerar PIX - R$ ${valorFinal.toFixed(2).replace('.', ',')}`
+                )}
+              </Button>
+            )}
           </div>
         </div>
       )}

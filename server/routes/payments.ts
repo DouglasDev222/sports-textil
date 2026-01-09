@@ -375,4 +375,72 @@ router.get("/status/:orderId", async (req, res) => {
   }
 });
 
+router.post("/confirm-free", async (req, res) => {
+  try {
+    const athleteId = (req.session as any)?.athleteId;
+    if (!athleteId) {
+      return res.status(401).json({ success: false, error: "Não autenticado" });
+    }
+
+    const { orderId } = req.body;
+    if (!orderId) {
+      return res.status(400).json({ success: false, error: "ID do pedido é obrigatório" });
+    }
+
+    const order = await storage.getOrder(orderId);
+    if (!order) {
+      return res.status(404).json({ success: false, error: "Pedido não encontrado" });
+    }
+
+    if (order.compradorId !== athleteId) {
+      return res.status(403).json({ success: false, error: "Acesso não autorizado" });
+    }
+
+    if (order.status !== "pendente") {
+      return res.status(400).json({ 
+        success: false, 
+        error: order.status === "pago" 
+          ? "Este pedido já foi confirmado" 
+          : "Este pedido não está disponível para confirmação"
+      });
+    }
+
+    const valorTotal = parseFloat(order.valorTotal);
+    if (valorTotal > 0) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "Este pedido requer pagamento. Utilize PIX ou cartão de crédito."
+      });
+    }
+
+    if (order.dataExpiracao) {
+      const expirationDate = new Date(order.dataExpiracao);
+      if (new Date() >= expirationDate) {
+        return res.status(400).json({ 
+          success: false, 
+          error: "Tempo de pagamento expirado. Por favor, faça uma nova inscrição.",
+          errorCode: "ORDER_EXPIRED"
+        });
+      }
+    }
+
+    await storage.confirmOrderPayment(order.id, "FREE_ORDER");
+
+    const registrations = await storage.getRegistrationsByOrder(order.id);
+
+    return res.json({
+      success: true,
+      data: {
+        orderId: order.id,
+        status: "pago",
+        message: "Inscrição confirmada com sucesso!",
+        registrationId: registrations[0]?.id
+      }
+    });
+  } catch (error) {
+    console.error("[payments] Erro ao confirmar pedido gratuito:", error);
+    return res.status(500).json({ success: false, error: "Erro interno do servidor" });
+  }
+});
+
 export default router;
