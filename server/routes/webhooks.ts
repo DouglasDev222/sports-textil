@@ -5,6 +5,11 @@ import { getPaymentStatus, validateWebhookSignature } from "../services/mercadop
 const router = Router();
 
 router.post("/mercadopago", async (req, res) => {
+  console.log("[webhook] ========== WEBHOOK RECEBIDO ==========");
+  console.log("[webhook] Headers:", JSON.stringify(req.headers, null, 2));
+  console.log("[webhook] Body:", JSON.stringify(req.body, null, 2));
+  console.log("[webhook] ========================================");
+  
   try {
     const xSignature = req.headers['x-signature'] as string | undefined;
     const xRequestId = req.headers['x-request-id'] as string | undefined;
