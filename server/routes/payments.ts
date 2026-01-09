@@ -28,7 +28,12 @@ const createPaymentSchema = z.object({
   cardToken: z.string().optional(),
   installments: z.number().min(1).max(12).optional().default(1),
   paymentMethodId: z.string().optional(),
-  issuerId: z.string().optional()
+  issuerId: z.string().optional(),
+  payerIdentification: z.object({
+    type: z.string(),
+    number: z.string()
+  }).optional(),
+  cardholderName: z.string().optional()
 });
 
 router.post("/create", async (req, res) => {
@@ -54,7 +59,7 @@ router.post("/create", async (req, res) => {
       });
     }
 
-    const { orderId, paymentMethod, cardToken, installments, paymentMethodId, issuerId } = parsed.data;
+    const { orderId, paymentMethod, cardToken, installments, paymentMethodId, issuerId, payerIdentification, cardholderName } = parsed.data;
 
     const order = await storage.getOrder(orderId);
     if (!order) {
@@ -180,7 +185,9 @@ router.post("/create", async (req, res) => {
         athlete.email,
         paymentMethodId,
         issuerId || "",
-        externalReference
+        externalReference,
+        payerIdentification,
+        cardholderName
       );
 
       if (!result.success) {

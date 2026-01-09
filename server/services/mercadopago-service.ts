@@ -95,7 +95,9 @@ export async function createCardPayment(
   buyerEmail: string,
   paymentMethodId: string,
   issuerId: string,
-  externalReference?: string
+  externalReference?: string,
+  payerIdentification?: { type: string; number: string },
+  cardholderName?: string
 ): Promise<CardPaymentResult> {
   if (!paymentClient) {
     return {
@@ -115,6 +117,19 @@ export async function createCardPayment(
       },
       external_reference: externalReference || orderId
     };
+
+    // Add payer identification (required for real cards in Brazil)
+    if (payerIdentification) {
+      paymentBody.payer.identification = {
+        type: payerIdentification.type,
+        number: payerIdentification.number
+      };
+      if (cardholderName) {
+        const nameParts = cardholderName.trim().split(/\s+/);
+        paymentBody.payer.first_name = nameParts[0] || "";
+        paymentBody.payer.last_name = nameParts.slice(1).join(" ") || nameParts[0] || "";
+      }
+    }
 
     if (issuerId && issuerId.trim() !== "") {
       paymentBody.issuer_id = parseInt(issuerId, 10);

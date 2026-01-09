@@ -19,6 +19,11 @@ interface CreditCardFormProps {
     paymentMethodId: string;
     issuerId: string;
     installments: number;
+    payerIdentification: {
+      type: string;
+      number: string;
+    };
+    cardholderName: string;
   }) => void;
   isProcessing: boolean;
   publicKey: string;
@@ -128,7 +133,7 @@ export default function CreditCardForm({ amount, onSubmit, isProcessing, publicK
   }, [cardNumber, getInstallments]);
 
   const formatCardNumber = (value: string) => {
-    const cleaned = value.replace(/\D/g, "").slice(0, 16);
+    const cleaned = value.replace(/\D/g, "").slice(0, 19);
     const groups = cleaned.match(/.{1,4}/g);
     return groups ? groups.join(" ") : cleaned;
   };
@@ -194,6 +199,11 @@ export default function CreditCardForm({ amount, onSubmit, isProcessing, publicK
         paymentMethodId: paymentMethodId,
         issuerId: issuerId,
         installments: selectedInstallment,
+        payerIdentification: {
+          type: identificationType,
+          number: identificationNumber.replace(/\D/g, ""),
+        },
+        cardholderName: cardholderName.toUpperCase(),
       });
     } catch (error: any) {
       console.error("Erro ao tokenizar cartão:", error);

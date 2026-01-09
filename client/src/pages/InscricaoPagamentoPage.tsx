@@ -310,6 +310,11 @@ export default function InscricaoPagamentoPage() {
     paymentMethodId: string;
     issuerId: string;
     installments: number;
+    payerIdentification: {
+      type: string;
+      number: string;
+    };
+    cardholderName: string;
   }) => {
     if (isExpired) {
       toast({
@@ -329,6 +334,8 @@ export default function InscricaoPagamentoPage() {
         paymentMethodId: cardData.paymentMethodId,
         issuerId: cardData.issuerId,
         installments: cardData.installments,
+        payerIdentification: cardData.payerIdentification,
+        cardholderName: cardData.cardholderName,
       });
       const result = await response.json();
 
