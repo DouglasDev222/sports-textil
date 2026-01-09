@@ -229,10 +229,23 @@ export default function MinhasInscricoesPage() {
   const [, setLocation] = useLocation();
   const { athlete, isLoading: isAuthLoading } = useAthleteAuth();
 
+  // Track if we should poll (based on previous data)
+  const [shouldPoll, setShouldPoll] = useState(false);
+
   const { data: ordersData, isLoading: isOrdersLoading } = useQuery<{ success: boolean; data: Pedido[] }>({
     queryKey: ['/api/registrations/my-orders'],
-    enabled: !!athlete
+    enabled: !!athlete,
+    refetchOnWindowFocus: true,
+    refetchInterval: shouldPoll ? 5000 : false,
+    refetchIntervalInBackground: false
   });
+
+  // Update polling state based on data
+  useEffect(() => {
+    const pedidos = ordersData?.data || [];
+    const hasPending = pedidos.some(p => p.status === 'pendente');
+    setShouldPoll(hasPending);
+  }, [ordersData]);
 
   useEffect(() => {
     if (!isAuthLoading && !athlete) {

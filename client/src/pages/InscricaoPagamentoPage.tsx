@@ -151,6 +151,9 @@ export default function InscricaoPagamentoPage() {
     }
   }, [authLoading, athlete, slug, orderId, setLocation]);
 
+  // Track if we should poll (order is pending)
+  const [shouldPollOrder, setShouldPollOrder] = useState(true);
+
   const { data, isLoading, error, refetch } = useQuery<{ success: boolean; data: OrderData }>({
     queryKey: ["/api/registrations/orders", orderId],
     queryFn: async () => {
@@ -160,7 +163,29 @@ export default function InscricaoPagamentoPage() {
       return response.json();
     },
     enabled: !!orderId && !!athlete,
+    refetchInterval: shouldPollOrder ? 5000 : false,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: true
   });
+
+  // Update polling state and detect payment confirmation
+  useEffect(() => {
+    const orderStatus = data?.data?.order?.status;
+    if (orderStatus === 'pago' || orderStatus === 'confirmado') {
+      setShouldPollOrder(false);
+      if (!paymentConfirmed) {
+        setPaymentConfirmed(true);
+        toast({
+          title: "Pagamento confirmado!",
+          description: "Sua inscrição foi confirmada com sucesso.",
+        });
+      }
+    } else if (orderStatus === 'pendente') {
+      setShouldPollOrder(true);
+    } else {
+      setShouldPollOrder(false);
+    }
+  }, [data, paymentConfirmed, toast]);
 
   const { data: paymentConfig } = useQuery<{ success: boolean; data: { publicKey: string | null; configured: boolean } }>({
     queryKey: ["/api/payments/config"],
@@ -173,6 +198,7 @@ export default function InscricaoPagamentoPage() {
   const mpPublicKey = paymentConfig?.data?.publicKey || "";
   const mpConfigured = paymentConfig?.data?.configured || false;
 
+  // Additional polling for PIX payment status (checks Mercado Pago directly)
   useEffect(() => {
     if (!pixData || !orderId || paymentConfirmed || isExpired) return;
 
@@ -185,12 +211,8 @@ export default function InscricaoPagamentoPage() {
         
         if (result.success && result.data) {
           if (result.data.orderStatus === "pago" || result.data.paymentStatus === "approved") {
-            setPaymentConfirmed(true);
+            // Just invalidate the query - the useEffect above will handle the toast
             queryClient.invalidateQueries({ queryKey: ["/api/registrations/orders", orderId] });
-            toast({
-              title: "Pagamento confirmado!",
-              description: "Sua inscrição foi confirmada com sucesso.",
-            });
           }
         }
       } catch (error) {
@@ -202,7 +224,7 @@ export default function InscricaoPagamentoPage() {
     pollPaymentStatus();
 
     return () => clearInterval(interval);
-  }, [pixData, orderId, paymentConfirmed, isExpired, toast]);
+  }, [pixData, orderId, paymentConfirmed, isExpired]);
 
   const createPaymentMutation = useMutation({
     mutationFn: async () => {
