@@ -1,4 +1,5 @@
 import { MercadoPagoConfig, Payment } from 'mercadopago';
+import crypto from 'crypto';
 
 const accessToken = process.env.MERCADOPAGO_ACCESS_TOKEN;
 
@@ -176,8 +177,6 @@ export function validateWebhookSignature(
   }
 
   try {
-    const crypto = require('crypto');
-    
     const parts = xSignature.split(',');
     let ts: string | undefined;
     let hash: string | undefined;
