@@ -79,14 +79,32 @@ router.post("/create", async (req, res) => {
       });
     }
 
+    // Verificar expiração do pedido
+    // REGRA: Se existe PIX válido, o pedido está válido (mesmo se dataExpiracao original passou)
+    // REGRA: Se não existe PIX e método é PIX, permitir criar (vai estabelecer novo deadline)
+    // REGRA: Se não existe PIX e método é cartão, verificar dataExpiracao normal
     if (order.dataExpiracao) {
       const expirationDate = new Date(order.dataExpiracao);
-      if (new Date() >= expirationDate) {
-        return res.status(400).json({ 
-          success: false, 
-          error: "Tempo de pagamento expirado. Por favor, faça uma nova inscrição.",
-          errorCode: "ORDER_EXPIRED"
-        });
+      const now = new Date();
+      
+      if (now >= expirationDate) {
+        // Verificar se existe PIX válido que pode ser reutilizado
+        const hasValidPix = order.pixExpiracao && new Date(order.pixExpiracao) > now;
+        
+        if (hasValidPix) {
+          // PIX válido - permitir continuar
+          console.log(`[payments] Pedido ${order.id} expirado mas tem PIX válido - permitindo`);
+        } else if (paymentMethod === "pix") {
+          // Não tem PIX, mas vai criar um novo - permitir (vai estabelecer novo deadline)
+          console.log(`[payments] Pedido ${order.id} expirado, criando novo PIX com novo deadline`);
+        } else {
+          // Pedido expirado, sem PIX válido, e não está criando PIX - bloquear
+          return res.status(400).json({ 
+            success: false, 
+            error: "Tempo de pagamento expirado. Por favor, faça uma nova inscrição.",
+            errorCode: "ORDER_EXPIRED"
+          });
+        }
       }
     }
 
@@ -106,23 +124,30 @@ router.post("/create", async (req, res) => {
 
     if (paymentMethod === "pix") {
       // Verificar se já existe um PIX válido para este pedido
-      if (order.pixQrCode && order.pixQrCodeBase64 && order.pixExpiracao && order.idPagamentoGateway) {
+      // Usar pixPaymentId (campo dedicado) em vez de idPagamentoGateway (pode ter sido sobrescrito por cartão)
+      const pixPaymentId = order.pixPaymentId || order.idPagamentoGateway;
+      if (order.pixQrCode && order.pixQrCodeBase64 && order.pixExpiracao && pixPaymentId) {
         const pixExpiration = new Date(order.pixExpiracao);
         const now = new Date();
         
         // Se o PIX ainda não expirou, reutilizar o código existente
         if (pixExpiration > now) {
-          console.log(`[payments] Reutilizando PIX existente para pedido ${order.id}`);
+          console.log(`[payments] Reutilizando PIX existente para pedido ${order.id} (pixPaymentId: ${pixPaymentId})`);
+          
+          // IMPORTANTE: Restaurar idPagamentoGateway para apontar para o PIX
+          // Isso garante que outros componentes (job de expiração, polling) funcionem corretamente
+          await storage.updateOrderPaymentId(order.id, pixPaymentId, "pix");
+          
           return res.json({
             success: true,
             data: {
-              paymentId: order.idPagamentoGateway,
+              paymentId: pixPaymentId,
               status: "pending",
               qrCode: order.pixQrCode,
               qrCodeBase64: order.pixQrCodeBase64,
               expirationDate: order.pixExpiracao,
               orderId: order.id,
-              dataExpiracao: order.dataExpiracao,
+              dataExpiracao: order.pixExpiracao, // Usar a expiração do PIX
               reutilizado: true
             }
           });
@@ -148,12 +173,26 @@ router.post("/create", async (req, res) => {
 
       await storage.updateOrderPaymentId(order.id, result.paymentId!, "pix");
 
+      let newOrderExpiration: Date | null = order.dataExpiracao;
       if (result.qrCode && result.qrCodeBase64 && result.expirationDate) {
+        const pixExpirationDate = new Date(result.expirationDate);
+        
+        // Sincronizar a expiração do pedido com a expiração do PIX
+        // O pedido não deve expirar antes do PIX
         await storage.updateOrderPixData(order.id, {
           qrCode: result.qrCode,
           qrCodeBase64: result.qrCodeBase64,
-          expiracao: new Date(result.expirationDate)
+          expiracao: pixExpirationDate,
+          paymentId: result.paymentId // Salvar o ID do PIX separadamente
         });
+        
+        // Atualizar a dataExpiracao do pedido para coincidir com o PIX
+        newOrderExpiration = pixExpirationDate;
+        await storage.updateOrder(order.id, { 
+          dataExpiracao: pixExpirationDate 
+        });
+        
+        console.log(`[payments] PIX criado para pedido ${order.id}. Expiração sincronizada: ${result.expirationDate}`);
       }
 
       return res.json({
@@ -165,7 +204,7 @@ router.post("/create", async (req, res) => {
           qrCodeBase64: result.qrCodeBase64,
           expirationDate: result.expirationDate,
           orderId: order.id,
-          dataExpiracao: order.dataExpiracao,
+          dataExpiracao: newOrderExpiration,
           reutilizado: false
         }
       });
@@ -343,19 +382,31 @@ router.post("/change-method/:orderId", async (req, res) => {
       });
     }
 
-    if (order.dataExpiracao && new Date(order.dataExpiracao) <= new Date()) {
+    // Verificar se existe PIX válido - se sim, verificar pela expiração do PIX
+    const now = new Date();
+    const hasValidPix = order.pixExpiracao && new Date(order.pixExpiracao) > now;
+    
+    // Se tem PIX válido, usar a expiração do PIX; senão, usar a expiração do pedido
+    const effectiveExpiration = hasValidPix ? order.pixExpiracao : order.dataExpiracao;
+    if (effectiveExpiration && new Date(effectiveExpiration) <= now) {
       return res.status(400).json({ 
         success: false, 
         error: "O prazo para pagamento deste pedido expirou"
       });
     }
 
-    await storage.clearOrderPixData(orderId);
-    await storage.updateOrder(orderId, { metodoPagamento: null, idPagamentoGateway: null });
+    // NÃO limpar dados do PIX - apenas limpar o método de pagamento atual
+    // Isso permite reutilizar o PIX se o usuário voltar a escolhê-lo
+    await storage.updateOrder(orderId, { metodoPagamento: null });
+
+    // Verificar se há PIX válido para informar ao frontend
+    const pixStillValid = order.pixExpiracao && new Date(order.pixExpiracao) > now;
 
     return res.json({
       success: true,
-      message: "Método de pagamento limpo. Você pode escolher um novo método."
+      message: "Método de pagamento limpo. Você pode escolher um novo método.",
+      hasValidPix: pixStillValid,
+      pixExpiracao: pixStillValid ? order.pixExpiracao : null
     });
   } catch (error) {
     console.error("[payments] Erro ao trocar método:", error);

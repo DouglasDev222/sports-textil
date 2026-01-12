@@ -76,3 +76,13 @@ Complete implementation of the voucher system as documented in `docs/MODALIDADE_
 - **Global Code Uniqueness**: Voucher and coupon codes are validated to be unique across both systems per event
 - **Improved Error Handling**: Frontend now correctly distinguishes HTTP 404/409/422 as business logic errors (showing specific messages from backend) vs network errors
 - **Voucher Modality Display**: Voucher-type modalities with zero value correctly show as "Gratuito" and are always selectable (not blocked)
+
+### PIX Payment System (January 2025)
+Complete refactoring of PIX payment handling to fix critical issues:
+
+- **PIX Reuse**: When user switches payment method (PIX → Card → PIX), the original PIX code is reused instead of generating a new one. Uses dedicated `pixPaymentId` field to track PIX payment ID separately from `idPagamentoGateway`
+- **Synchronized Expiration**: When PIX is created, `dataExpiracao` of the order is updated to match PIX expiration (30 minutes). This ensures the order timer and PIX timer are synchronized
+- **Expiration Job Protection**: The order expiration job now checks for valid PIX before canceling. Orders with active PIX are never auto-canceled, and their expiration is extended to match PIX validity
+- **Flexible PIX Creation**: If order timer expired but no PIX was created yet, user can still choose PIX and a new deadline will be established based on PIX expiration
+- **Change Method Preservation**: Switching payment methods no longer clears PIX data, allowing reuse when returning to PIX
+- **Database Field**: New `pix_payment_id` column in orders table stores PIX payment ID independently

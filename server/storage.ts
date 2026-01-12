@@ -111,7 +111,7 @@ export interface IStorage {
   createOrder(order: InsertOrder): Promise<Order>;
   updateOrder(id: string, order: Partial<InsertOrder>): Promise<Order | undefined>;
   updateOrderPaymentId(orderId: string, paymentId: string, paymentMethod: string): Promise<void>;
-  updateOrderPixData(orderId: string, pixData: { qrCode: string; qrCodeBase64: string; expiracao: Date }): Promise<void>;
+  updateOrderPixData(orderId: string, pixData: { qrCode: string; qrCodeBase64: string; expiracao: Date; paymentId?: string }): Promise<void>;
   clearOrderPixData(orderId: string): Promise<void>;
   confirmOrderPayment(orderId: string, paymentId: string): Promise<void>;
   getPendingOrdersWithPayment(): Promise<Order[]>;
@@ -670,14 +670,21 @@ export class DbStorage implements IStorage {
       .where(eq(orders.id, orderId));
   }
 
-  async updateOrderPixData(orderId: string, pixData: { qrCode: string; qrCodeBase64: string; expiracao: Date }): Promise<void> {
+  async updateOrderPixData(orderId: string, pixData: { qrCode: string; qrCodeBase64: string; expiracao: Date; paymentId?: string }): Promise<void> {
+    const updateData: any = {
+      pixQrCode: pixData.qrCode,
+      pixQrCodeBase64: pixData.qrCodeBase64,
+      pixExpiracao: pixData.expiracao,
+      pixDataGeracao: new Date()
+    };
+    
+    // Se um paymentId do PIX foi fornecido, salvar no campo dedicado
+    if (pixData.paymentId) {
+      updateData.pixPaymentId = pixData.paymentId;
+    }
+    
     await db.update(orders)
-      .set({
-        pixQrCode: pixData.qrCode,
-        pixQrCodeBase64: pixData.qrCodeBase64,
-        pixExpiracao: pixData.expiracao,
-        pixDataGeracao: new Date()
-      })
+      .set(updateData)
       .where(eq(orders.id, orderId));
   }
 

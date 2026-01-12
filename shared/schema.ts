@@ -179,6 +179,7 @@ export const orders = pgTable("orders", {
   pixQrCodeBase64: text("pix_qr_code_base64"),
   pixExpiracao: timestamp("pix_expiracao", { withTimezone: true }),
   pixDataGeracao: timestamp("pix_data_geracao", { withTimezone: true }),
+  pixPaymentId: text("pix_payment_id"), // ID do pagamento PIX separado do idPagamentoGateway
 });
 
 export const registrations = pgTable("registrations", {

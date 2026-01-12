@@ -5,6 +5,9 @@ interface ExpiredOrder {
   id: string;
   numeroPedido: number;
   eventId: string;
+  pixExpiracao: Date | null;
+  idPagamentoGateway: string | null;
+  pixPaymentId: string | null;
 }
 
 interface ExpiredRegistration {
@@ -26,8 +29,12 @@ export async function expireOrders(): Promise<{
   let errors = 0;
 
   try {
+    // Buscar pedidos pendentes com expiração passada
+    // Incluímos dados do PIX para verificar se ainda está válido
     const expiredOrdersResult = await client.query<ExpiredOrder>(
-      `SELECT id, numero_pedido as "numeroPedido", event_id as "eventId"
+      `SELECT id, numero_pedido as "numeroPedido", event_id as "eventId",
+              pix_expiracao as "pixExpiracao", id_pagamento_gateway as "idPagamentoGateway",
+              pix_payment_id as "pixPaymentId"
        FROM orders 
        WHERE status = 'pendente' 
          AND data_expiracao IS NOT NULL 
@@ -39,10 +46,36 @@ export async function expireOrders(): Promise<{
       return { processedOrders: 0, releasedSpots: 0, errors: 0 };
     }
 
-    console.log(`[order-expiration-job] Encontrados ${expiredOrdersResult.rows.length} pedidos expirados`);
+    console.log(`[order-expiration-job] Encontrados ${expiredOrdersResult.rows.length} pedidos para verificar`);
 
     for (const order of expiredOrdersResult.rows) {
       try {
+        // REGRA CRÍTICA: Se existe um PIX ainda válido, NÃO cancelar o pedido
+        // Isso evita inconsistência entre PIX ativo e pedido cancelado
+        // Usar pixPaymentId (campo dedicado) para verificar se existe PIX,
+        // pois idPagamentoGateway pode ter sido sobrescrito por tentativa de cartão
+        const hasPixData = order.pixPaymentId || (order.idPagamentoGateway && order.pixExpiracao);
+        
+        if (order.pixExpiracao && hasPixData) {
+          const pixExpirationDate = new Date(order.pixExpiracao);
+          const now = new Date();
+          
+          if (pixExpirationDate > now) {
+            // PIX ainda válido - atualizar a expiração do pedido para coincidir com o PIX
+            console.log(
+              `[order-expiration-job] Pedido #${order.numeroPedido} tem PIX válido até ${pixExpirationDate.toISOString()}. ` +
+              `Sincronizando expiração do pedido.`
+            );
+            
+            await client.query(
+              `UPDATE orders SET data_expiracao = $1 WHERE id = $2`,
+              [pixExpirationDate, order.id]
+            );
+            
+            continue; // Pular para o próximo pedido, não cancelar este
+          }
+        }
+
         await client.query('BEGIN');
 
         const registrationsResult = await client.query<ExpiredRegistration>(
