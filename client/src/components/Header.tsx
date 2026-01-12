@@ -15,7 +15,6 @@ import { useAthleteAuth } from "@/contexts/AthleteAuthContext";
 export default function Header() {
   const [location, setLocation] = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [dropdownOpen, setDropdownOpen] = useState(false);
   const { athlete, isLoading, logout } = useAthleteAuth();
 
   const navItems = [
@@ -56,64 +55,54 @@ export default function Header() {
             ))}
 
             {!isLoading && athlete ? (
-              <div
-                onMouseEnter={() => setDropdownOpen(true)}
-                onMouseLeave={() => setDropdownOpen(false)}
-              >
-                <DropdownMenu open={dropdownOpen} onOpenChange={setDropdownOpen}>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="text-primary-foreground"
-                      data-testid="button-user-menu"
-                    >
-                      <User className="h-5 w-5" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent 
-                    align="end" 
-                    className="w-56"
-                    onMouseEnter={() => setDropdownOpen(true)}
-                    onMouseLeave={() => setDropdownOpen(false)}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="text-primary-foreground"
+                    data-testid="button-user-menu"
                   >
-                    <DropdownMenuLabel className="font-normal">
-                      <div className="flex flex-col space-y-1">
-                        <p className="text-sm font-medium leading-none">{athlete.nome}</p>
-                        <p className="text-xs leading-none text-muted-foreground">
-                          {athlete.email}
-                        </p>
-                      </div>
-                    </DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      onClick={() => { setDropdownOpen(false); setLocation("/minha-conta"); }}
-                      className="cursor-pointer"
-                      data-testid="menu-minha-conta"
-                    >
-                      <UserCircle className="mr-2 h-4 w-4" />
-                      Minha Conta
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => { setDropdownOpen(false); setLocation("/minhas-inscricoes"); }}
-                      className="cursor-pointer"
-                      data-testid="menu-minhas-inscricoes"
-                    >
-                      <Trophy className="mr-2 h-4 w-4" />
-                      Minhas Inscrições
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      onClick={() => { setDropdownOpen(false); handleLogout(); }}
-                      className="cursor-pointer text-destructive focus:text-destructive"
-                      data-testid="menu-sair"
-                    >
-                      <LogOut className="mr-2 h-4 w-4" />
-                      Sair
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
+                    <User className="h-5 w-5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel className="font-normal">
+                    <div className="flex flex-col space-y-1">
+                      <p className="text-sm font-medium leading-none">{athlete.nome}</p>
+                      <p className="text-xs leading-none text-muted-foreground">
+                        {athlete.email}
+                      </p>
+                    </div>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => setLocation("/minha-conta")}
+                    className="cursor-pointer"
+                    data-testid="menu-minha-conta"
+                  >
+                    <UserCircle className="mr-2 h-4 w-4" />
+                    Minha Conta
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => setLocation("/minhas-inscricoes")}
+                    className="cursor-pointer"
+                    data-testid="menu-minhas-inscricoes"
+                  >
+                    <Trophy className="mr-2 h-4 w-4" />
+                    Minhas Inscrições
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={handleLogout}
+                    className="cursor-pointer text-destructive focus:text-destructive"
+                    data-testid="menu-sair"
+                  >
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Sair
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             ) : !isLoading ? (
               <div className="flex items-center gap-2">
                 <Link href="/login">
