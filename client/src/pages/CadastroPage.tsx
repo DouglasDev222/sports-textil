@@ -10,10 +10,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Link, useLocation } from "wouter";
+import { Link, useLocation, useSearch } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import Header from "@/components/Header";
 import { useAthleteAuth } from "@/contexts/AthleteAuthContext";
+import { CalendarCheck } from "lucide-react";
 
 const estadosBrasil = [
   "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG",
@@ -49,6 +50,10 @@ export default function CadastroPage() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const { register } = useAthleteAuth();
+  const searchString = useSearch();
+  const searchParams = new URLSearchParams(searchString);
+  const redirectTo = searchParams.get("redirect") || "/";
+  const isInscricaoFlow = redirectTo.includes("/inscricao/");
 
   const formatCPF = (value: string) => {
     const numbers = value.replace(/\D/g, '');
@@ -246,12 +251,14 @@ export default function CadastroPage() {
 
       toast({
         title: "Cadastro realizado!",
-        description: "Sua conta foi criada com sucesso.",
+        description: isInscricaoFlow 
+          ? "Sua conta foi criada. Continuando sua inscrição..." 
+          : "Sua conta foi criada com sucesso.",
       });
 
       setIsLoading(false);
       setTimeout(() => {
-        setLocation("/");
+        setLocation(redirectTo);
       }, 100);
     } catch (error) {
       console.error("Erro ao cadastrar:", error);
@@ -269,11 +276,21 @@ export default function CadastroPage() {
       <Header />
       
       <div className="max-w-2xl mx-auto px-4 py-8 md:py-12">
+        {isInscricaoFlow && (
+          <div className="mb-4 p-4 bg-primary/10 border border-primary/20 rounded-lg flex items-center gap-3">
+            <CalendarCheck className="h-5 w-5 text-primary flex-shrink-0" />
+            <p className="text-sm text-foreground">
+              Crie sua conta para continuar com a inscrição. Após o cadastro, você será direcionado automaticamente.
+            </p>
+          </div>
+        )}
         <Card>
           <CardHeader>
             <CardTitle className="text-2xl">Cadastro de Atleta</CardTitle>
             <CardDescription>
-              Preencha o formulário abaixo para criar sua conta
+              {isInscricaoFlow 
+                ? "Preencha o formulário abaixo para criar sua conta e continuar a inscrição"
+                : "Preencha o formulário abaixo para criar sua conta"}
             </CardDescription>
           </CardHeader>
           <CardContent>
