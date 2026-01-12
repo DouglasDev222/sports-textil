@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
@@ -13,14 +13,214 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Search, CalendarX, MapPin, Calendar, Trophy } from "lucide-react";
+import { Search, CalendarX, MapPin, Calendar, Trophy, ChevronLeft, ChevronRight } from "lucide-react";
 import heroImage from '@assets/generated_images/Marathon_runners_landscape_hero_b439e181.png';
 import type { Event } from "@shared/schema";
+
+function useMediaQuery(query: string): boolean {
+  const [matches, setMatches] = useState(false);
+
+  useEffect(() => {
+    const media = window.matchMedia(query);
+    if (media.matches !== matches) {
+      setMatches(media.matches);
+    }
+    const listener = () => setMatches(media.matches);
+    media.addEventListener("change", listener);
+    return () => media.removeEventListener("change", listener);
+  }, [matches, query]);
+
+  return matches;
+}
+
+interface PaginationControlsProps {
+  currentPage: number;
+  totalPages: number;
+  totalItems: number;
+  onPrevious: () => void;
+  onNext: () => void;
+  position: "top" | "bottom";
+  testIdPrefix: string;
+}
+
+function PaginationControls({
+  currentPage,
+  totalPages,
+  totalItems,
+  onPrevious,
+  onNext,
+  position,
+  testIdPrefix,
+}: PaginationControlsProps) {
+  if (totalPages <= 1) return null;
+
+  return (
+    <div className={`flex items-center justify-between gap-4 ${position === "top" ? "mb-4" : "mt-6"}`}>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={onPrevious}
+        disabled={currentPage === 1}
+        className="gap-1"
+        data-testid={`${testIdPrefix}-prev-${position}`}
+      >
+        <ChevronLeft className="h-4 w-4" />
+        <span className="hidden sm:inline">Anterior</span>
+      </Button>
+      
+      <span className="text-sm text-muted-foreground">
+        Página <span className="font-medium text-foreground">{currentPage}</span> de{" "}
+        <span className="font-medium text-foreground">{totalPages}</span>
+        <span className="hidden sm:inline text-muted-foreground/70"> ({totalItems} eventos)</span>
+      </span>
+      
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={onNext}
+        disabled={currentPage === totalPages}
+        className="gap-1"
+        data-testid={`${testIdPrefix}-next-${position}`}
+      >
+        <span className="hidden sm:inline">Próxima</span>
+        <ChevronRight className="h-4 w-4" />
+      </Button>
+    </div>
+  );
+}
+
+interface EventsSectionProps {
+  events: Event[];
+  isPast: boolean;
+  perPage: number;
+  isLoading?: boolean;
+  emptyState?: React.ReactNode;
+  title: string;
+  subtitle: string;
+  icon?: React.ReactNode;
+  testIdPrefix: string;
+}
+
+function EventsSection({
+  events,
+  isPast,
+  perPage,
+  isLoading,
+  emptyState,
+  title,
+  subtitle,
+  icon,
+  testIdPrefix,
+}: EventsSectionProps) {
+  const [currentPage, setCurrentPage] = useState(1);
+  
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [events.length, perPage]);
+
+  const totalPages = Math.ceil(events.length / perPage);
+  const startIndex = (currentPage - 1) * perPage;
+  const paginatedEvents = events.slice(startIndex, startIndex + perPage);
+
+  const handlePrevious = () => {
+    setCurrentPage((prev) => Math.max(1, prev - 1));
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const handleNext = () => {
+    setCurrentPage((prev) => Math.min(totalPages, prev + 1));
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  if (isLoading) {
+    return (
+      <section className="mb-12">
+        <div className="mb-6">
+          <h2 className="text-2xl md:text-3xl font-bold text-foreground">{title}</h2>
+          <p className="text-muted-foreground mt-1">Carregando...</p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="space-y-4">
+              <Skeleton className="h-48 w-full rounded-lg" />
+              <Skeleton className="h-6 w-3/4" />
+              <Skeleton className="h-4 w-1/2" />
+            </div>
+          ))}
+        </div>
+      </section>
+    );
+  }
+
+  if (events.length === 0) {
+    return emptyState ? (
+      <section className="mb-12">
+        <div className="mb-6">
+          <h2 className="text-2xl md:text-3xl font-bold text-foreground">{title}</h2>
+          <p className="text-muted-foreground mt-1">{subtitle}</p>
+        </div>
+        {emptyState}
+      </section>
+    ) : null;
+  }
+
+  return (
+    <section className="mb-12">
+      <div className="mb-4">
+        <div className="flex items-center gap-2">
+          {icon}
+          <h2 className="text-2xl md:text-3xl font-bold text-foreground">{title}</h2>
+        </div>
+        <p className="text-muted-foreground mt-1">{subtitle}</p>
+      </div>
+
+      <PaginationControls
+        currentPage={currentPage}
+        totalPages={totalPages}
+        totalItems={events.length}
+        onPrevious={handlePrevious}
+        onNext={handleNext}
+        position="top"
+        testIdPrefix={testIdPrefix}
+      />
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        {paginatedEvents.map((event) => (
+          <EventCard
+            key={event.id}
+            id={event.id}
+            slug={event.slug}
+            nome={event.nome}
+            data={event.dataEvento}
+            local={event.endereco}
+            cidade={event.cidade}
+            estado={event.estado}
+            imagemUrl={event.bannerUrl || heroImage}
+            isPast={isPast}
+          />
+        ))}
+      </div>
+
+      <PaginationControls
+        currentPage={currentPage}
+        totalPages={totalPages}
+        totalItems={events.length}
+        onPrevious={handlePrevious}
+        onNext={handleNext}
+        position="bottom"
+        testIdPrefix={testIdPrefix}
+      />
+    </section>
+  );
+}
 
 export default function EventosPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCity, setSelectedCity] = useState<string>("all");
   const [selectedDate, setSelectedDate] = useState<string>("all");
+
+  const isDesktop = useMediaQuery("(min-width: 768px)");
+  const eventsPerPage = isDesktop ? 12 : 8;
 
   const { data, isLoading } = useQuery<{ success: boolean; data: Event[] }>({
     queryKey: ["/api/events"],
@@ -50,8 +250,11 @@ export default function EventosPage() {
     return options;
   }, []);
 
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
+  const now = useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }, []);
 
   const { upcomingEvents, pastEvents } = useMemo(() => {
     const upcoming: Event[] = [];
@@ -96,6 +299,8 @@ export default function EventosPage() {
 
   const filteredUpcoming = filterEvents(upcomingEvents);
   const filteredPast = filterEvents(pastEvents);
+
+  const hasFilters = searchTerm || selectedCity !== "all" || selectedDate !== "all";
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -182,47 +387,18 @@ export default function EventosPage() {
         </div>
 
         <div className="max-w-7xl mx-auto px-4 md:px-6 pb-8 md:pb-12">
-          <section className="mb-12">
-            <div className="mb-6">
-              <h2 className="text-2xl md:text-3xl font-bold text-foreground">
-                Próximos Eventos
-              </h2>
-              <p className="text-muted-foreground mt-1">
-                {isLoading ? "Carregando..." : `${filteredUpcoming.length} ${filteredUpcoming.length === 1 ? 'evento disponível' : 'eventos disponíveis'}`}
-              </p>
-            </div>
-
-            {isLoading ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="space-y-4">
-                    <Skeleton className="h-48 w-full rounded-lg" />
-                    <Skeleton className="h-6 w-3/4" />
-                    <Skeleton className="h-4 w-1/2" />
-                  </div>
-                ))}
-              </div>
-            ) : filteredUpcoming.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredUpcoming.map((event) => (
-                  <EventCard
-                    key={event.id}
-                    id={event.id}
-                    slug={event.slug}
-                    nome={event.nome}
-                    data={event.dataEvento}
-                    local={event.endereco}
-                    cidade={event.cidade}
-                    estado={event.estado}
-                    imagemUrl={event.bannerUrl || heroImage}
-                    isPast={false}
-                  />
-                ))}
-              </div>
-            ) : (
+          <EventsSection
+            events={filteredUpcoming}
+            isPast={false}
+            perPage={eventsPerPage}
+            isLoading={isLoading}
+            title="Próximos Eventos"
+            subtitle={`${filteredUpcoming.length} ${filteredUpcoming.length === 1 ? 'evento disponível' : 'eventos disponíveis'}`}
+            testIdPrefix="upcoming"
+            emptyState={
               <div className="text-center py-12 bg-muted/30 rounded-lg">
                 <CalendarX className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-                {searchTerm || selectedCity !== "all" || selectedDate !== "all" ? (
+                {hasFilters ? (
                   <p className="text-muted-foreground text-lg">
                     Nenhum evento encontrado com os filtros selecionados
                   </p>
@@ -237,40 +413,19 @@ export default function EventosPage() {
                   </>
                 )}
               </div>
-            )}
-          </section>
+            }
+          />
 
           {filteredPast.length > 0 && (
-            <section>
-              <div className="mb-6">
-                <div className="flex items-center gap-2">
-                  <Trophy className="h-6 w-6 text-accent" />
-                  <h2 className="text-2xl md:text-3xl font-bold text-foreground">
-                    Eventos Realizados
-                  </h2>
-                </div>
-                <p className="text-muted-foreground mt-1">
-                  {`${filteredPast.length} ${filteredPast.length === 1 ? 'evento realizado' : 'eventos realizados'}`}
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredPast.map((event) => (
-                  <EventCard
-                    key={event.id}
-                    id={event.id}
-                    slug={event.slug}
-                    nome={event.nome}
-                    data={event.dataEvento}
-                    local={event.endereco}
-                    cidade={event.cidade}
-                    estado={event.estado}
-                    imagemUrl={event.bannerUrl || heroImage}
-                    isPast={true}
-                  />
-                ))}
-              </div>
-            </section>
+            <EventsSection
+              events={filteredPast}
+              isPast={true}
+              perPage={eventsPerPage}
+              title="Eventos Realizados"
+              subtitle={`${filteredPast.length} ${filteredPast.length === 1 ? 'evento realizado' : 'eventos realizados'}`}
+              icon={<Trophy className="h-6 w-6 text-accent" />}
+              testIdPrefix="past"
+            />
           )}
         </div>
       </main>
