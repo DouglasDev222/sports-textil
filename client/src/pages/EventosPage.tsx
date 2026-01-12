@@ -76,10 +76,10 @@ export default function EventosPage() {
         <img
           src={heroImage}
           alt="Corrida"
-          className="w-full h-[350px] md:h-[450px] object-cover"
+          className="w-full h-[300px] md:h-[400px] object-cover"
         />
         <div className="absolute inset-0 z-20 flex flex-col items-center justify-center">
-          <div className="text-center px-4 max-w-3xl mb-8">
+          <div className="text-center px-4 max-w-3xl">
             <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
               Encontre Sua Próxima Corrida
             </h1>
@@ -87,68 +87,70 @@ export default function EventosPage() {
               Inscreva-se nos melhores eventos esportivos do Brasil
             </p>
           </div>
-          
-          <div className="w-full max-w-4xl px-4">
-            <div className="bg-white rounded-lg shadow-lg p-2 flex flex-col md:flex-row items-stretch gap-2">
-              <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                <Input
-                  type="search"
-                  placeholder="Digite para procurar..."
-                  className="pl-10 border-0 shadow-none focus-visible:ring-0 h-12"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  data-testid="input-search-events"
-                />
-              </div>
-              
-              <div className="hidden md:block w-px bg-border"></div>
-              
-              <div className="flex-1">
-                <Select value={selectedCity} onValueChange={setSelectedCity}>
-                  <SelectTrigger className="border-0 shadow-none focus:ring-0 h-12" data-testid="select-city">
-                    <MapPin className="h-5 w-5 text-muted-foreground mr-2" />
-                    <SelectValue placeholder="Local" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos os locais</SelectItem>
-                    {cities.map(city => (
-                      <SelectItem key={city} value={city}>{city}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div className="hidden md:block w-px bg-border"></div>
-              
-              <div className="flex-1">
-                <Select value={selectedDate} onValueChange={setSelectedDate}>
-                  <SelectTrigger className="border-0 shadow-none focus:ring-0 h-12" data-testid="select-date">
-                    <Calendar className="h-5 w-5 text-muted-foreground mr-2" />
-                    <SelectValue placeholder="Todas as datas" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas as datas</SelectItem>
-                    {dateOptions.map(opt => (
-                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <Button 
-                size="lg" 
-                className="h-12 px-8"
-                data-testid="button-search"
-              >
-                <Search className="h-5 w-5" />
-              </Button>
+        </div>
+      </div>
+
+      <div className="relative z-30 -mt-8 mb-8">
+        <div className="max-w-4xl mx-auto px-4">
+          <div className="bg-white rounded-lg shadow-xl p-2 flex flex-col md:flex-row items-stretch gap-2">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+              <Input
+                type="search"
+                placeholder="Digite para procurar..."
+                className="pl-10 border-0 shadow-none focus-visible:ring-0 h-12"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                data-testid="input-search-events"
+              />
             </div>
+            
+            <div className="hidden md:block w-px bg-border"></div>
+            
+            <div className="flex-1">
+              <Select value={selectedCity} onValueChange={setSelectedCity}>
+                <SelectTrigger className="border-0 shadow-none focus:ring-0 h-12" data-testid="select-city">
+                  <MapPin className="h-5 w-5 text-muted-foreground mr-2" />
+                  <SelectValue placeholder="Local" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os locais</SelectItem>
+                  {cities.map(city => (
+                    <SelectItem key={city} value={city}>{city}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="hidden md:block w-px bg-border"></div>
+            
+            <div className="flex-1">
+              <Select value={selectedDate} onValueChange={setSelectedDate}>
+                <SelectTrigger className="border-0 shadow-none focus:ring-0 h-12" data-testid="select-date">
+                  <Calendar className="h-5 w-5 text-muted-foreground mr-2" />
+                  <SelectValue placeholder="Todas as datas" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas as datas</SelectItem>
+                  {dateOptions.map(opt => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <Button 
+              size="lg" 
+              className="h-12 px-8"
+              data-testid="button-search"
+            >
+              <Search className="h-5 w-5" />
+            </Button>
           </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 md:px-6 py-8 md:py-12">
+      <div className="max-w-7xl mx-auto px-4 md:px-6 pb-8 md:pb-12">
 
         <div className="mb-6">
           <h2 className="text-2xl md:text-3xl font-bold text-foreground">
