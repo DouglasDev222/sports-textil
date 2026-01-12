@@ -216,6 +216,12 @@ router.post("/create", async (req, res) => {
         });
       }
 
+      // Limpar CPF removendo caracteres não numéricos antes de enviar ao Mercado Pago
+      const cleanedPayerIdentification = payerIdentification ? {
+        type: payerIdentification.type,
+        number: payerIdentification.number.replace(/\D/g, "")
+      } : undefined;
+
       const result = await createCardPayment(
         order.id,
         amount,
@@ -225,7 +231,7 @@ router.post("/create", async (req, res) => {
         paymentMethodId,
         issuerId || "",
         externalReference,
-        payerIdentification,
+        cleanedPayerIdentification,
         cardholderName,
         description
       );
