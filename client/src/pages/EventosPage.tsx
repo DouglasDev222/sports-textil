@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Search, CalendarX, MapPin, Calendar, Trophy, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, CalendarX, MapPin, Calendar, Trophy, ChevronLeft, ChevronRight, CalendarCheck } from "lucide-react";
 import heroImage from '@assets/generated_images/Marathon_runners_landscape_hero_b439e181.png';
 import type { Event } from "@shared/schema";
 
@@ -41,6 +41,7 @@ interface PaginationControlsProps {
   onNext: () => void;
   position: "top" | "bottom";
   testIdPrefix: string;
+  variant?: "default" | "muted";
 }
 
 function PaginationControls({
@@ -51,13 +52,16 @@ function PaginationControls({
   onNext,
   position,
   testIdPrefix,
+  variant = "default",
 }: PaginationControlsProps) {
   if (totalPages <= 1) return null;
+
+  const buttonVariant = variant === "muted" ? "secondary" : "outline";
 
   return (
     <div className={`flex items-center justify-between gap-4 ${position === "top" ? "mb-4" : "mt-6"}`}>
       <Button
-        variant="outline"
+        variant={buttonVariant}
         size="sm"
         onClick={onPrevious}
         disabled={currentPage === 1}
@@ -75,7 +79,7 @@ function PaginationControls({
       </span>
       
       <Button
-        variant="outline"
+        variant={buttonVariant}
         size="sm"
         onClick={onNext}
         disabled={currentPage === totalPages}
@@ -99,6 +103,7 @@ interface EventsSectionProps {
   subtitle: string;
   icon?: React.ReactNode;
   testIdPrefix: string;
+  variant?: "default" | "muted";
 }
 
 function EventsSection({
@@ -111,6 +116,7 @@ function EventsSection({
   subtitle,
   icon,
   testIdPrefix,
+  variant = "default",
 }: EventsSectionProps) {
   const [currentPage, setCurrentPage] = useState(1);
   
@@ -132,9 +138,13 @@ function EventsSection({
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  const containerClass = variant === "muted" 
+    ? "bg-muted/40 dark:bg-muted/20 -mx-4 md:-mx-6 px-4 md:px-6 py-8 rounded-none" 
+    : "";
+
   if (isLoading) {
     return (
-      <section className="mb-12">
+      <section className={`mb-12 ${containerClass}`}>
         <div className="mb-6">
           <h2 className="text-2xl md:text-3xl font-bold text-foreground">{title}</h2>
           <p className="text-muted-foreground mt-1">Carregando...</p>
@@ -165,7 +175,7 @@ function EventsSection({
   }
 
   return (
-    <section className="mb-12">
+    <section className={containerClass}>
       <div className="mb-4">
         <div className="flex items-center gap-2">
           {icon}
@@ -182,6 +192,7 @@ function EventsSection({
         onNext={handleNext}
         position="top"
         testIdPrefix={testIdPrefix}
+        variant={variant}
       />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -209,6 +220,7 @@ function EventsSection({
         onNext={handleNext}
         position="bottom"
         testIdPrefix={testIdPrefix}
+        variant={variant}
       />
     </section>
   );
@@ -394,7 +406,9 @@ export default function EventosPage() {
             isLoading={isLoading}
             title="Próximos Eventos"
             subtitle={`${filteredUpcoming.length} ${filteredUpcoming.length === 1 ? 'evento disponível' : 'eventos disponíveis'}`}
+            icon={<CalendarCheck className="h-6 w-6 text-primary" />}
             testIdPrefix="upcoming"
+            variant="default"
             emptyState={
               <div className="text-center py-12 bg-muted/30 rounded-lg">
                 <CalendarX className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
@@ -417,15 +431,24 @@ export default function EventosPage() {
           />
 
           {filteredPast.length > 0 && (
-            <EventsSection
-              events={filteredPast}
-              isPast={true}
-              perPage={eventsPerPage}
-              title="Eventos Realizados"
-              subtitle={`${filteredPast.length} ${filteredPast.length === 1 ? 'evento realizado' : 'eventos realizados'}`}
-              icon={<Trophy className="h-6 w-6 text-accent" />}
-              testIdPrefix="past"
-            />
+            <>
+              <div className="my-10 flex items-center gap-4">
+                <div className="flex-1 h-px bg-border"></div>
+                <span className="text-sm text-muted-foreground font-medium uppercase tracking-wider">Histórico</span>
+                <div className="flex-1 h-px bg-border"></div>
+              </div>
+
+              <EventsSection
+                events={filteredPast}
+                isPast={true}
+                perPage={eventsPerPage}
+                title="Eventos Realizados"
+                subtitle={`${filteredPast.length} ${filteredPast.length === 1 ? 'evento realizado' : 'eventos realizados'} - Confira os resultados`}
+                icon={<Trophy className="h-6 w-6 text-accent" />}
+                testIdPrefix="past"
+                variant="muted"
+              />
+            </>
           )}
         </div>
       </main>
