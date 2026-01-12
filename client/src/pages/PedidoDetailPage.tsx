@@ -296,6 +296,9 @@ export default function PedidoDetailPage() {
     enabled: !!athlete && !!orderId,
   });
 
+  // Estado local para forçar exibição das opções de pagamento após trocar método
+  const [showPaymentOptions, setShowPaymentOptions] = useState(false);
+
   const createPaymentMutation = useMutation({
     mutationFn: async (paymentMethod: "pix" | "credit_card") => {
       const response = await apiRequest("POST", "/api/payments/create", {
@@ -307,6 +310,8 @@ export default function PedidoDetailPage() {
     onSuccess: (data) => {
       if (data.success) {
         queryClient.invalidateQueries({ queryKey: ["/api/payments/order", orderId] });
+        // Reseta o estado para mostrar o resultado do pagamento
+        setShowPaymentOptions(false);
         toast({
           title: "Pagamento iniciado",
           description: data.data.paymentMethod === "pix" ? "QR Code PIX gerado com sucesso!" : "Processando pagamento...",
@@ -335,9 +340,11 @@ export default function PedidoDetailPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/payments/order", orderId] });
+      // Força exibição das opções de pagamento
+      setShowPaymentOptions(true);
       toast({
         title: "Pronto",
-        description: "Você pode escolher outro método de pagamento.",
+        description: "Escolha a nova forma de pagamento abaixo.",
       });
     },
   });
@@ -400,8 +407,9 @@ export default function PedidoDetailPage() {
   const isExpired = order.status === "expirado";
   const isCanceled = order.status === "cancelado";
   const isFailed = order.status === "falhou" || order.status === "failed";
-  const hasPixActive = isPending && order.pixQrCode && !order.pixExpired;
-  const hasPixExpired = isPending && order.pixExpiracao && order.pixExpired;
+  // Se showPaymentOptions=true, esconde o QR Code e mostra opções de pagamento
+  const hasPixActive = isPending && order.pixQrCode && !order.pixExpired && !showPaymentOptions;
+  const hasPixExpired = isPending && order.pixExpiracao && order.pixExpired && !showPaymentOptions;
   const canPay = isPending && !order.orderExpired;
   const canRetryPayment = isFailed && !order.orderExpired;
 
