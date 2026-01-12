@@ -1,19 +1,34 @@
-import { Menu, User, X } from "lucide-react";
+import { Menu, User, X, LogOut, UserCircle, Trophy, LogIn, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Link, useLocation } from "wouter";
 import { useState } from "react";
+import { useAthleteAuth } from "@/contexts/AthleteAuthContext";
 
 export default function Header() {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const { athlete, isLoading, logout } = useAthleteAuth();
 
   const navItems = [
     { path: "/", label: "Eventos" },
     { path: "/minhas-inscricoes", label: "Minhas Inscrições" },
-    { path: "/minha-conta", label: "Minha Conta" },
   ];
 
   const isActive = (path: string) => location === path;
+
+  const handleLogout = async () => {
+    await logout();
+    setLocation("/");
+  };
 
   return (
     <header className="sticky top-0 z-50 w-full bg-primary border-b border-primary-border">
@@ -25,7 +40,7 @@ export default function Header() {
             </div>
           </Link>
 
-          <nav className="hidden md:flex items-center space-x-1">
+          <nav className="hidden md:flex items-center gap-1">
             {navItems.map((item) => (
               <Link key={item.path} href={item.path}>
                 <Button
@@ -39,16 +54,91 @@ export default function Header() {
                 </Button>
               </Link>
             ))}
-            <Link href="/login">
-              <Button
-                size="icon"
-                variant="ghost"
-                className="text-primary-foreground"
-                data-testid="button-user-menu"
+
+            {!isLoading && athlete ? (
+              <div
+                onMouseEnter={() => setDropdownOpen(true)}
+                onMouseLeave={() => setDropdownOpen(false)}
               >
-                <User className="h-5 w-5" />
-              </Button>
-            </Link>
+                <DropdownMenu open={dropdownOpen} onOpenChange={setDropdownOpen}>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="text-primary-foreground"
+                      data-testid="button-user-menu"
+                    >
+                      <User className="h-5 w-5" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent 
+                    align="end" 
+                    className="w-56"
+                    onMouseEnter={() => setDropdownOpen(true)}
+                    onMouseLeave={() => setDropdownOpen(false)}
+                  >
+                    <DropdownMenuLabel className="font-normal">
+                      <div className="flex flex-col space-y-1">
+                        <p className="text-sm font-medium leading-none">{athlete.nome}</p>
+                        <p className="text-xs leading-none text-muted-foreground">
+                          {athlete.email}
+                        </p>
+                      </div>
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={() => { setDropdownOpen(false); setLocation("/minha-conta"); }}
+                      className="cursor-pointer"
+                      data-testid="menu-minha-conta"
+                    >
+                      <UserCircle className="mr-2 h-4 w-4" />
+                      Minha Conta
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => { setDropdownOpen(false); setLocation("/minhas-inscricoes"); }}
+                      className="cursor-pointer"
+                      data-testid="menu-minhas-inscricoes"
+                    >
+                      <Trophy className="mr-2 h-4 w-4" />
+                      Minhas Inscrições
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={() => { setDropdownOpen(false); handleLogout(); }}
+                      className="cursor-pointer text-destructive focus:text-destructive"
+                      data-testid="menu-sair"
+                    >
+                      <LogOut className="mr-2 h-4 w-4" />
+                      Sair
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            ) : !isLoading ? (
+              <div className="flex items-center gap-2">
+                <Link href="/login">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-primary-foreground"
+                    data-testid="button-login"
+                  >
+                    <LogIn className="h-4 w-4 mr-2" />
+                    Entrar
+                  </Button>
+                </Link>
+                <Link href="/cadastro">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    data-testid="button-cadastro"
+                  >
+                    <UserPlus className="h-4 w-4 mr-2" />
+                    Cadastrar
+                  </Button>
+                </Link>
+              </div>
+            ) : null}
           </nav>
 
           <Button
@@ -78,17 +168,65 @@ export default function Header() {
                 </Button>
               </Link>
             ))}
-            <Link href="/login">
-              <Button
-                variant="ghost"
-                className="w-full justify-start text-primary-foreground"
-                onClick={() => setMobileMenuOpen(false)}
-                data-testid="button-mobile-login"
-              >
-                <User className="h-5 w-5 mr-2" />
-                Login
-              </Button>
-            </Link>
+            
+            {!isLoading && athlete ? (
+              <>
+                <div className="border-t border-primary-foreground/20 pt-2 mt-2">
+                  <div className="px-4 py-2 text-primary-foreground/70 text-sm">
+                    {athlete.nome}
+                  </div>
+                </div>
+                <Link href="/minha-conta">
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start text-primary-foreground"
+                    onClick={() => setMobileMenuOpen(false)}
+                    data-testid="link-mobile-minha-conta"
+                  >
+                    <UserCircle className="h-5 w-5 mr-2" />
+                    Minha Conta
+                  </Button>
+                </Link>
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start text-primary-foreground"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    handleLogout();
+                  }}
+                  data-testid="button-mobile-sair"
+                >
+                  <LogOut className="h-5 w-5 mr-2" />
+                  Sair
+                </Button>
+              </>
+            ) : !isLoading ? (
+              <>
+                <div className="border-t border-primary-foreground/20 pt-2 mt-2" />
+                <Link href="/login">
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start text-primary-foreground"
+                    onClick={() => setMobileMenuOpen(false)}
+                    data-testid="button-mobile-login"
+                  >
+                    <LogIn className="h-5 w-5 mr-2" />
+                    Entrar
+                  </Button>
+                </Link>
+                <Link href="/cadastro">
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start text-primary-foreground"
+                    onClick={() => setMobileMenuOpen(false)}
+                    data-testid="button-mobile-cadastro"
+                  >
+                    <UserPlus className="h-5 w-5 mr-2" />
+                    Cadastrar
+                  </Button>
+                </Link>
+              </>
+            ) : null}
           </div>
         )}
       </div>
