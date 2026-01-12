@@ -31,6 +31,7 @@ import { Link } from "wouter";
 import { useAthleteAuth } from "@/contexts/AthleteAuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import CreditCardForm from "@/components/CreditCardForm";
 
 interface Modalidade {
   id: string;
@@ -296,8 +297,20 @@ export default function PedidoDetailPage() {
     enabled: !!athlete && !!orderId,
   });
 
+  // Buscar configuração do Mercado Pago para cartão de crédito
+  const { data: paymentConfig } = useQuery<{ success: boolean; data: { publicKey: string; configured: boolean } }>({
+    queryKey: ["/api/payments/config"],
+    enabled: !!athlete,
+  });
+
+  const mpPublicKey = paymentConfig?.data?.publicKey || "";
+  const mpConfigured = paymentConfig?.data?.configured || false;
+
   // Estado local para forçar exibição das opções de pagamento após trocar método
   const [showPaymentOptions, setShowPaymentOptions] = useState(false);
+  // Estado para controlar exibição do formulário de cartão
+  const [showCardForm, setShowCardForm] = useState(false);
+  const [isProcessingCard, setIsProcessingCard] = useState(false);
 
   const createPaymentMutation = useMutation({
     mutationFn: async (paymentMethod: "pix" | "credit_card") => {
@@ -340,14 +353,86 @@ export default function PedidoDetailPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/payments/order", orderId] });
-      // Força exibição das opções de pagamento
+      // Força exibição das opções de pagamento e esconde formulário de cartão
       setShowPaymentOptions(true);
+      setShowCardForm(false);
       toast({
         title: "Pronto",
         description: "Escolha a nova forma de pagamento abaixo.",
       });
     },
   });
+
+  // Handler para pagamento com cartão de crédito
+  const handleCardPayment = async (cardData: {
+    token: string;
+    paymentMethodId: string;
+    issuerId: string;
+    installments: number;
+    payerIdentification: {
+      type: string;
+      number: string;
+    };
+    cardholderName: string;
+  }) => {
+    setIsProcessingCard(true);
+    try {
+      const response = await apiRequest("POST", "/api/payments/create", {
+        orderId,
+        paymentMethod: "credit_card",
+        cardToken: cardData.token,
+        paymentMethodId: cardData.paymentMethodId,
+        issuerId: cardData.issuerId,
+        installments: cardData.installments,
+        payerIdentification: cardData.payerIdentification,
+        cardholderName: cardData.cardholderName,
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        queryClient.invalidateQueries({ queryKey: ["/api/payments/order", orderId] });
+        setShowPaymentOptions(false);
+        setShowCardForm(false);
+        
+        if (result.data.status === "approved") {
+          toast({
+            title: "Pagamento aprovado!",
+            description: "Sua inscrição foi confirmada.",
+          });
+        } else if (result.data.status === "pending" || result.data.status === "in_process") {
+          toast({
+            title: "Pagamento em análise",
+            description: "Seu pagamento está sendo processado. Acompanhe o status.",
+          });
+        } else {
+          toast({
+            title: "Pagamento processado",
+            description: "Verifique o status do seu pagamento.",
+          });
+        }
+      } else {
+        toast({
+          title: "Erro no pagamento",
+          description: result.error || "Não foi possível processar o pagamento",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Erro ao processar pagamento com cartão",
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessingCard(false);
+    }
+  };
+
+  // Ao clicar em cartão, mostrar o formulário em vez de chamar a API diretamente
+  const handleSelectCardPayment = () => {
+    setShowCardForm(true);
+  };
 
   const handleCopyPixCode = useCallback(() => {
     if (data?.data?.pixQrCode) {
@@ -622,6 +707,37 @@ export default function PedidoDetailPage() {
                     Pagar com cartão de crédito
                   </Button>
                 </div>
+              ) : showCardForm ? (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowCardForm(false)}
+                      data-testid="button-voltar-opcoes"
+                    >
+                      <ArrowLeft className="h-4 w-4 mr-1" />
+                      Voltar
+                    </Button>
+                    <span className="text-sm text-muted-foreground">Pagamento com Cartão</span>
+                  </div>
+                  
+                  {mpConfigured && mpPublicKey ? (
+                    <CreditCardForm
+                      amount={order.valorTotal}
+                      onSubmit={handleCardPayment}
+                      isProcessing={isProcessingCard}
+                      publicKey={mpPublicKey}
+                    />
+                  ) : (
+                    <div className="flex items-center gap-2 p-3 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800 rounded-md">
+                      <AlertCircle className="h-4 w-4 text-yellow-600" />
+                      <span className="text-sm text-yellow-800 dark:text-yellow-200">
+                        Pagamento com cartão temporariamente indisponível. Use PIX.
+                      </span>
+                    </div>
+                  )}
+                </div>
               ) : (
                 <div className="space-y-4">
                   <p className="text-center text-muted-foreground">
@@ -644,7 +760,7 @@ export default function PedidoDetailPage() {
 
                     <Button
                       variant="outline"
-                      onClick={() => createPaymentMutation.mutate("credit_card")}
+                      onClick={handleSelectCardPayment}
                       disabled={createPaymentMutation.isPending}
                       className="h-auto py-4"
                       data-testid="button-pagar-cartao"
@@ -671,40 +787,73 @@ export default function PedidoDetailPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                <p className="text-center text-muted-foreground">
-                  Escolha uma forma de pagamento para tentar novamente
-                </p>
-
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <Button
-                    onClick={() => createPaymentMutation.mutate("pix")}
-                    disabled={createPaymentMutation.isPending}
-                    className="h-auto py-4"
-                    data-testid="button-retry-pix"
-                  >
-                    <QrCode className="h-6 w-6 mr-3" />
-                    <div className="text-left">
-                      <p className="font-semibold">Pagar com PIX</p>
-                      <p className="text-xs opacity-80">Aprovação instantânea</p>
+              {showCardForm ? (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowCardForm(false)}
+                      data-testid="button-retry-voltar-opcoes"
+                    >
+                      <ArrowLeft className="h-4 w-4 mr-1" />
+                      Voltar
+                    </Button>
+                    <span className="text-sm text-muted-foreground">Pagamento com Cartão</span>
+                  </div>
+                  
+                  {mpConfigured && mpPublicKey ? (
+                    <CreditCardForm
+                      amount={order.valorTotal}
+                      onSubmit={handleCardPayment}
+                      isProcessing={isProcessingCard}
+                      publicKey={mpPublicKey}
+                    />
+                  ) : (
+                    <div className="flex items-center gap-2 p-3 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800 rounded-md">
+                      <AlertCircle className="h-4 w-4 text-yellow-600" />
+                      <span className="text-sm text-yellow-800 dark:text-yellow-200">
+                        Pagamento com cartão temporariamente indisponível. Use PIX.
+                      </span>
                     </div>
-                  </Button>
-
-                  <Button
-                    variant="outline"
-                    onClick={() => createPaymentMutation.mutate("credit_card")}
-                    disabled={createPaymentMutation.isPending}
-                    className="h-auto py-4"
-                    data-testid="button-retry-cartao"
-                  >
-                    <CreditCard className="h-6 w-6 mr-3" />
-                    <div className="text-left">
-                      <p className="font-semibold">Cartão de Crédito</p>
-                      <p className="text-xs text-muted-foreground">Parcelamento disponível</p>
-                    </div>
-                  </Button>
+                  )}
                 </div>
-              </div>
+              ) : (
+                <div className="space-y-4">
+                  <p className="text-center text-muted-foreground">
+                    Escolha uma forma de pagamento para tentar novamente
+                  </p>
+
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <Button
+                      onClick={() => createPaymentMutation.mutate("pix")}
+                      disabled={createPaymentMutation.isPending}
+                      className="h-auto py-4"
+                      data-testid="button-retry-pix"
+                    >
+                      <QrCode className="h-6 w-6 mr-3" />
+                      <div className="text-left">
+                        <p className="font-semibold">Pagar com PIX</p>
+                        <p className="text-xs opacity-80">Aprovação instantânea</p>
+                      </div>
+                    </Button>
+
+                    <Button
+                      variant="outline"
+                      onClick={handleSelectCardPayment}
+                      disabled={createPaymentMutation.isPending}
+                      className="h-auto py-4"
+                      data-testid="button-retry-cartao"
+                    >
+                      <CreditCard className="h-6 w-6 mr-3" />
+                      <div className="text-left">
+                        <p className="font-semibold">Cartão de Crédito</p>
+                        <p className="text-xs text-muted-foreground">Parcelamento disponível</p>
+                      </div>
+                    </Button>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         )}
