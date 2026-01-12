@@ -1,7 +1,7 @@
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, MapPin, Users } from "lucide-react";
+import { Calendar, MapPin, Trophy } from "lucide-react";
 import { Link } from "wouter";
 import { formatDateOnlyLong } from "@/lib/timezone";
 
@@ -13,9 +13,9 @@ interface EventCardProps {
   local: string;
   cidade: string;
   estado: string;
-  distancias: string;
+  distancias?: string;
   imagemUrl: string;
-  valor: string;
+  isPast?: boolean;
 }
 
 export default function EventCard({
@@ -28,7 +28,7 @@ export default function EventCard({
   estado,
   distancias,
   imagemUrl,
-  valor,
+  isPast = false,
 }: EventCardProps) {
   const formattedDate = formatDateOnlyLong(data);
 
@@ -45,15 +45,17 @@ export default function EventCard({
         <h3 className="text-xl font-bold text-foreground leading-tight" data-testid={`text-event-name-${id}`}>
           {nome}
         </h3>
-        <div className="flex flex-wrap gap-2">
-          {distancias.split(',').map((dist, idx) => (
-            <Badge key={idx} variant="secondary" className="text-xs">
-              {dist.trim()}
-            </Badge>
-          ))}
-        </div>
+        {distancias && distancias.trim() && (
+          <div className="flex flex-wrap gap-2">
+            {distancias.split(',').filter(d => d.trim()).map((dist, idx) => (
+              <Badge key={idx} variant="secondary" className="text-xs">
+                {dist.trim()}
+              </Badge>
+            ))}
+          </div>
+        )}
       </CardHeader>
-      <CardContent className="space-y-3 pb-4">
+      <CardContent className="space-y-2 pb-4">
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Calendar className="h-4 w-4" />
           <span data-testid={`text-event-date-${id}`}>{formattedDate}</span>
@@ -62,19 +64,22 @@ export default function EventCard({
           <MapPin className="h-4 w-4" />
           <span data-testid={`text-event-location-${id}`}>{cidade}, {estado}</span>
         </div>
-        <div className="pt-2">
-          <p className="text-sm text-muted-foreground">A partir de</p>
-          <p className="text-2xl font-bold text-foreground" data-testid={`text-event-price-${id}`}>{valor}</p>
-        </div>
       </CardContent>
       <CardFooter>
-        <Link href={`/evento/${slug}`} className="w-full">
+        <Link href={isPast ? `/evento/${slug}/resultados` : `/evento/${slug}`} className="w-full">
           <Button 
-            variant="secondary" 
+            variant={isPast ? "outline" : "default"}
             className="w-full font-semibold"
             data-testid={`button-view-event-${id}`}
           >
-            Ver Detalhes
+            {isPast ? (
+              <>
+                <Trophy className="h-4 w-4 mr-2" />
+                Resultados
+              </>
+            ) : (
+              "Inscreva-se"
+            )}
           </Button>
         </Link>
       </CardFooter>
