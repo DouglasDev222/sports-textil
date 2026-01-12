@@ -98,7 +98,8 @@ export async function createCardPayment(
   externalReference?: string,
   payerIdentification?: { type: string; number: string },
   cardholderName?: string,
-  description?: string
+  description?: string,
+  ipAddress?: string
 ): Promise<CardPaymentResult> {
   if (!paymentClient) {
     return {
@@ -108,16 +109,44 @@ export async function createCardPayment(
   }
 
   try {
+    // Parse first_name and last_name from cardholderName
+    let firstName = "";
+    let lastName = "";
+    if (cardholderName) {
+      const nameParts = cardholderName.trim().split(/\s+/);
+      firstName = nameParts[0] || "";
+      lastName = nameParts.slice(1).join(" ") || nameParts[0] || "";
+    }
+
     const paymentBody: any = {
       transaction_amount: amount,
       token: token,
       description: description || `Pagamento pedido ${orderId}`,
       installments: installments,
       payment_method_id: paymentMethodId,
+      statement_descriptor: "STEVENTOS",
       payer: {
-        email: buyerEmail
+        email: buyerEmail,
+        first_name: firstName,
+        last_name: lastName
       },
-      external_reference: externalReference || orderId
+      external_reference: externalReference || orderId,
+      additional_info: {
+        items: [
+          {
+            id: orderId,
+            title: description || `Inscrição em evento esportivo`,
+            description: description || `Inscrição em evento esportivo`,
+            category_id: "services",
+            quantity: 1,
+            unit_price: amount
+          }
+        ],
+        payer: {
+          first_name: firstName,
+          last_name: lastName
+        }
+      }
     };
 
     // Add payer identification (required for real cards in Brazil)
@@ -126,15 +155,15 @@ export async function createCardPayment(
         type: payerIdentification.type,
         number: payerIdentification.number
       };
-      if (cardholderName) {
-        const nameParts = cardholderName.trim().split(/\s+/);
-        paymentBody.payer.first_name = nameParts[0] || "";
-        paymentBody.payer.last_name = nameParts.slice(1).join(" ") || nameParts[0] || "";
-      }
     }
 
     if (issuerId && issuerId.trim() !== "") {
       paymentBody.issuer_id = parseInt(issuerId, 10);
+    }
+
+    // Add IP address for fraud prevention if available
+    if (ipAddress) {
+      paymentBody.additional_info.ip_address = ipAddress;
     }
 
     console.log('[mercadopago-service] Enviando pagamento cartão:', {
@@ -144,7 +173,10 @@ export async function createCardPayment(
       issuer_id: paymentBody.issuer_id,
       has_token: !!paymentBody.token,
       has_identification: !!paymentBody.payer?.identification,
-      payer_email: paymentBody.payer?.email
+      payer_email: paymentBody.payer?.email,
+      payer_first_name: paymentBody.payer?.first_name,
+      payer_last_name: paymentBody.payer?.last_name,
+      has_additional_info: !!paymentBody.additional_info
     });
 
     const payment = await paymentClient.create({

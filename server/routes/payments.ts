@@ -222,6 +222,11 @@ router.post("/create", async (req, res) => {
         number: payerIdentification.number.replace(/\D/g, "")
       } : undefined;
 
+      // Capturar IP do cliente para prevenção de fraude
+      const clientIp = req.headers['x-forwarded-for'] 
+        ? (req.headers['x-forwarded-for'] as string).split(',')[0].trim()
+        : req.socket.remoteAddress || undefined;
+
       const result = await createCardPayment(
         order.id,
         amount,
@@ -233,7 +238,8 @@ router.post("/create", async (req, res) => {
         externalReference,
         cleanedPayerIdentification,
         cardholderName,
-        description
+        description,
+        clientIp
       );
 
       if (!result.success) {
