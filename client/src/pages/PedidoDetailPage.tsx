@@ -31,6 +31,7 @@ import { Link } from "wouter";
 import { useAthleteAuth } from "@/contexts/AthleteAuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { parseApiError, getFriendlyErrorMessage } from "@/lib/error-messages";
 import CreditCardForm from "@/components/CreditCardForm";
 
 interface Modalidade {
@@ -419,7 +420,7 @@ export default function PedidoDetailPage() {
         }
       } else {
         // Mapear erros do backend para mensagens amigáveis
-        const friendlyMessage = getPaymentErrorMessage(result.error, result.statusDetail);
+        const friendlyMessage = getFriendlyErrorMessage(result.error, result.errorCode, result.statusDetail);
         toast({
           title: "Erro no pagamento",
           description: friendlyMessage,
@@ -428,7 +429,7 @@ export default function PedidoDetailPage() {
       }
     } catch (error: any) {
       // Tentar extrair mensagem amigável do erro
-      const friendlyMessage = parseApiError(error);
+      const friendlyMessage = parseApiError(error, "Erro ao processar pagamento. Tente novamente.");
       toast({
         title: "Erro",
         description: friendlyMessage,
@@ -437,73 +438,6 @@ export default function PedidoDetailPage() {
     } finally {
       setIsProcessingCard(false);
     }
-  };
-  
-  // Função para parsear erros da API e retornar mensagem amigável
-  const parseApiError = (error: any): string => {
-    try {
-      // O erro vem no formato "409: {json}"
-      const errorStr = error?.message || String(error);
-      const jsonMatch = errorStr.match(/\d+:\s*(.+)/);
-      if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[1]);
-        return getPaymentErrorMessage(parsed.error, parsed.statusDetail);
-      }
-    } catch {
-      // Ignorar erro de parse
-    }
-    return "Erro ao processar pagamento. Tente novamente.";
-  };
-  
-  // Mapear códigos de erro para mensagens amigáveis em português
-  const getPaymentErrorMessage = (error?: string, statusDetail?: string): string => {
-    // Verificar statusDetail do Mercado Pago primeiro
-    if (statusDetail) {
-      const mpErrors: Record<string, string> = {
-        "cc_rejected_high_risk": "Pagamento não autorizado. Tente outro cartão ou aguarde alguns minutos.",
-        "cc_rejected_insufficient_amount": "Saldo insuficiente no cartão.",
-        "cc_rejected_bad_filled_card_number": "Número do cartão incorreto.",
-        "cc_rejected_bad_filled_date": "Data de validade incorreta.",
-        "cc_rejected_bad_filled_security_code": "Código de segurança incorreto.",
-        "cc_rejected_bad_filled_other": "Dados do cartão incorretos. Verifique e tente novamente.",
-        "cc_rejected_blacklist": "Cartão não autorizado. Use outro cartão.",
-        "cc_rejected_call_for_authorize": "Ligue para a operadora do cartão para autorizar.",
-        "cc_rejected_card_disabled": "Cartão desabilitado. Entre em contato com a operadora.",
-        "cc_rejected_duplicated_payment": "Pagamento duplicado. Verifique se já não foi processado.",
-        "cc_rejected_max_attempts": "Limite de tentativas excedido. Tente novamente mais tarde.",
-        "cc_rejected_other_reason": "Pagamento não autorizado. Tente outro cartão.",
-        "pending_contingency": "Pagamento em análise. Aguarde a confirmação.",
-        "pending_review_manual": "Pagamento em análise manual. Aguarde a confirmação.",
-      };
-      if (mpErrors[statusDetail]) {
-        return mpErrors[statusDetail];
-      }
-    }
-    
-    // Verificar códigos de erro do backend
-    if (error) {
-      const backendErrors: Record<string, string> = {
-        "ORDER_EXPIRED": "Pedido expirado. Faça uma nova inscrição.",
-        "ORDER_NOT_FOUND": "Pedido não encontrado.",
-        "ORDER_ALREADY_PAID": "Este pedido já foi pago.",
-        "PAYMENT_ALREADY_EXISTS": "Já existe um pagamento para este pedido.",
-        "INVALID_PAYMENT_METHOD": "Forma de pagamento inválida.",
-      };
-      
-      // Verificar se o erro contém algum código conhecido
-      for (const [code, message] of Object.entries(backendErrors)) {
-        if (error.includes(code)) {
-          return message;
-        }
-      }
-      
-      // Se é uma mensagem legível, retornar ela
-      if (!error.includes("{") && error.length < 200) {
-        return error;
-      }
-    }
-    
-    return "Não foi possível processar o pagamento. Tente novamente.";
   };
 
   // Ao clicar em cartão, mostrar o formulário em vez de chamar a API diretamente

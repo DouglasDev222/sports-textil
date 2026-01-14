@@ -11,6 +11,7 @@ import Header from "@/components/Header";
 import { useAthleteAuth } from "@/contexts/AthleteAuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { parseApiError, getFriendlyErrorMessage } from "@/lib/error-messages";
 import { formatDateOnlyBrazil } from "@/lib/timezone";
 
 interface ModalityInfo {
@@ -94,17 +95,19 @@ export default function InscricaoResumoPage() {
           setLocation(`/evento/${slug}/inscricao/pagamento?orderId=${result.data.order.id}`);
         }
       } else {
+        const friendlyMessage = getFriendlyErrorMessage(result.error, result.errorCode);
         toast({
           title: "Erro na inscrição",
-          description: result.error || "Não foi possível realizar a inscrição.",
+          description: friendlyMessage,
           variant: "destructive"
         });
       }
     },
     onError: (error: any) => {
+      const friendlyMessage = parseApiError(error, "Não foi possível realizar a inscrição.");
       toast({
         title: "Erro na inscrição",
-        description: error.message || "Não foi possível realizar a inscrição.",
+        description: friendlyMessage,
         variant: "destructive"
       });
     }
