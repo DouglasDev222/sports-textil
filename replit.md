@@ -86,3 +86,15 @@ Complete refactoring of PIX payment handling to fix critical issues:
 - **Flexible PIX Creation**: If order timer expired but no PIX was created yet, user can still choose PIX and a new deadline will be established based on PIX expiration
 - **Change Method Preservation**: Switching payment methods no longer clears PIX data, allowing reuse when returning to PIX
 - **Database Field**: New `pix_payment_id` column in orders table stores PIX payment ID independently
+
+### Status Change Audit Logging (January 2025)
+Complete audit trail system for all status changes:
+
+- **status_change_logs table**: Records entity type (event/order/registration), old/new status, reason, changed by (system/admin/athlete), timestamp, and JSON metadata
+- **logStatusChange utility**: Centralized service in `server/services/status-log-service.ts` for consistent logging across the application
+- **Instrumented locations**:
+  - `recalculateBatchesForEvent`: Logs when events automatically change to 'esgotado' (capacity full or no valid batches)
+  - `order-expiration-job`: Logs when orders expire and registrations are cancelled
+  - `confirmPaymentAtomic`: Logs when payments are confirmed and registrations are activated
+  - `admin/events.ts`: Logs manual status changes by administrators
+- **Debugging benefit**: Full audit trail helps identify why events/orders/registrations changed status unexpectedly
