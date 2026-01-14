@@ -1,5 +1,6 @@
 import { pool } from '../db';
 import type { PoolClient } from 'pg';
+import { logStatusChange } from './status-log-service';
 
 export interface BatchValidationResult {
   eventId: string;
@@ -62,11 +63,27 @@ export async function recalculateBatchesForEvent(eventId: string): Promise<Batch
     // Check if event capacity is already full - mark as sold out
     if (event.vagas_ocupadas >= event.limite_vagas_total) {
       if (event.status !== 'esgotado') {
+        const oldStatus = event.status;
         await client.query(
           `UPDATE events SET status = 'esgotado' WHERE id = $1`,
           [eventId]
         );
         eventMarkedAsSoldOut = true;
+        
+        // Log status change
+        await logStatusChange({
+          entityType: 'event',
+          entityId: eventId,
+          oldStatus,
+          newStatus: 'esgotado',
+          reason: `Capacidade atingida: ${event.vagas_ocupadas}/${event.limite_vagas_total} vagas ocupadas`,
+          changedByType: 'system',
+          metadata: {
+            vagasOcupadas: event.vagas_ocupadas,
+            limiteVagasTotal: event.limite_vagas_total,
+            function: 'recalculateBatchesForEvent'
+          }
+        });
       }
       
       await client.query('COMMIT');
@@ -228,11 +245,27 @@ export async function recalculateBatchesForEvent(eventId: string): Promise<Batch
       
       // If no future batches and no active batch, mark event as sold out
       if (futureBatches.rows.length === 0 && event.status !== 'esgotado') {
+        const oldStatus = event.status;
         await client.query(
           `UPDATE events SET status = 'esgotado' WHERE id = $1`,
           [eventId]
         );
         eventMarkedAsSoldOut = true;
+        
+        // Log status change
+        await logStatusChange({
+          entityType: 'event',
+          entityId: eventId,
+          oldStatus,
+          newStatus: 'esgotado',
+          reason: 'Sem lotes ativos ou futuros disponíveis',
+          changedByType: 'system',
+          metadata: {
+            hasValidBatches: false,
+            hasFutureBatches: false,
+            function: 'recalculateBatchesForEvent'
+          }
+        });
       }
     }
     
