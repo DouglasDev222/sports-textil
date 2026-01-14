@@ -166,6 +166,10 @@ export async function createCardPayment(
       paymentBody.additional_info.ip_address = ipAddress;
     }
 
+    // Enable 3D Secure for improved approval rates on high-risk payments
+    // "optional" allows MP to decide when 3DS is needed
+    paymentBody.three_d_secure_mode = "optional";
+
     console.log('[mercadopago-service] Enviando pagamento cartão:', {
       transaction_amount: paymentBody.transaction_amount,
       payment_method_id: paymentBody.payment_method_id,

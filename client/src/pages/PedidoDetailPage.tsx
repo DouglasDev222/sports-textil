@@ -375,6 +375,12 @@ export default function PedidoDetailPage() {
     };
     cardholderName: string;
   }) => {
+    // Prevenir chamadas duplicadas
+    if (isProcessingCard) {
+      console.log("[PedidoDetailPage] Ignorando chamada duplicada de handleCardPayment");
+      return;
+    }
+    
     setIsProcessingCard(true);
     try {
       const response = await apiRequest("POST", "/api/payments/create", {

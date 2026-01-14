@@ -144,6 +144,12 @@ export default function CreditCardForm({ amount, onSubmit, isProcessing, publicK
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Prevenir submissões duplicadas
+    if (isProcessing) {
+      return;
+    }
+    
     setFormError(null);
 
     if (!mp) {
