@@ -10,6 +10,8 @@ export const orderStatusEnum = pgEnum("order_status", ["pendente", "pago", "canc
 export const userRoleEnum = pgEnum("user_role", ["superadmin", "admin", "organizador"]);
 export const userStatusEnum = pgEnum("user_status", ["ativo", "inativo", "bloqueado"]);
 export const batchStatusEnum = pgEnum("batch_status", ["active", "closed", "future"]);
+export const statusEntityTypeEnum = pgEnum("status_entity_type", ["event", "order", "registration"]);
+export const statusChangedByTypeEnum = pgEnum("status_changed_by_type", ["system", "admin", "athlete"]);
 
 export const organizers = pgTable("organizers", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -369,3 +371,21 @@ export type CouponUsage = typeof couponUsages.$inferSelect;
 
 export type VoucherStatus = "available" | "used" | "expired";
 export type CouponType = "percentage" | "fixed" | "full";
+
+// Status Change Logs - Audit trail for status changes
+export const statusChangeLogs = pgTable("status_change_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  entityType: statusEntityTypeEnum("entity_type").notNull(),
+  entityId: varchar("entity_id").notNull(),
+  oldStatus: text("old_status"),
+  newStatus: text("new_status").notNull(),
+  reason: text("reason").notNull(),
+  changedByType: statusChangedByTypeEnum("changed_by_type").notNull(),
+  changedById: varchar("changed_by_id"),
+  metadata: text("metadata"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const insertStatusChangeLogSchema = createInsertSchema(statusChangeLogs).omit({ id: true, createdAt: true });
+export type InsertStatusChangeLog = z.infer<typeof insertStatusChangeLogSchema>;
+export type StatusChangeLog = typeof statusChangeLogs.$inferSelect;
