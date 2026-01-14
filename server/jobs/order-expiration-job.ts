@@ -1,5 +1,6 @@
 import { pool } from '../db';
 import { decrementVagasOcupadas } from '../services/registration-service';
+import { logStatusChange } from '../services/status-log-service';
 
 interface ExpiredOrder {
   id: string;
@@ -99,6 +100,21 @@ export async function expireOrders(): Promise<{
             `UPDATE registrations SET status = 'cancelada' WHERE id = $1`,
             [registration.id]
           );
+          
+          // Log registration status change
+          await logStatusChange({
+            entityType: 'registration',
+            entityId: registration.id,
+            oldStatus: 'pendente',
+            newStatus: 'cancelada',
+            reason: 'Pedido expirado - tempo limite atingido',
+            changedByType: 'system',
+            metadata: {
+              orderId: order.id,
+              numeroPedido: order.numeroPedido,
+              function: 'expireOrders'
+            }
+          });
 
           releasedSpots++;
         }
@@ -107,6 +123,21 @@ export async function expireOrders(): Promise<{
           `UPDATE orders SET status = 'expirado' WHERE id = $1`,
           [order.id]
         );
+        
+        // Log order status change
+        await logStatusChange({
+          entityType: 'order',
+          entityId: order.id,
+          oldStatus: 'pendente',
+          newStatus: 'expirado',
+          reason: 'Tempo limite de pagamento atingido',
+          changedByType: 'system',
+          metadata: {
+            numeroPedido: order.numeroPedido,
+            registrationsCount: registrationsResult.rows.length,
+            function: 'expireOrders'
+          }
+        });
 
         await client.query('COMMIT');
         processedOrders++;

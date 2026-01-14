@@ -4,6 +4,7 @@ import { storage } from "../../storage";
 import { requireAuth, requireRole, checkEventOwnership } from "../../middleware/auth";
 import { slugify, generateUniqueSlug } from "../../utils/slugify";
 import { localToBrazilUTC, utcToBrazilLocal } from "../../utils/timezone";
+import { logStatusChange } from "../../services/status-log-service";
 
 const router = Router();
 
@@ -297,6 +298,22 @@ router.patch("/:id/status", requireAuth, requireRole("superadmin", "admin"), asy
       const hasNoActiveBatch = activeBatches.length === 0;
       if (hasNoActiveBatch) {
         const updated = await storage.updateEvent(req.params.id, { status: newStatus });
+        
+        // Log status change
+        await logStatusChange({
+          entityType: 'event',
+          entityId: event.id,
+          oldStatus: event.status,
+          newStatus: newStatus,
+          reason: 'Status alterado pelo admin (sem lote ativo)',
+          changedByType: 'admin',
+          changedById: req.adminUser?.id || null,
+          metadata: {
+            adminEmail: req.adminUser?.email,
+            warning: 'NO_ACTIVE_BATCH'
+          }
+        });
+        
         return res.json({ 
           success: true, 
           data: updated,
@@ -309,6 +326,21 @@ router.patch("/:id/status", requireAuth, requireRole("superadmin", "admin"), asy
     }
 
     const updated = await storage.updateEvent(req.params.id, { status: newStatus });
+    
+    // Log status change
+    await logStatusChange({
+      entityType: 'event',
+      entityId: event.id,
+      oldStatus: event.status,
+      newStatus: newStatus,
+      reason: 'Status alterado pelo admin',
+      changedByType: 'admin',
+      changedById: req.adminUser?.id || null,
+      metadata: {
+        adminEmail: req.adminUser?.email
+      }
+    });
+    
     res.json({ success: true, data: updated });
   } catch (error) {
     console.error("Update event status error:", error);

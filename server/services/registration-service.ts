@@ -1,5 +1,6 @@
 import { pool } from '../db';
 import type { PoolClient } from 'pg';
+import { logStatusChange } from './status-log-service';
 
 export interface RegistrationData {
   eventId: string;
@@ -821,7 +822,37 @@ export async function confirmPaymentAtomic(
         `UPDATE registrations SET status = 'confirmada' WHERE id = $1`,
         [regId]
       );
+      
+      // Log registration status change
+      await logStatusChange({
+        entityType: 'registration',
+        entityId: regId,
+        oldStatus: 'pendente',
+        newStatus: 'confirmada',
+        reason: `Pagamento confirmado via ${metodoPagamento}`,
+        changedByType: 'system',
+        metadata: {
+          orderId,
+          metodoPagamento,
+          function: 'confirmPaymentAtomic'
+        }
+      });
     }
+    
+    // Log order status change
+    await logStatusChange({
+      entityType: 'order',
+      entityId: orderId,
+      oldStatus: order.status,
+      newStatus: 'pago',
+      reason: `Pagamento aprovado via ${metodoPagamento}`,
+      changedByType: 'system',
+      metadata: {
+        metodoPagamento,
+        registrationsConfirmed: registrationsToConfirm.length,
+        function: 'confirmPaymentAtomic'
+      }
+    });
     
     await client.query('COMMIT');
     return { success: true };
