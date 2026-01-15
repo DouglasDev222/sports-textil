@@ -222,12 +222,12 @@ export default function AdminEventInscritosPage() {
   });
   
   // Fetch status history when a registration is selected
-  const { data: registrationHistoryData } = useQuery<{ success: boolean; data: StatusChangeLog[] }>({
+  const { data: registrationHistoryData, isLoading: registrationHistoryLoading } = useQuery<{ success: boolean; data: StatusChangeLog[] }>({
     queryKey: ["/api/admin/events/status-history/registration", selectedRegistration?.id],
     enabled: !!selectedRegistration?.id,
   });
   
-  const { data: orderHistoryData } = useQuery<{ success: boolean; data: StatusChangeLog[] }>({
+  const { data: orderHistoryData, isLoading: orderHistoryLoading } = useQuery<{ success: boolean; data: StatusChangeLog[] }>({
     queryKey: ["/api/admin/events/status-history/order", selectedRegistration?.orderId],
     enabled: !!selectedRegistration?.orderId,
   });
@@ -235,20 +235,27 @@ export default function AdminEventInscritosPage() {
   const registrationHistory = registrationHistoryData?.data || [];
   const orderHistory = orderHistoryData?.data || [];
   
+  const resetStatusChangeState = () => {
+    setNewRegistrationStatus("");
+    setNewOrderStatus("");
+    setStatusChangeReason("");
+    setStatusChangeType(null);
+  };
+  
   // Mutations for status changes
   const updateRegistrationStatusMutation = useMutation({
     mutationFn: async ({ registrationId, status, reason }: { registrationId: string; status: string; reason: string }) => {
       return await apiRequest("PATCH", `/api/admin/events/${id}/registrations/${registrationId}/status`, { status, reason });
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       toast({ title: "Status da inscricao atualizado com sucesso" });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/events", id, "registrations"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/events/status-history/registration", selectedRegistration?.id] });
       setConfirmDialogOpen(false);
-      setStatusChangeReason("");
       if (selectedRegistration) {
-        setSelectedRegistration({ ...selectedRegistration, status: newRegistrationStatus });
+        setSelectedRegistration({ ...selectedRegistration, status: variables.status });
       }
+      resetStatusChangeState();
     },
     onError: (error: any) => {
       toast({ title: "Erro ao atualizar status", description: error.message, variant: "destructive" });
@@ -259,15 +266,15 @@ export default function AdminEventInscritosPage() {
     mutationFn: async ({ orderId, status, reason }: { orderId: string; status: string; reason: string }) => {
       return await apiRequest("PATCH", `/api/admin/events/${id}/orders/${orderId}/status`, { status, reason });
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       toast({ title: "Status do pedido atualizado com sucesso" });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/events", id, "registrations"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/events/status-history/order", selectedRegistration?.orderId] });
       setConfirmDialogOpen(false);
-      setStatusChangeReason("");
       if (selectedRegistration) {
-        setSelectedRegistration({ ...selectedRegistration, orderStatus: newOrderStatus });
+        setSelectedRegistration({ ...selectedRegistration, orderStatus: variables.status });
       }
+      resetStatusChangeState();
     },
     onError: (error: any) => {
       toast({ title: "Erro ao atualizar status", description: error.message, variant: "destructive" });
@@ -556,7 +563,7 @@ export default function AdminEventInscritosPage() {
       </div>
 
       <Dialog open={!!selectedRegistration} onOpenChange={(open) => !open && setSelectedRegistration(null)}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col" data-testid="dialog-registration-details">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <User className="h-5 w-5" />
@@ -566,7 +573,7 @@ export default function AdminEventInscritosPage() {
           
           {selectedRegistration && (
             <Tabs defaultValue="detalhes" className="flex-1 flex flex-col min-h-0">
-              <TabsList className="grid w-full grid-cols-3">
+              <TabsList className="grid w-full grid-cols-3" data-testid="tabs-list-registration">
                 <TabsTrigger value="detalhes" data-testid="tab-detalhes">Detalhes</TabsTrigger>
                 <TabsTrigger value="status" data-testid="tab-status">Status</TabsTrigger>
                 <TabsTrigger value="historico" data-testid="tab-historico">Historico</TabsTrigger>
@@ -711,7 +718,7 @@ export default function AdminEventInscritosPage() {
                 </div>
               </TabsContent>
               
-              <TabsContent value="status" className="flex-1 overflow-auto">
+              <TabsContent value="status" className="flex-1 overflow-auto" data-testid="tab-content-status">
                 <div className="space-y-6 py-4">
                   <div className="space-y-4">
                     <h4 className="font-medium flex items-center gap-2">
@@ -729,8 +736,10 @@ export default function AdminEventInscritosPage() {
                       <div className="flex-1">
                         <Label>Alterar para</Label>
                         <Select 
-                          value="" 
+                          key={`reg-status-${selectedRegistration.id}-${selectedRegistration.status}`}
+                          value={newRegistrationStatus}
                           onValueChange={(value) => handleStatusChangeClick("registration", value)}
+                          disabled={confirmDialogOpen || updateRegistrationStatusMutation.isPending}
                         >
                           <SelectTrigger data-testid="select-registration-status">
                             <SelectValue placeholder="Selecionar status" />
@@ -763,8 +772,10 @@ export default function AdminEventInscritosPage() {
                       <div className="flex-1">
                         <Label>Alterar para</Label>
                         <Select 
-                          value="" 
+                          key={`order-status-${selectedRegistration.orderId}-${selectedRegistration.orderStatus}`}
+                          value={newOrderStatus}
                           onValueChange={(value) => handleStatusChangeClick("order", value)}
+                          disabled={confirmDialogOpen || updateOrderStatusMutation.isPending}
                         >
                           <SelectTrigger data-testid="select-order-status">
                             <SelectValue placeholder="Selecionar status" />
@@ -785,20 +796,22 @@ export default function AdminEventInscritosPage() {
                 </div>
               </TabsContent>
               
-              <TabsContent value="historico" className="flex-1 overflow-auto">
+              <TabsContent value="historico" className="flex-1 overflow-auto" data-testid="tab-content-historico">
                 <div className="space-y-6 py-4">
                   <div className="space-y-3">
                     <h4 className="font-medium flex items-center gap-2">
                       <History className="h-4 w-4" />
                       Historico da Inscricao
                     </h4>
-                    {registrationHistory.length === 0 ? (
+                    {registrationHistoryLoading ? (
+                      <p className="text-sm text-muted-foreground">Carregando historico...</p>
+                    ) : registrationHistory.length === 0 ? (
                       <p className="text-sm text-muted-foreground">Nenhum historico disponivel</p>
                     ) : (
                       <ScrollArea className="h-32">
                         <div className="space-y-2">
                           {registrationHistory.map((log) => (
-                            <div key={log.id} className="text-sm border-l-2 border-primary pl-3 py-1">
+                            <div key={log.id} className="text-sm border-l-2 border-primary pl-3 py-1" data-testid={`history-registration-${log.id}`}>
                               <div className="flex items-center gap-2">
                                 <Badge variant="outline" className="text-xs">
                                   {log.old_status || "N/A"} → {log.new_status}
@@ -821,13 +834,15 @@ export default function AdminEventInscritosPage() {
                       <History className="h-4 w-4" />
                       Historico do Pedido #{selectedRegistration.numeroPedido}
                     </h4>
-                    {orderHistory.length === 0 ? (
+                    {orderHistoryLoading ? (
+                      <p className="text-sm text-muted-foreground">Carregando historico...</p>
+                    ) : orderHistory.length === 0 ? (
                       <p className="text-sm text-muted-foreground">Nenhum historico disponivel</p>
                     ) : (
                       <ScrollArea className="h-32">
                         <div className="space-y-2">
                           {orderHistory.map((log) => (
-                            <div key={log.id} className="text-sm border-l-2 border-primary pl-3 py-1">
+                            <div key={log.id} className="text-sm border-l-2 border-primary pl-3 py-1" data-testid={`history-order-${log.id}`}>
                               <div className="flex items-center gap-2">
                                 <Badge variant="outline" className="text-xs">
                                   {log.old_status || "N/A"} → {log.new_status}
@@ -851,8 +866,8 @@ export default function AdminEventInscritosPage() {
         </DialogContent>
       </Dialog>
       
-      <AlertDialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
-        <AlertDialogContent>
+      <AlertDialog open={confirmDialogOpen} onOpenChange={(open) => { if (!open) resetStatusChangeState(); setConfirmDialogOpen(open); }}>
+        <AlertDialogContent data-testid="dialog-confirm-status-change">
           <AlertDialogHeader>
             <AlertDialogTitle>Confirmar alteracao de status</AlertDialogTitle>
             <AlertDialogDescription>
@@ -874,7 +889,7 @@ export default function AdminEventInscritosPage() {
             />
           </div>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setStatusChangeReason("")}>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel onClick={resetStatusChangeState} data-testid="button-cancel-status-change">Cancelar</AlertDialogCancel>
             <AlertDialogAction 
               onClick={handleConfirmStatusChange}
               disabled={!statusChangeReason.trim() || updateRegistrationStatusMutation.isPending || updateOrderStatusMutation.isPending}
