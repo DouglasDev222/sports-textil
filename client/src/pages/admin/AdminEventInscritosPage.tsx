@@ -1,18 +1,32 @@
 import { useState } from "react";
 import { useParams, Link } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Table,
   TableBody,
@@ -28,6 +42,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
 import { 
   Search, 
   Download,
@@ -43,9 +63,13 @@ import {
   Hash,
   Phone,
   Mail,
-  Layers
+  Layers,
+  History,
+  ShoppingCart
 } from "lucide-react";
 import { formatDateOnlyBrazil, formatDateTimeBrazil } from "@/lib/timezone";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Event, Modality } from "@shared/schema";
 
 interface EnrichedRegistration {
@@ -73,6 +97,22 @@ interface EnrichedRegistration {
   dataPagamento: string | null;
   valorTotal: string;
   valorDesconto: string;
+  orderId: string;
+  numeroPedido: number | null;
+  orderRegistrationsCount: number;
+}
+
+interface StatusChangeLog {
+  id: string;
+  entity_type: string;
+  entity_id: string;
+  old_status: string | null;
+  new_status: string;
+  reason: string;
+  changed_by_type: string;
+  changed_by_id: string | null;
+  metadata: string | null;
+  created_at: string;
 }
 
 const statusLabels: Record<string, string> = {
@@ -156,10 +196,18 @@ function formatCurrency(value: string | number | null | undefined): string {
 
 export default function AdminEventInscritosPage() {
   const { id } = useParams<{ id: string }>();
+  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("todos");
   const [modalityFilter, setModalityFilter] = useState<string>("todos");
   const [selectedRegistration, setSelectedRegistration] = useState<EnrichedRegistration | null>(null);
+  
+  // Status change states
+  const [newRegistrationStatus, setNewRegistrationStatus] = useState<string>("");
+  const [newOrderStatus, setNewOrderStatus] = useState<string>("");
+  const [statusChangeReason, setStatusChangeReason] = useState<string>("");
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  const [statusChangeType, setStatusChangeType] = useState<"registration" | "order" | null>(null);
 
   const { data: eventData, isLoading: eventLoading } = useQuery<{ success: boolean; data: Event }>({
     queryKey: ["/api/admin/events", id],
@@ -172,6 +220,90 @@ export default function AdminEventInscritosPage() {
   const { data: registrationsData, isLoading: registrationsLoading } = useQuery<{ success: boolean; data: EnrichedRegistration[] }>({
     queryKey: ["/api/admin/events", id, "registrations"],
   });
+  
+  // Fetch status history when a registration is selected
+  const { data: registrationHistoryData } = useQuery<{ success: boolean; data: StatusChangeLog[] }>({
+    queryKey: ["/api/admin/events/status-history/registration", selectedRegistration?.id],
+    enabled: !!selectedRegistration?.id,
+  });
+  
+  const { data: orderHistoryData } = useQuery<{ success: boolean; data: StatusChangeLog[] }>({
+    queryKey: ["/api/admin/events/status-history/order", selectedRegistration?.orderId],
+    enabled: !!selectedRegistration?.orderId,
+  });
+  
+  const registrationHistory = registrationHistoryData?.data || [];
+  const orderHistory = orderHistoryData?.data || [];
+  
+  // Mutations for status changes
+  const updateRegistrationStatusMutation = useMutation({
+    mutationFn: async ({ registrationId, status, reason }: { registrationId: string; status: string; reason: string }) => {
+      return await apiRequest("PATCH", `/api/admin/events/${id}/registrations/${registrationId}/status`, { status, reason });
+    },
+    onSuccess: () => {
+      toast({ title: "Status da inscricao atualizado com sucesso" });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/events", id, "registrations"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/events/status-history/registration", selectedRegistration?.id] });
+      setConfirmDialogOpen(false);
+      setStatusChangeReason("");
+      if (selectedRegistration) {
+        setSelectedRegistration({ ...selectedRegistration, status: newRegistrationStatus });
+      }
+    },
+    onError: (error: any) => {
+      toast({ title: "Erro ao atualizar status", description: error.message, variant: "destructive" });
+    }
+  });
+  
+  const updateOrderStatusMutation = useMutation({
+    mutationFn: async ({ orderId, status, reason }: { orderId: string; status: string; reason: string }) => {
+      return await apiRequest("PATCH", `/api/admin/events/${id}/orders/${orderId}/status`, { status, reason });
+    },
+    onSuccess: () => {
+      toast({ title: "Status do pedido atualizado com sucesso" });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/events", id, "registrations"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/events/status-history/order", selectedRegistration?.orderId] });
+      setConfirmDialogOpen(false);
+      setStatusChangeReason("");
+      if (selectedRegistration) {
+        setSelectedRegistration({ ...selectedRegistration, orderStatus: newOrderStatus });
+      }
+    },
+    onError: (error: any) => {
+      toast({ title: "Erro ao atualizar status", description: error.message, variant: "destructive" });
+    }
+  });
+  
+  const handleStatusChangeClick = (type: "registration" | "order", newStatus: string) => {
+    if (type === "registration") {
+      setNewRegistrationStatus(newStatus);
+    } else {
+      setNewOrderStatus(newStatus);
+    }
+    setStatusChangeType(type);
+    setConfirmDialogOpen(true);
+  };
+  
+  const handleConfirmStatusChange = () => {
+    if (!selectedRegistration || !statusChangeReason.trim()) {
+      toast({ title: "Por favor, informe o motivo da alteracao", variant: "destructive" });
+      return;
+    }
+    
+    if (statusChangeType === "registration") {
+      updateRegistrationStatusMutation.mutate({
+        registrationId: selectedRegistration.id,
+        status: newRegistrationStatus,
+        reason: statusChangeReason
+      });
+    } else if (statusChangeType === "order") {
+      updateOrderStatusMutation.mutate({
+        orderId: selectedRegistration.orderId,
+        status: newOrderStatus,
+        reason: statusChangeReason
+      });
+    }
+  };
 
   const event = eventData?.data;
   const modalities = modalitiesData?.data || [];
@@ -424,7 +556,7 @@ export default function AdminEventInscritosPage() {
       </div>
 
       <Dialog open={!!selectedRegistration} onOpenChange={(open) => !open && setSelectedRegistration(null)}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <User className="h-5 w-5" />
@@ -433,137 +565,326 @@ export default function AdminEventInscritosPage() {
           </DialogHeader>
           
           {selectedRegistration && (
-            <div className="space-y-6">
-              <div className="flex items-center gap-4">
-                <div className="flex-1">
-                  <h3 className="text-lg font-semibold">
-                    {selectedRegistration.nomeCompleto || selectedRegistration.athleteName}
-                  </h3>
-                  <p className="text-sm text-muted-foreground flex items-center gap-1">
-                    <Hash className="h-3 w-3" />
-                    Inscricao #{selectedRegistration.numeroInscricao}
-                  </p>
-                </div>
-                <StatusIcon status={selectedRegistration.status} />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">CPF</p>
-                  <p className="font-mono">{formatCPF(selectedRegistration.cpf)}</p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Data de Nascimento</p>
-                  <p className="flex items-center gap-1">
-                    <Calendar className="h-3 w-3 text-muted-foreground" />
-                    {selectedRegistration.dataNascimento 
-                      ? formatDateOnlyBrazil(selectedRegistration.dataNascimento) 
-                      : "-"}
-                  </p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Telefone</p>
-                  <p className="flex items-center gap-1">
-                    <Phone className="h-3 w-3 text-muted-foreground" />
-                    {selectedRegistration.athletePhone || "-"}
-                  </p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Email</p>
-                  <p className="flex items-center gap-1 text-sm truncate">
-                    <Mail className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-                    {selectedRegistration.athleteEmail || "-"}
-                  </p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Sexo</p>
-                  <p className="capitalize">{selectedRegistration.sexo || "-"}</p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Camisa</p>
-                  <p className="flex items-center gap-1">
-                    <Shirt className="h-3 w-3 text-muted-foreground" />
-                    {selectedRegistration.tamanhoCamisa || "-"}
-                  </p>
-                </div>
-              </div>
-
-              <div className="border-t pt-4">
-                <h4 className="font-medium mb-3 flex items-center gap-2">
-                  <CreditCard className="h-4 w-4" />
-                  Informacoes da Inscricao
-                </h4>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Modalidade</p>
-                    <Badge variant="outline">{selectedRegistration.modalityName}</Badge>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Lote</p>
-                    <p className="flex items-center gap-1">
-                      <Layers className="h-3 w-3 text-muted-foreground" />
-                      {selectedRegistration.batchName}
-                    </p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Valor da Inscricao</p>
-                    <p className="font-semibold">{formatCurrency(selectedRegistration.valorUnitario)}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Taxa de Servico</p>
-                    <p>{formatCurrency(selectedRegistration.taxaComodidade)}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Data da Inscricao</p>
-                    <p>{formatDateTimeBrazil(selectedRegistration.dataInscricao)}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Equipe</p>
-                    <p>{selectedRegistration.equipe || "-"}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="border-t pt-4">
-                <h4 className="font-medium mb-3 flex items-center gap-2">
-                  <CreditCard className="h-4 w-4" />
-                  Pagamento
-                </h4>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Status do Pedido</p>
-                    <Badge 
-                      variant={selectedRegistration.orderStatus === "pago" ? "default" : "secondary"}
-                    >
-                      {orderStatusLabels[selectedRegistration.orderStatus] || selectedRegistration.orderStatus}
-                    </Badge>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Forma de Pagamento</p>
-                    <p>
-                      {selectedRegistration.metodoPagamento 
-                        ? metodoPagamentoLabels[selectedRegistration.metodoPagamento] || selectedRegistration.metodoPagamento
-                        : "-"}
-                    </p>
-                  </div>
-                  {selectedRegistration.dataPagamento && (
-                    <div className="space-y-1 col-span-2">
-                      <p className="text-xs text-muted-foreground uppercase tracking-wide">Data do Pagamento</p>
-                      <p>{formatDateTimeBrazil(selectedRegistration.dataPagamento)}</p>
+            <Tabs defaultValue="detalhes" className="flex-1 flex flex-col min-h-0">
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="detalhes" data-testid="tab-detalhes">Detalhes</TabsTrigger>
+                <TabsTrigger value="status" data-testid="tab-status">Status</TabsTrigger>
+                <TabsTrigger value="historico" data-testid="tab-historico">Historico</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="detalhes" className="flex-1 overflow-auto">
+                <div className="space-y-6 py-4">
+                  <div className="flex items-center gap-4">
+                    <div className="flex-1">
+                      <h3 className="text-lg font-semibold">
+                        {selectedRegistration.nomeCompleto || selectedRegistration.athleteName}
+                      </h3>
+                      <p className="text-sm text-muted-foreground flex items-center gap-1">
+                        <Hash className="h-3 w-3" />
+                        Inscricao #{selectedRegistration.numeroInscricao}
+                      </p>
                     </div>
-                  )}
-                  {parseFloat(selectedRegistration.valorDesconto) > 0 && (
+                    <StatusIcon status={selectedRegistration.status} />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1">
-                      <p className="text-xs text-muted-foreground uppercase tracking-wide">Desconto</p>
-                      <p className="text-green-600">{formatCurrency(selectedRegistration.valorDesconto)}</p>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide">CPF</p>
+                      <p className="font-mono">{formatCPF(selectedRegistration.cpf)}</p>
                     </div>
-                  )}
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide">Data de Nascimento</p>
+                      <p className="flex items-center gap-1">
+                        <Calendar className="h-3 w-3 text-muted-foreground" />
+                        {selectedRegistration.dataNascimento 
+                          ? formatDateOnlyBrazil(selectedRegistration.dataNascimento) 
+                          : "-"}
+                      </p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide">Telefone</p>
+                      <p className="flex items-center gap-1">
+                        <Phone className="h-3 w-3 text-muted-foreground" />
+                        {selectedRegistration.athletePhone || "-"}
+                      </p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide">Email</p>
+                      <p className="flex items-center gap-1 text-sm truncate">
+                        <Mail className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                        {selectedRegistration.athleteEmail || "-"}
+                      </p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide">Sexo</p>
+                      <p className="capitalize">{selectedRegistration.sexo || "-"}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide">Camisa</p>
+                      <p className="flex items-center gap-1">
+                        <Shirt className="h-3 w-3 text-muted-foreground" />
+                        {selectedRegistration.tamanhoCamisa || "-"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="border-t pt-4">
+                    <h4 className="font-medium mb-3 flex items-center gap-2">
+                      <Layers className="h-4 w-4" />
+                      Informacoes da Inscricao
+                    </h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <p className="text-xs text-muted-foreground uppercase tracking-wide">Modalidade</p>
+                        <Badge variant="outline">{selectedRegistration.modalityName}</Badge>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-xs text-muted-foreground uppercase tracking-wide">Lote</p>
+                        <p className="flex items-center gap-1">
+                          <Layers className="h-3 w-3 text-muted-foreground" />
+                          {selectedRegistration.batchName}
+                        </p>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-xs text-muted-foreground uppercase tracking-wide">Valor da Inscricao</p>
+                        <p className="font-semibold">{formatCurrency(selectedRegistration.valorUnitario)}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-xs text-muted-foreground uppercase tracking-wide">Taxa de Servico</p>
+                        <p>{formatCurrency(selectedRegistration.taxaComodidade)}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-xs text-muted-foreground uppercase tracking-wide">Data da Inscricao</p>
+                        <p>{formatDateTimeBrazil(selectedRegistration.dataInscricao)}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-xs text-muted-foreground uppercase tracking-wide">Equipe</p>
+                        <p>{selectedRegistration.equipe || "-"}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="border-t pt-4">
+                    <h4 className="font-medium mb-3 flex items-center gap-2">
+                      <ShoppingCart className="h-4 w-4" />
+                      Pedido
+                    </h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <p className="text-xs text-muted-foreground uppercase tracking-wide">Numero do Pedido</p>
+                        <p className="font-mono font-semibold">#{selectedRegistration.numeroPedido || "-"}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-xs text-muted-foreground uppercase tracking-wide">Inscricoes no Pedido</p>
+                        <p>{selectedRegistration.orderRegistrationsCount}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-xs text-muted-foreground uppercase tracking-wide">Status do Pedido</p>
+                        <Badge 
+                          variant={selectedRegistration.orderStatus === "pago" ? "default" : "secondary"}
+                        >
+                          {orderStatusLabels[selectedRegistration.orderStatus] || selectedRegistration.orderStatus}
+                        </Badge>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-xs text-muted-foreground uppercase tracking-wide">Forma de Pagamento</p>
+                        <p>
+                          {selectedRegistration.metodoPagamento 
+                            ? metodoPagamentoLabels[selectedRegistration.metodoPagamento] || selectedRegistration.metodoPagamento
+                            : "-"}
+                        </p>
+                      </div>
+                      {selectedRegistration.dataPagamento && (
+                        <div className="space-y-1 col-span-2">
+                          <p className="text-xs text-muted-foreground uppercase tracking-wide">Data do Pagamento</p>
+                          <p>{formatDateTimeBrazil(selectedRegistration.dataPagamento)}</p>
+                        </div>
+                      )}
+                      {parseFloat(selectedRegistration.valorDesconto) > 0 && (
+                        <div className="space-y-1">
+                          <p className="text-xs text-muted-foreground uppercase tracking-wide">Desconto</p>
+                          <p className="text-green-600">{formatCurrency(selectedRegistration.valorDesconto)}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
+              </TabsContent>
+              
+              <TabsContent value="status" className="flex-1 overflow-auto">
+                <div className="space-y-6 py-4">
+                  <div className="space-y-4">
+                    <h4 className="font-medium flex items-center gap-2">
+                      <User className="h-4 w-4" />
+                      Status da Inscricao
+                    </h4>
+                    <div className="flex items-center gap-4">
+                      <div className="flex-1">
+                        <Label>Status atual</Label>
+                        <div className="flex items-center gap-2 mt-1">
+                          <StatusIcon status={selectedRegistration.status} />
+                          <span>{statusLabels[selectedRegistration.status] || selectedRegistration.status}</span>
+                        </div>
+                      </div>
+                      <div className="flex-1">
+                        <Label>Alterar para</Label>
+                        <Select 
+                          value="" 
+                          onValueChange={(value) => handleStatusChangeClick("registration", value)}
+                        >
+                          <SelectTrigger data-testid="select-registration-status">
+                            <SelectValue placeholder="Selecionar status" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="pendente" disabled={selectedRegistration.status === "pendente"}>Pendente</SelectItem>
+                            <SelectItem value="confirmada" disabled={selectedRegistration.status === "confirmada"}>Confirmada</SelectItem>
+                            <SelectItem value="cancelada" disabled={selectedRegistration.status === "cancelada"}>Cancelada</SelectItem>
+                            <SelectItem value="no_show" disabled={selectedRegistration.status === "no_show"}>No Show</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="border-t pt-4 space-y-4">
+                    <h4 className="font-medium flex items-center gap-2">
+                      <ShoppingCart className="h-4 w-4" />
+                      Status do Pedido #{selectedRegistration.numeroPedido}
+                    </h4>
+                    <div className="flex items-center gap-4">
+                      <div className="flex-1">
+                        <Label>Status atual</Label>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Badge variant={selectedRegistration.orderStatus === "pago" ? "default" : "secondary"}>
+                            {orderStatusLabels[selectedRegistration.orderStatus] || selectedRegistration.orderStatus}
+                          </Badge>
+                        </div>
+                      </div>
+                      <div className="flex-1">
+                        <Label>Alterar para</Label>
+                        <Select 
+                          value="" 
+                          onValueChange={(value) => handleStatusChangeClick("order", value)}
+                        >
+                          <SelectTrigger data-testid="select-order-status">
+                            <SelectValue placeholder="Selecionar status" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="pendente" disabled={selectedRegistration.orderStatus === "pendente"}>Pendente</SelectItem>
+                            <SelectItem value="pago" disabled={selectedRegistration.orderStatus === "pago"}>Pago</SelectItem>
+                            <SelectItem value="cancelado" disabled={selectedRegistration.orderStatus === "cancelado"}>Cancelado</SelectItem>
+                            <SelectItem value="expirado" disabled={selectedRegistration.orderStatus === "expirado"}>Expirado</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Este pedido possui {selectedRegistration.orderRegistrationsCount} inscricao(oes). Alterar o status do pedido nao altera automaticamente o status das inscricoes.
+                    </p>
+                  </div>
+                </div>
+              </TabsContent>
+              
+              <TabsContent value="historico" className="flex-1 overflow-auto">
+                <div className="space-y-6 py-4">
+                  <div className="space-y-3">
+                    <h4 className="font-medium flex items-center gap-2">
+                      <History className="h-4 w-4" />
+                      Historico da Inscricao
+                    </h4>
+                    {registrationHistory.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">Nenhum historico disponivel</p>
+                    ) : (
+                      <ScrollArea className="h-32">
+                        <div className="space-y-2">
+                          {registrationHistory.map((log) => (
+                            <div key={log.id} className="text-sm border-l-2 border-primary pl-3 py-1">
+                              <div className="flex items-center gap-2">
+                                <Badge variant="outline" className="text-xs">
+                                  {log.old_status || "N/A"} → {log.new_status}
+                                </Badge>
+                                <span className="text-xs text-muted-foreground">
+                                  {formatDateTimeBrazil(log.created_at)}
+                                </span>
+                              </div>
+                              <p className="text-xs text-muted-foreground mt-1">{log.reason}</p>
+                              <p className="text-xs text-muted-foreground">Por: {log.changed_by_type}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </ScrollArea>
+                    )}
+                  </div>
+                  
+                  <div className="border-t pt-4 space-y-3">
+                    <h4 className="font-medium flex items-center gap-2">
+                      <History className="h-4 w-4" />
+                      Historico do Pedido #{selectedRegistration.numeroPedido}
+                    </h4>
+                    {orderHistory.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">Nenhum historico disponivel</p>
+                    ) : (
+                      <ScrollArea className="h-32">
+                        <div className="space-y-2">
+                          {orderHistory.map((log) => (
+                            <div key={log.id} className="text-sm border-l-2 border-primary pl-3 py-1">
+                              <div className="flex items-center gap-2">
+                                <Badge variant="outline" className="text-xs">
+                                  {log.old_status || "N/A"} → {log.new_status}
+                                </Badge>
+                                <span className="text-xs text-muted-foreground">
+                                  {formatDateTimeBrazil(log.created_at)}
+                                </span>
+                              </div>
+                              <p className="text-xs text-muted-foreground mt-1">{log.reason}</p>
+                              <p className="text-xs text-muted-foreground">Por: {log.changed_by_type}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </ScrollArea>
+                    )}
+                  </div>
+                </div>
+              </TabsContent>
+            </Tabs>
           )}
         </DialogContent>
       </Dialog>
+      
+      <AlertDialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar alteracao de status</AlertDialogTitle>
+            <AlertDialogDescription>
+              {statusChangeType === "registration" 
+                ? `Voce esta prestes a alterar o status da inscricao para "${statusLabels[newRegistrationStatus] || newRegistrationStatus}".`
+                : `Voce esta prestes a alterar o status do pedido para "${orderStatusLabels[newOrderStatus] || newOrderStatus}".`
+              }
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-4">
+            <Label htmlFor="reason">Motivo da alteracao *</Label>
+            <Textarea
+              id="reason"
+              placeholder="Informe o motivo da alteracao..."
+              value={statusChangeReason}
+              onChange={(e) => setStatusChangeReason(e.target.value)}
+              className="mt-2"
+              data-testid="input-status-change-reason"
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setStatusChangeReason("")}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleConfirmStatusChange}
+              disabled={!statusChangeReason.trim() || updateRegistrationStatusMutation.isPending || updateOrderStatusMutation.isPending}
+              data-testid="button-confirm-status-change"
+            >
+              {(updateRegistrationStatusMutation.isPending || updateOrderStatusMutation.isPending) ? "Salvando..." : "Confirmar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AdminLayout>
   );
 }
