@@ -40,6 +40,7 @@ const eventSchema = z.object({
   usarGradePorModalidade: z.boolean().optional(),
   informacoesRetiradaKit: z.string().optional().nullable(),
   idadeMinimaEvento: z.number().int().min(0, "Idade minima deve ser positiva").max(100, "Idade minima invalida").optional(),
+  permitirMultiplasModalidades: z.boolean().optional(),
   status: z.enum(["rascunho", "publicado", "cancelado", "finalizado"]).optional()
 });
 
