@@ -41,7 +41,7 @@ const eventSchema = z.object({
   informacoesRetiradaKit: z.string().optional().nullable(),
   idadeMinimaEvento: z.number().int().min(0, "Idade minima deve ser positiva").max(100, "Idade minima invalida").optional(),
   permitirMultiplasModalidades: z.boolean().optional(),
-  status: z.enum(["rascunho", "publicado", "cancelado", "finalizado"]).optional()
+  status: z.enum(["rascunho", "publicado", "cancelado", "finalizado", "esgotado"]).optional()
 });
 
 router.get("/", requireAuth, async (req, res) => {
@@ -212,8 +212,6 @@ router.patch("/:id", requireAuth, requireRole("superadmin", "admin"), async (req
     const updateSchema = eventSchema.partial();
     const validation = updateSchema.safeParse(req.body);
     if (!validation.success) {
-      console.error("Event update validation error:", JSON.stringify(validation.error.errors, null, 2));
-      console.error("Request body:", JSON.stringify(req.body, null, 2));
       return res.status(400).json({
         success: false,
         error: { code: "VALIDATION_ERROR", message: validation.error.errors[0].message }
