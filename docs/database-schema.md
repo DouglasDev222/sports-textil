@@ -17,7 +17,7 @@ Este documento descreve a estrutura completa do banco de dados do sistema ST Eve
 |------|---------|-----|
 | event_status | rascunho, publicado, cancelado, finalizado | Status do evento |
 | modality_access | gratuita, paga, voucher, pcd, aprovacao_manual | Tipo de acesso a modalidade |
-| registration_status | pendente, confirmada, cancelada, no_show | Status da inscricao |
+| registration_status | pendente, confirmada, cancelada | Status da inscricao |
 | order_status | pendente, pago, cancelado, reembolsado, expirado | Status do pedido |
 | user_role | superadmin, admin, organizador | Papel do usuario admin |
 | user_status | ativo, inativo, bloqueado | Status do usuario admin |
@@ -326,7 +326,7 @@ Registro de cada inscricao individual, vinculada a um pedido.
 | athleteId | varchar | Referencia ao atleta inscrito |
 | tamanhoCamisa | varchar(10) | Tamanho escolhido |
 | valorUnitario | decimal | Valor individual (preco + taxa) |
-| status | enum | pendente, confirmada, cancelada, no_show |
+| status | enum | pendente, confirmada, cancelada |
 | equipe | text | Nome da equipe |
 | dataInscricao | timestamp | Data da inscricao |
 

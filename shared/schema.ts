@@ -5,7 +5,7 @@ import { z } from "zod";
 
 export const eventStatusEnum = pgEnum("event_status", ["rascunho", "publicado", "cancelado", "finalizado", "esgotado"]);
 export const modalityAccessEnum = pgEnum("modality_access", ["gratuita", "paga", "voucher", "pcd", "aprovacao_manual"]);
-export const registrationStatusEnum = pgEnum("registration_status", ["pendente", "confirmada", "cancelada", "no_show"]);
+export const registrationStatusEnum = pgEnum("registration_status", ["pendente", "confirmada", "cancelada"]);
 export const orderStatusEnum = pgEnum("order_status", ["pendente", "pago", "cancelado", "reembolsado", "expirado"]);
 export const userRoleEnum = pgEnum("user_role", ["superadmin", "admin", "organizador"]);
 export const userStatusEnum = pgEnum("user_status", ["ativo", "inativo", "bloqueado"]);

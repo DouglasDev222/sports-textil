@@ -335,7 +335,7 @@ router.get("/status-history/:entityType/:entityId", requireAuth, async (req, res
 
 // Alterar status da inscrição
 const updateRegistrationStatusSchema = z.object({
-  status: z.enum(["pendente", "confirmada", "cancelada", "no_show"]),
+  status: z.enum(["pendente", "confirmada", "cancelada"]),
   reason: z.string().min(1, "Motivo obrigatorio")
 });
 

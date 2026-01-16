@@ -180,7 +180,7 @@ Este documento descreve o fluxo completo de inscricao do atleta na plataforma ST
   tamanhoCamisa: string?,     // Tamanho escolhido
   valorUnitario: decimal,     // Preco da modalidade
   taxaComodidade: decimal,    // Taxa aplicada
-  status: "pendente" | "confirmada" | "cancelada" | "no_show",
+  status: "pendente" | "confirmada" | "cancelada",
   equipe: string?,            // Nome da equipe
   dataInscricao: timestamp
 }
@@ -348,7 +348,6 @@ pago -> reembolsado (solicitacao aceita)
 pendente -> confirmada (apos pagamento ou inscricao gratuita)
 pendente -> cancelada (cancelamento do pedido)
 confirmada -> cancelada (solicitacao aceita)
-confirmada -> no_show (atleta nao compareceu)
 ```
 
 ---

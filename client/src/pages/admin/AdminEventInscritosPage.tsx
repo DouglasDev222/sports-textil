@@ -119,7 +119,6 @@ const statusLabels: Record<string, string> = {
   pendente: "Pendente",
   confirmada: "Confirmada",
   cancelada: "Cancelada",
-  no_show: "No Show",
 };
 
 const orderStatusLabels: Record<string, string> = {
@@ -161,12 +160,6 @@ function StatusIcon({ status }: { status: string }) {
       return (
         <div className="flex items-center justify-center w-6 h-6 rounded-full bg-yellow-100 dark:bg-yellow-900" title="Pendente">
           <Clock className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
-        </div>
-      );
-    case "no_show":
-      return (
-        <div className="flex items-center justify-center w-6 h-6 rounded-full bg-gray-100 dark:bg-gray-800" title="No Show">
-          <X className="h-4 w-4 text-gray-600 dark:text-gray-400" />
         </div>
       );
     default:
@@ -489,7 +482,6 @@ export default function AdminEventInscritosPage() {
                   <SelectItem value="confirmada">Confirmada</SelectItem>
                   <SelectItem value="pendente">Pendente</SelectItem>
                   <SelectItem value="cancelada">Cancelada</SelectItem>
-                  <SelectItem value="no_show">No Show</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -748,7 +740,6 @@ export default function AdminEventInscritosPage() {
                             <SelectItem value="pendente" disabled={selectedRegistration.status === "pendente"}>Pendente</SelectItem>
                             <SelectItem value="confirmada" disabled={selectedRegistration.status === "confirmada"}>Confirmada</SelectItem>
                             <SelectItem value="cancelada" disabled={selectedRegistration.status === "cancelada"}>Cancelada</SelectItem>
-                            <SelectItem value="no_show" disabled={selectedRegistration.status === "no_show"}>No Show</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
